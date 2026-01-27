@@ -1,0 +1,385 @@
+{
+  "1768923146488:ash": {
+    "profile": {
+      "characterKey": "1768923146488:ash",
+      "origin": "Emberhollow",
+      "keyEvent": "The night Emberhollow burned",
+      "unresolvedConflict": "Loss of loved ones, guilt over survival",
+      "antagonisticForce": "The fire that destroyed Emberhollow, symbolizing loss and guilt",
+      "witnesses": [
+        "Survivors of Emberhollow"
+      ],
+      "debts": [
+        "Emotional debt to his mother and father"
+      ],
+      "artifactsOrMarks": [
+        "Scar on his cheek"
+      ],
+      "emotionalCore": "Pain, guilt, longing for a place of warmth and safety",
+      "secrecyRules": [
+        "Avoid discussing his past in detail",
+        "Keep his Umbramancer abilities hidden"
+      ],
+      "hookTags": [
+        "Survivor's guilt",
+        "Search for a safe haven"
+      ]
+    },
+    "plan": {
+      "characterKey": "1768923146488:ash",
+      "beats": [
+        {
+          "id": "Emberhollow's Shadow",
+          "type": "echo",
+          "goal": "Ash's past haunts him",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Emberhollow's fire"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "Smoke and Ash",
+          "type": "trace",
+          "goal": "Ash's presence sparks curiosity",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Umbramancer"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "The Weight of Guilt",
+          "type": "pressure",
+          "goal": "Ash's guilt affects his actions",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "What if I had saved her?"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "Revelation in the Flames",
+          "type": "revelation",
+          "goal": "Ash's past revealed to others",
+          "deliveryModes": [
+            "artifactReaction"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Emberhollow's last night"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "Path of Redemption",
+          "type": "vector",
+          "goal": "Ash seeks redemption",
+          "deliveryModes": [
+            "wantedPoster"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Find the ones who survived"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "Crossroads",
+          "type": "choice",
+          "goal": "Ash must make a difficult decision",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Continue searching or settle"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "Consequences of Ash's Actions",
+          "type": "consequence",
+          "goal": "Ash faces the consequences of his choice",
+          "deliveryModes": [
+            "patrol"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "full"
+          },
+          "triggerHints": {},
+          "payload": {},
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 7,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1768996053387:ash": {
+    "profile": {
+      "characterKey": "1768996053387:ash",
+      "origin": "Emberhollow",
+      "keyEvent": "The night Emberhollow burned",
+      "unresolvedConflict": "Guilt over losing his mother",
+      "antagonisticForce": "The fire that destroyed Emberhollow",
+      "witnesses": [
+        "his father (deceased)"
+      ],
+      "debts": [
+        "to his mother for not saving her"
+      ],
+      "artifactsOrMarks": [
+        "scar on his cheek"
+      ],
+      "emotionalCore": "Pain and guilt",
+      "secrecyRules": [
+        "don't reveal his true name easily",
+        "don't talk about his past"
+      ],
+      "hookTags": [
+        "survivor's guilt",
+        "lost loved ones",
+        "fire phobia"
+      ]
+    },
+    "plan": {
+      "characterKey": "1768996053387:ash",
+      "beats": [
+        {
+          "id": "beat1",
+          "type": "echo",
+          "goal": "Ash's past haunts him",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Emberhollow"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "beat2",
+          "type": "trace",
+          "goal": "Ash's skills as an Umbra Mage are noticed",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "smoke",
+              "ashes"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "beat3",
+          "type": "pressure",
+          "goal": "Ash is pursued by those seeking to exploit his abilities",
+          "deliveryModes": [
+            "wantedPoster"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "warning"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Umbra Mage",
+              "danger"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "beat4",
+          "type": "revelation",
+          "goal": "Ash learns the truth about Emberhollow's destruction",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Emberhollow's downfall"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "beat5",
+          "type": "vector",
+          "goal": "Ash sets out to find those responsible for Emberhollow's destruction",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "direction"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "avenge Emberhollow"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "beat6",
+          "type": "choice",
+          "goal": "Ash must choose between seeking revenge or protecting the innocent",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "decision"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "morality"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "beat7",
+          "type": "consequence",
+          "goal": "Ash faces the aftermath of his choice",
+          "deliveryModes": [
+            "artifactReaction"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "resolution"
+          },
+          "triggerHints": {},
+          "payload": {},
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 6,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  }
+}

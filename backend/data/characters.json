@@ -1,0 +1,125 @@
+[
+  {
+    "id": "3ca91c5f-615a-4ca7-b567-cea09d20a75b",
+    "createdAt": "2026-01-15T13:19:32.567Z",
+    "updatedAt": "2026-01-15T13:19:32.568Z",
+    "avatarStatus": "failed",
+    "avatarUrl": null,
+    "avatarHash": null,
+    "name": "Ash",
+    "class": "Umbra Mage",
+    "classDescription": "A shadow mage who phases through walls and binds foes with starless chains.",
+    "backstory": "I was born in a small river town that no longer exists. A fire, a raid, or something worse — people argue about it, but no one goes back there. I survived because I was away, working as a courier, and when I returned there was nothing left to return to.\n\nSince then I’ve lived on the road: guard work, escorting caravans, sometimes things that don’t look good in daylight. I’ve learned to read danger in people’s eyes and to leave places before they turn sour. I’m not chasing glory, only stability — enough coin and enough allies to stop running someday.\n\nThere is one thing from my past I never talk about: a promise I failed to keep, and someone who might still be alive because of it… or dead because of me.",
+    "appearance": "Medium height, lean build, clearly used to travel rather than comfort. Dark hair usually tied back to keep it out of the eyes, a short, uneven beard, and a thin scar running from the left cheek toward the jaw. The eyes are tired but alert, always moving, привыкшие следить за окружением. Wears practical, worn leather armor and a travel cloak with old rain stains, and carries a simple weapon that looks well-maintained but not ornamental.",
+    "avatarError": "HF_TOKEN is not configured"
+  },
+  {
+    "id": "95339415-5267-4adf-8034-b817038bd508",
+    "createdAt": "2026-01-15T13:22:05.591Z",
+    "updatedAt": "2026-01-21T11:44:57.569Z",
+    "avatarStatus": "failed",
+    "avatarUrl": null,
+    "avatarHash": "a7cdb69827613f413f8b83556945471143c8dfc57606c9df60b0078cebc2e85d",
+    "name": "Ash",
+    "class": "Umbra Mage",
+    "classDescription": "A shadow mage who phases through walls and binds foes with starless chains.",
+    "backstory": "Ash was born in Emberhollow, a city where houses huddled close together as if trying to keep warm against the eternal winds from the ashen wastes. His childhood was filled with the crackle of coals and the smell of smoke: forges, hearths, distant fires—everything blended into one постоянный фон, and the air itself seemed steeped in loss. His mother sang him lullabies that carried more sorrow than sleep, and his father came home each evening silent and worn, as if every day left a piece of his soul in the flames.\n\nThe night Emberhollow burned, the sky turned the color of spilled blood. Fire devoured the streets like a living thing, and the screams of the people were swallowed by the roar of collapsing roofs. He remembered running, stumbling, the heat searing his lungs, and the moment his mother’s hand slipped from his grasp. He called for her until his voice broke, but only the crack of falling beams answered. He found his father later—motionless beneath a shroud of ash, as though the city itself had laid him to rest.\n\nHe survived, but the fire never truly left him. The scar on his cheek is not only from flame, but from guilt: for running, for living, for failing to save those he loved. Since that night he has wandered from town to town, carrying the name Emberhollow like both a curse and a reminder. In every hearth he sees the echo of that inferno; in every scent of smoke he hears his mother’s voice, lost to the blaze.\n\nHe smiles rarely, and when he does, there is more pain than joy in it. Yet he keeps moving, because somewhere in the world, he believes, there is a place where fire no longer devours, but only gives warmth. And perhaps there, at last, his scars will stop pulling him back into the ashes.",
+    "appearance": "A lean, travel-worn figure in their mid-twenties, standing with a relaxed but alert posture, as if every muscle remembers the weight of past danger. Dark, slightly unkempt hair falls to the shoulders, often tied back with a simple leather cord. Sharp eyes — the kind that constantly scan a room, measuring exits, shadows, and people alike — carry a quiet mix of curiosity and fatigue.\n\nTheir face bears faint scars: a thin line along the cheekbone, another barely visible across the brow, marks of battles that were survived rather than forgotten. The skin is lightly weathered by wind and road dust, hinting at long journeys and restless nights under open skies.\n\nClothing is practical yet personal: a fitted leather coat worn at the edges, reinforced at the shoulders and forearms; dark trousers tucked into sturdy boots, their soles scratched by stone and tavern floors alike. A simple metal pendant hangs at the chest — its symbol unclear, but clearly meaningful. A short blade rests at the hip, more a companion than a threat, its hilt polished by habitual touch.\n\nOverall, the character looks like someone who belongs equally in a crowded tavern and on a silent road at dusk — not a hero from songs yet, but someone the songs might one day be about.",
+    "avatarError": "ModelsLab response did not include image data. keys=status,message message=error You cannot use this model as a trial account holder without a plan, subscribe to a plan or fund your wallet to continue",
+    "appearanceDescription": "A lean, travel-worn figure in their mid-twenties, standing with a relaxed but alert posture, as if every muscle remembers the weight of past danger. Dark, slightly unkempt hair falls to the shoulders, often tied back with a simple leather cord. Sharp eyes — the kind that constantly scan a room, measuring exits, shadows, and people alike — carry a quiet mix of curiosity and fatigue.\n\nTheir face bears faint scars: a thin line along the cheekbone, another barely visible across the brow, marks of battles that were survived rather than forgotten. The skin is lightly weathered by wind and road dust, hinting at long journeys and restless nights under open skies.\n\nClothing is practical yet personal: a fitted leather coat worn at the edges, reinforced at the shoulders and forearms; dark trousers tucked into sturdy boots, their soles scratched by stone and tavern floors alike. A simple metal pendant hangs at the chest — its symbol unclear, but clearly meaningful. A short blade rests at the hip, more a companion than a threat, its hilt polished by habitual touch.\n\nOverall, the character looks like someone who belongs equally in a crowded tavern and on a silent road at dusk — not a hero from songs yet, but someone the songs might one day be about.",
+    "appearanceSpec": {
+      "sex": "unknown",
+      "genderPresentation": "unknown",
+      "ageRange": "20s",
+      "hairLength": "medium",
+      "bodyType": "slim",
+      "notableFeatures": [
+        "faint scars on cheekbone and brow",
+        "sharp eyes"
+      ],
+      "clothingStyle": [
+        "practical",
+        "leather coat",
+        "sturdy boots"
+      ],
+      "palette": [
+        "dark",
+        "weathered"
+      ],
+      "confidence": 0.8
+    },
+    "appearanceSpecMeta": {
+      "confidence": 0.8,
+      "warnings": [
+        "sex_unknown",
+        "gender_presentation_unknown"
+      ]
+    },
+    "avatarPrompt": {
+      "prompt": "Best quality, masterpiece, ultra high resolution, 4k, highly detailed, sharp focus, professional fantasy illustration, artbook quality, realistic lighting, high dynamic range, global illumination, fine details, crisp edges, no noise, no blur. Centered head-and-shoulders portrait, looking directly at the viewer, symmetrical composition, face and upper torso only, clean neutral background, suitable for circular avatar crop. dark anime style, semi-realistic, cinematic lighting, dramatic shadows, high detail, sharp focus. Class: Umbra Mage. Visual motifs: hooded, aura, chains, shadow, collar. adult adventurer, realistic fantasy portrait. age 20s, slim build, medium hair. faint scars on cheekbone and brow, sharp eyes. practical, leather coat, sturdy boots. dark, weathered. Appearance description: A lean, travel-worn figure in their mid-twenties, standing with a relaxed but alert posture, as if every muscle remembers the weight of past danger. Dark, slightly unkempt hair falls to the shoulders, often tied back with a simple leather cord. Sharp eyes — the kind that constantly scan a room, measuring exits, shadows, and people alike — carry a quiet mix of curiosity and fatigue. Their face bears faint scars: a thin line along the cheekbone, another barely visible across the brow, marks of battles that were survived rather than forgotten. The skin is lightly weathered by wind and road dust, hinting at long journeys and restless nights under open skies. Clothing is practical yet personal: a fitted leather coat worn at the edges, reinforced at the shoulders and forearms; dark trousers tucked into sturdy boots, their soles scratched by stone and tavern floors alike. A simple metal pendant hangs at the chest — its symbol unclear, but clearly meaningful. A short blade rests at the hip, more a companion than a threat, its hilt polished by habitual touch. Overall, the character looks like someone who belongs equally in a crowded tavern and on a silent road at dusk — not a hero from songs yet, but someone the songs might one day be about..",
+      "negativePrompt": "low quality, worst quality, blurry, noisy, grainy, jpeg artifacts, watermark, text, logo, signature, deformed, bad anatomy, extra fingers, extra limbs, multiple faces, cropped face, out of frame, full body, character sheet, multiple poses, turnarounds, lineup, concept art sheet, reference sheet, standing figure, weapon showcase, scene, environment, background characters"
+    },
+    "derivedAvatarClassTags": [
+      "hooded",
+      "aura",
+      "chains",
+      "shadow",
+      "collar"
+    ]
+  },
+  {
+    "id": "eb286ad9-8102-46dd-8cd2-69c3c7299537",
+    "createdAt": "2026-01-19T15:52:59.004Z",
+    "updatedAt": "2026-01-19T15:52:59.589Z",
+    "avatarStatus": "failed",
+    "avatarUrl": null,
+    "avatarHash": "50799245c69d6d5dcf77197919e805beb4c69f26e93a4a6e9133556e6a09ba61",
+    "name": "Ash",
+    "class": "Umbramancer",
+    "classDescription": "A shadow mage who phases through walls and binds foes with starless chains.",
+    "backstory": "Ash was born in Emberhollow, a city where houses huddled close together as if trying to keep warm against the eternal winds from the ashen wastes. His childhood was filled with the crackle of coals and the smell of smoke: forges, hearths, distant fires—everything blended into one постоянный фон, and the air itself seemed steeped in loss. His mother sang him lullabies that carried more sorrow than sleep, and his father came home each evening silent and worn, as if every day left a piece of his soul in the flames.\n\nThe night Emberhollow burned, the sky turned the color of spilled blood. Fire devoured the streets like a living thing, and the screams of the people were swallowed by the roar of collapsing roofs. He remembered running, stumbling, the heat searing his lungs, and the moment his mother’s hand slipped from his grasp. He called for her until his voice broke, but only the crack of falling beams answered. He found his father later—motionless beneath a shroud of ash, as though the city itself had laid him to rest.\n\nHe survived, but the fire never truly left him. The scar on his cheek is not only from flame, but from guilt: for running, for living, for failing to save those he loved. Since that night he has wandered from town to town, carrying the name Emberhollow like both a curse and a reminder. In every hearth he sees the echo of that inferno; in every scent of smoke he hears his mother’s voice, lost to the blaze.\n\nHe smiles rarely, and when he does, there is more pain than joy in it. Yet he keeps moving, because somewhere in the world, he believes, there is a place where fire no longer devours, but only gives warmth. And perhaps there, at last, his scars will stop pulling him back into the ashes.",
+    "appearance": "A lean, travel-worn figure in their mid-twenties, standing with a relaxed but alert posture, as if every muscle remembers the weight of past danger. Dark, slightly unkempt hair falls to the shoulders, often tied back with a simple leather cord. Sharp eyes — the kind that constantly scan a room, measuring exits, shadows, and people alike — carry a quiet mix of curiosity and fatigue.\n\nTheir face bears faint scars: a thin line along the cheekbone, another barely visible across the brow, marks of battles that were survived rather than forgotten. The skin is lightly weathered by wind and road dust, hinting at long journeys and restless nights under open skies.\n\nClothing is practical yet personal: a fitted leather coat worn at the edges, reinforced at the shoulders and forearms; dark trousers tucked into sturdy boots, their soles scratched by stone and tavern floors alike. A simple metal pendant hangs at the chest — its symbol unclear, but clearly meaningful. A short blade rests at the hip, more a companion than a threat, its hilt polished by habitual touch.\n\nOverall, the character looks like someone who belongs equally in a crowded tavern and on a silent road at dusk — not a hero from songs yet, but someone the songs might one day be about.",
+    "appearanceDescription": "A lean, travel-worn figure in their mid-twenties, standing with a relaxed but alert posture, as if every muscle remembers the weight of past danger. Dark, slightly unkempt hair falls to the shoulders, often tied back with a simple leather cord. Sharp eyes — the kind that constantly scan a room, measuring exits, shadows, and people alike — carry a quiet mix of curiosity and fatigue.\n\nTheir face bears faint scars: a thin line along the cheekbone, another barely visible across the brow, marks of battles that were survived rather than forgotten. The skin is lightly weathered by wind and road dust, hinting at long journeys and restless nights under open skies.\n\nClothing is practical yet personal: a fitted leather coat worn at the edges, reinforced at the shoulders and forearms; dark trousers tucked into sturdy boots, their soles scratched by stone and tavern floors alike. A simple metal pendant hangs at the chest — its symbol unclear, but clearly meaningful. A short blade rests at the hip, more a companion than a threat, its hilt polished by habitual touch.\n\nOverall, the character looks like someone who belongs equally in a crowded tavern and on a silent road at dusk — not a hero from songs yet, but someone the songs might one day be about.",
+    "appearanceSpec": {
+      "sex": "unknown",
+      "genderPresentation": "unknown",
+      "ageRange": "20s",
+      "hairLength": "medium",
+      "bodyType": "slim",
+      "notableFeatures": [
+        "faint scars on cheekbone and brow",
+        "sharp eyes"
+      ],
+      "clothingStyle": [
+        "practical",
+        "leather coat",
+        "sturdy boots"
+      ],
+      "palette": [
+        "dark",
+        "leather",
+        "metal"
+      ],
+      "confidence": 0.8
+    },
+    "appearanceSpecMeta": {
+      "confidence": 0.8,
+      "warnings": [
+        "sex_unknown",
+        "gender_presentation_unknown"
+      ]
+    },
+    "derivedAvatarClassTags": [
+      "hooded",
+      "aura",
+      "chains",
+      "shadowy",
+      "collar"
+    ],
+    "avatarPrompt": {
+      "prompt": "Best quality, masterpiece, ultra high resolution, 4k, highly detailed, sharp focus, professional fantasy illustration, artbook quality, realistic lighting, high dynamic range, global illumination, fine details, crisp edges, no noise, no blur. Centered head-and-shoulders portrait, looking directly at the viewer, symmetrical composition, face and upper torso only, clean neutral background, suitable for circular avatar crop. dark anime style, semi-realistic, cinematic lighting, dramatic shadows, high detail, sharp focus. Class: Umbramancer. Visual motifs: hooded, aura, chains, shadowy, collar. adult adventurer, realistic fantasy portrait. age 20s, slim build, medium hair. faint scars on cheekbone and brow, sharp eyes. practical, leather coat, sturdy boots. dark, leather, metal. Appearance description: A lean, travel-worn figure in their mid-twenties, standing with a relaxed but alert posture, as if every muscle remembers the weight of past danger. Dark, slightly unkempt hair falls to the shoulders, often tied back with a simple leather cord. Sharp eyes — the kind that constantly scan a room, measuring exits, shadows, and people alike — carry a quiet mix of curiosity and fatigue. Their face bears faint scars: a thin line along the cheekbone, another barely visible across the brow, marks of battles that were survived rather than forgotten. The skin is lightly weathered by wind and road dust, hinting at long journeys and restless nights under open skies. Clothing is practical yet personal: a fitted leather coat worn at the edges, reinforced at the shoulders and forearms; dark trousers tucked into sturdy boots, their soles scratched by stone and tavern floors alike. A simple metal pendant hangs at the chest — its symbol unclear, but clearly meaningful. A short blade rests at the hip, more a companion than a threat, its hilt polished by habitual touch. Overall, the character looks like someone who belongs equally in a crowded tavern and on a silent road at dusk — not a hero from songs yet, but someone the songs might one day be about..",
+      "negativePrompt": "low quality, worst quality, blurry, noisy, grainy, jpeg artifacts, watermark, text, logo, signature, deformed, bad anatomy, extra fingers, extra limbs, multiple faces, cropped face, out of frame, full body, character sheet, multiple poses, turnarounds, lineup, concept art sheet, reference sheet, standing figure, weapon showcase, scene, environment, background characters"
+    },
+    "avatarError": "ModelsLab response did not include image data. keys=status,message message=error You cannot use this model as a trial account holder without a plan, subscribe to a plan or fund your wallet to continue"
+  }
+]
