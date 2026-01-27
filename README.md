@@ -107,7 +107,6 @@ The built files will be in the `dist` directory.
 ## Project Structure
 
 ```
-D:\CODE\
 РІвЂќСљРІвЂќР‚РІвЂќР‚ package.json                 # Frontend dependencies
 РІвЂќСљРІвЂќР‚РІвЂќР‚ tsconfig.json
 РІвЂќСљРІвЂќР‚РІвЂќР‚ vite.config.ts
