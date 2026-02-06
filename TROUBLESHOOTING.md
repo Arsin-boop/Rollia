@@ -42,9 +42,7 @@ When you send a message in the game, check the backend terminal for error messag
 ### Step 4: Verify API Key
 
 1. Check that `backend/.env` file exists and contains:
-   ```
-   OPENAI_API_KEY=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
-   ```
+   (sensitive values omitted)
 
 2. When the backend starts, you should see:
    ```
