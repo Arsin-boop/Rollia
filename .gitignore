@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 backend/uploads/
+*.db
+*.db-wal
+*.db-shm
 
 # Editor directories and files
 .vscode/*
