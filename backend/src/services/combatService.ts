@@ -9,6 +9,12 @@ export type CombatEntity = {
   mp?: number
   mp_max?: number
   statuses: Array<{ key: string; duration: number }>
+  statusEffects: Array<{
+    id: string
+    name: string
+    duration: number
+    modifiers: Record<string, string | number>
+  }>
 }
 
 export type CombatEvent = {
@@ -44,6 +50,18 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 const appendLog = (state: CombatState, events: CombatEvent[]) => {
   state.log = [...state.log, ...events].slice(-20)
 }
+
+const toNumeric = (value: unknown, fallback = 0): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return fallback
+}
+
+const getEntityModifierSum = (entity: CombatEntity, key: string): number =>
+  (entity.statusEffects || []).reduce((sum, effect) => sum + toNumeric(effect?.modifiers?.[key], 0), 0)
 
 export const startBattle = (campaignId: string, player: CombatEntity, enemies: CombatEntity[]): CombatState => {
   const id = `${campaignId}-battle`
@@ -91,18 +109,37 @@ const resolveAttack = (
         ? attackRoll.total - d20
         : 0
   const total = typeof attackRoll?.total === 'number' ? attackRoll.total : d20 + bonus
+  const statusAttackBonus = getEntityModifierSum(attacker, 'attackBonus')
+  const adjustedTotal = total + statusAttackBonus
   const critical = d20 === 20
   const fumble = d20 === 1
   const ac = 10
-  const hit = critical ? true : fumble ? false : total >= ac
+  const hit = critical ? true : fumble ? false : adjustedTotal >= ac
   events.push({
     type: 'ATTACK_RESOLVED',
-    data: { actor: attacker.id, target: target.id, hit, roll: d20, bonus, total, critical, fumble, ac }
+    data: {
+      actor: attacker.id,
+      target: target.id,
+      hit,
+      roll: d20,
+      bonus,
+      statusAttackBonus,
+      total: adjustedTotal,
+      critical,
+      fumble,
+      ac
+    }
   })
 
   if (hit) {
     const baseDamage = attacker.type === 'player' ? rollDie(8) + 2 : rollDie(6) + 1
+    const statusDamageBonus = getEntityModifierSum(attacker, 'damageBonus')
     let damage = critical ? baseDamage * 2 : baseDamage
+    damage += statusDamageBonus
+    const incomingMultiplier = getEntityModifierSum(target, 'damageTakenMultiplier')
+    if (incomingMultiplier) {
+      damage = Math.max(1, Math.round(damage * (1 + incomingMultiplier)))
+    }
     if (target.type === 'player') {
       const defending = target.statuses.find(status => status.key === 'defending')
       if (defending) {
@@ -153,6 +190,33 @@ const clearExpiredStatuses = (entity: CombatEntity, events: CombatEvent[]) => {
   })
 
   entity.statuses = remaining
+}
+
+export const applyStatusToEntity = (
+  state: CombatState,
+  targetId: string,
+  effect: { id: string; name: string; duration: number; modifiers: Record<string, string | number> }
+): CombatState => {
+  return {
+    ...state,
+    entities: state.entities.map(entity =>
+      entity.id === targetId
+        ? { ...entity, statusEffects: [...(entity.statusEffects || []), effect] }
+        : entity
+    )
+  }
+}
+
+export const tickStatusEffects = (state: CombatState): CombatState => {
+  return {
+    ...state,
+    entities: state.entities.map(entity => ({
+      ...entity,
+      statusEffects: (entity.statusEffects || [])
+        .map(effect => ({ ...effect, duration: effect.duration - 1 }))
+        .filter(effect => effect.duration > 0)
+    }))
+  }
 }
 
 const resolveEnemyTurn = (state: CombatState, events: CombatEvent[]) => {
@@ -238,6 +302,8 @@ export const resolveAction = (
     resolveEnemyTurn(state, events)
     state.round += 1
     state.phase = 'player_turn'
+    const ticked = tickStatusEffects(state)
+    state.entities = ticked.entities
     state.entities.forEach(entity => clearExpiredStatuses(entity, events))
     checkCombatEnd(state, events)
   }

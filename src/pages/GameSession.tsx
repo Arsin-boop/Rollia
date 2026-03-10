@@ -34,6 +34,7 @@ import {
 } from '../utils/api'
 import './GameSession.css'
 import { useI18n } from '../i18n'
+import type { CharacterStats, InventoryItem } from '../types/character'
 
 type Message = {
   id: string
@@ -117,25 +118,6 @@ type NPCRelation = {
   notes: string[]
 }
 
-type InventoryItem = {
-  id: string
-  name: string
-  description: string
-  tags: string[]
-  damage?: string
-  armorClass?: number
-  slot?: 'weapon' | 'armor' | 'equipment'
-  equipped?: boolean
-  consumable?: boolean
-  effects?: {
-    hp?: number
-    mp?: number
-  }
-  charges?: number
-}
-
-
-
 type CharacterAbility = {
   id: string
   name: string
@@ -196,7 +178,7 @@ type PersistedCampaignState = {
   sceneSummary?: string
 }
 
-const DEFAULT_STATS = {
+const DEFAULT_STATS: CharacterStats = {
   strength: 10,
   dexterity: 14,
   constitution: 12,

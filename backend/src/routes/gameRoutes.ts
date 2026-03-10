@@ -18,7 +18,9 @@ import {
 import { listNPCProfiles, listNPCDialoguePalette, localizeNpcName } from '../services/npcRegistry.js'
 import { getBattle, resolveAction, startBattle, type CombatEntity } from '../services/combatService.js'
 import {
-  processTurn,
+  classifyAction,
+  processTurnWithActionType,
+  type ActionType,
   type NPCState,
   type WorldState
 } from '../services/directorService.js'
@@ -91,7 +93,30 @@ const normalizeNpcState = (value: unknown, fallbackWorldState: WorldState): NPCS
   }
 }
 
-const applyDirectorMemoryPipeline = (payload: {
+const resolveDirectorActionType = async (playerInput: string): Promise<ActionType> => {
+  const text = String(playerInput || '').trim()
+  const fallback = classifyAction(text)
+  if (!text) return fallback
+  try {
+    const intent = await generateIntentDecision({
+      rawText: text,
+      segments: [{ id: 'seg-1', text, hint: 'ACTION_NOW' } as any]
+    })
+    const domainMap: Record<string, ActionType> = {
+      violence: 'violent',
+      social: 'social',
+      mental: 'investigation',
+      physical: 'exploration',
+      stealth: 'exploration',
+      other: 'neutral'
+    }
+    return domainMap[String(intent?.domain || '').toLowerCase()] || fallback
+  } catch {
+    return fallback
+  }
+}
+
+const applyDirectorMemoryPipeline = async (payload: {
   campaignKey: string
   playerInput: string
   turnNumber: number
@@ -106,7 +131,8 @@ const applyDirectorMemoryPipeline = (payload: {
     ? normalizeWorldState(payload.worldStateOverride)
     : storedWorldState
   const baseNpcState = normalizeNpcState(payload.npcStateOverride, baseWorldState)
-  const directorResult = processTurn(payload.playerInput, baseWorldState, baseNpcState)
+  const actionType = await resolveDirectorActionType(payload.playerInput)
+  const directorResult = processTurnWithActionType(payload.playerInput, actionType, baseWorldState, baseNpcState)
 
   let memory = storyMemoryByCampaign.get(payload.campaignKey) || {
     recentEvents: [],
@@ -988,7 +1014,7 @@ router.post('/dm-response', async (req, res) => {
       if (pending && pending.id === pendingCheckId) {
         pendingChecks.delete(campaignKey)
         console.log('Pending check cleared:', pending.id)
-        const { directorResult, memoryContext, recentEvents } = applyDirectorMemoryPipeline({
+        const { directorResult, memoryContext, recentEvents } = await applyDirectorMemoryPipeline({
           campaignKey,
           playerInput: effectivePlayerAction,
           turnNumber: currentTurn,
@@ -1008,7 +1034,8 @@ router.post('/dm-response', async (req, res) => {
               hp_max: baseHp,
               mp: baseMp,
               mp_max: baseMp,
-              statuses: []
+              statuses: [],
+              statusEffects: []
             }
             const enemyName = pending.targetLabel || 'Enemy'
             const enemyEntity: CombatEntity = {
@@ -1017,7 +1044,8 @@ router.post('/dm-response', async (req, res) => {
               name: enemyName,
               hp: 12,
               hp_max: 12,
-              statuses: []
+              statuses: [],
+              statusEffects: []
             }
             battleState = startBattle(campaignKey, playerEntity, [enemyEntity])
           }
@@ -1227,7 +1255,8 @@ router.post('/dm-response', async (req, res) => {
         hp_max: 20,
         mp: 0,
         mp_max: 0,
-        statuses: []
+        statuses: [],
+        statusEffects: []
       }
       const enemyName = pendingCheck.targetLabel || 'Enemy'
       const enemyEntity: CombatEntity = {
@@ -1236,7 +1265,8 @@ router.post('/dm-response', async (req, res) => {
         name: enemyName,
         hp: 12,
         hp_max: 12,
-        statuses: []
+        statuses: [],
+        statusEffects: []
       }
       startBattle(campaignKey, playerEntity, [enemyEntity])
       console.log('Combat state created for narrative resolution.')
@@ -1305,7 +1335,7 @@ router.post('/dm-response', async (req, res) => {
       }
     }
 
-    const { directorResult, memoryContext, recentEvents } = applyDirectorMemoryPipeline({
+    const { directorResult, memoryContext, recentEvents } = await applyDirectorMemoryPipeline({
       campaignKey,
       playerInput: effectivePlayerAction,
       turnNumber: currentTurn,

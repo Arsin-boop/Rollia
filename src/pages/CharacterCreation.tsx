@@ -8,6 +8,7 @@ import {
   type CustomClassResponse
 } from '../utils/api'
 import './CharacterCreation.css'
+import type { InventoryItem } from '../types/character'
 
 type CharacterData = {
   name: string
@@ -28,16 +29,7 @@ type CharacterAbility = {
   requiresArtifact?: string[]
 }
 
-type GeneratedLoadoutItem = {
-  id: string
-  name: string
-  description: string
-  tags: string[]
-  damage?: string
-  armorClass?: number
-  slot?: 'weapon' | 'armor'
-  equipped?: boolean
-}
+type GeneratedLoadoutItem = InventoryItem
 
 const STAGES = ['name', 'class', 'backstory', 'appearance', 'review'] as const
 type Stage = typeof STAGES[number]

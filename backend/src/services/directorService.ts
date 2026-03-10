@@ -36,6 +36,27 @@ export interface DirectorResult {
   directorNotes: string
 }
 
+export function processTurnWithActionType(
+  playerInput: string,
+  actionType: ActionType,
+  worldState: WorldState,
+  npcState: NPCState
+): DirectorResult {
+  const npcReaction = determineNPCReaction(actionType, npcState)
+  const updatedWorldState = updateWorldState(worldState, npcReaction)
+
+  const directorNotes = npcReaction.callGuards
+    ? `${npcReaction.summary} Tension rises to ${updatedWorldState.tension}. Guards are now alerted.`
+    : `${npcReaction.summary} Tension is now ${updatedWorldState.tension}.`
+
+  return {
+    actionType,
+    npcReaction,
+    updatedWorldState,
+    directorNotes
+  }
+}
+
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value))
 
@@ -169,17 +190,5 @@ export function processTurn(
   npcState: NPCState
 ): DirectorResult {
   const actionType = classifyAction(playerInput)
-  const npcReaction = determineNPCReaction(actionType, npcState)
-  const updatedWorldState = updateWorldState(worldState, npcReaction)
-
-  const directorNotes = npcReaction.callGuards
-    ? `${npcReaction.summary} Tension rises to ${updatedWorldState.tension}. Guards are now alerted.`
-    : `${npcReaction.summary} Tension is now ${updatedWorldState.tension}.`
-
-  return {
-    actionType,
-    npcReaction,
-    updatedWorldState,
-    directorNotes
-  }
+  return processTurnWithActionType(playerInput, actionType, worldState, npcState)
 }

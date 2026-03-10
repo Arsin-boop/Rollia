@@ -1,5 +1,3 @@
-import dotenv from "dotenv";
-dotenv.config();
 import express from 'express'
 import path from 'path'
 import cors from 'cors'
@@ -12,10 +10,25 @@ import { generateAIResponse } from './services/aiService.js'
 
 dotenv.config()
 
+const requiredEnvVars = ['GROQ_API_KEY_PRIMARY', 'GROQ_API_KEY_UTILITY', 'GROQ_BASE_URL']
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    console.error(`Missing required environment variable: ${envVar}`)
+    console.error('Check backend/.env — see backend/.env.example for reference')
+    process.exit(1)
+  }
+}
+
 const app = express()
 const PORT = process.env.PORT || 3001
 
-app.use(cors())
+app.use(
+  cors({
+    origin: process.env.ALLOWED_ORIGIN || 'http://localhost:5173',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+  })
+)
 app.use(express.json())
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
 

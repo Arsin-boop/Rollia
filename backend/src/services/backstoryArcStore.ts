@@ -1,5 +1,8 @@
 import fs from 'fs'
 import path from 'path'
+import { eq } from 'drizzle-orm'
+import { db } from '../db/db.js'
+import { backstoryArcs } from '../db/schema.js'
 
 export type BackstoryProfile = {
   characterKey: string
@@ -65,42 +68,55 @@ export type BackstoryArcPlan = {
   status: 'active' | 'resolved' | 'dormant'
 }
 
-const storeDir = path.join(process.cwd(), 'data')
-const storePath = path.join(storeDir, 'backstory_arcs.json')
 const arcStore = new Map<string, { profile: BackstoryProfile; plan: BackstoryArcPlan }>()
-
-const ensureStoreDir = () => {
-  if (!fs.existsSync(storeDir)) {
-    fs.mkdirSync(storeDir, { recursive: true })
-  }
-}
 
 const loadStore = () => {
   try {
-    if (!fs.existsSync(storePath)) {
-      return
-    }
-    const raw = fs.readFileSync(storePath, 'utf8')
-    const parsed = JSON.parse(raw)
-    if (parsed && typeof parsed === 'object') {
-      Object.entries(parsed).forEach(([key, value]) => {
-        if (value && typeof value === 'object' && 'profile' in value && 'plan' in value) {
-          arcStore.set(key, value as { profile: BackstoryProfile; plan: BackstoryArcPlan })
+    const rows = db.select().from(backstoryArcs).all()
+    rows.forEach(row => {
+      try {
+        const profile = JSON.parse(row.profileJson) as BackstoryProfile
+        const plan = JSON.parse(row.planJson) as BackstoryArcPlan
+        if (profile?.characterKey && plan?.characterKey) {
+          arcStore.set(row.characterKey, { profile, plan })
         }
-      })
-    }
+      } catch {
+        // Ignore malformed rows
+      }
+    })
   } catch (error) {
     console.error('Failed to load backstory arc store:', error)
   }
 }
 
-const persistStore = () => {
+const migrateLegacyBackstoryArcs = () => {
   try {
-    ensureStoreDir()
-    const payload = Object.fromEntries(arcStore.entries())
-    fs.writeFileSync(storePath, JSON.stringify(payload, null, 2), 'utf8')
+    const legacyPath = path.join(process.cwd(), 'data', 'backstory_arcs.json')
+    if (!fs.existsSync(legacyPath)) return
+    const raw = fs.readFileSync(legacyPath, 'utf8')
+    const parsed = JSON.parse(raw) as Record<string, { profile: BackstoryProfile; plan: BackstoryArcPlan }>
+    if (!parsed || typeof parsed !== 'object') return
+
+    Object.entries(parsed).forEach(([characterKey, payload]) => {
+      if (!characterKey || !payload?.profile || !payload?.plan) return
+      const existing = db
+        .select()
+        .from(backstoryArcs)
+        .where(eq(backstoryArcs.characterKey, characterKey))
+        .all()
+      if (existing.length) return
+
+      db.insert(backstoryArcs)
+        .values({
+          characterKey,
+          profileJson: JSON.stringify(payload.profile),
+          planJson: JSON.stringify(payload.plan),
+          updatedAt: Date.now()
+        })
+        .run()
+    })
   } catch (error) {
-    console.error('Failed to persist backstory arc store:', error)
+    console.error('Failed to migrate legacy backstory_arcs.json:', error)
   }
 }
 
@@ -128,7 +144,26 @@ export const saveBackstoryArc = (
   plan: BackstoryArcPlan
 ) => {
   arcStore.set(characterKey, { profile, plan })
-  persistStore()
+  try {
+    db.insert(backstoryArcs)
+      .values({
+        characterKey,
+        profileJson: JSON.stringify(profile),
+        planJson: JSON.stringify(plan),
+        updatedAt: Date.now()
+      })
+      .onConflictDoUpdate({
+        target: backstoryArcs.characterKey,
+        set: {
+          profileJson: JSON.stringify(profile),
+          planJson: JSON.stringify(plan),
+          updatedAt: Date.now()
+        }
+      })
+      .run()
+  } catch (error) {
+    console.error('Failed to persist backstory arc:', error)
+  }
 }
 
 export const normalizeBackstoryArc = (
@@ -234,4 +269,5 @@ export const markBeatUsed = (
   }
 }
 
+migrateLegacyBackstoryArcs()
 loadStore()

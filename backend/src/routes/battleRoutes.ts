@@ -21,7 +21,8 @@ router.post('/start', async (req, res) => {
       hp_max: Number(player.hp_max ?? player.hp ?? 1),
       mp: typeof player.mp === 'number' ? player.mp : undefined,
       mp_max: typeof player.mp_max === 'number' ? player.mp_max : undefined,
-      statuses: []
+      statuses: [],
+      statusEffects: []
     }
 
     const enemyEntities: CombatEntity[] = enemies.map((enemy: any, index: number) => ({
@@ -30,7 +31,8 @@ router.post('/start', async (req, res) => {
       name: enemy.name || `Enemy ${index + 1}`,
       hp: Number(enemy.hp ?? 10),
       hp_max: Number(enemy.hp_max ?? enemy.hp ?? 10),
-      statuses: []
+      statuses: [],
+      statusEffects: []
     }))
 
     const state = startBattle(String(campaignId), playerEntity, enemyEntities)
