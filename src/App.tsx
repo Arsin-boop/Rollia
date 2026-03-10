@@ -1,22 +1,12 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import LandingPage from './pages/LandingPage'
-import CharacterCreation from './pages/CharacterCreation'
-import CampaignHub from './pages/CampaignHub'
-import GameSession from './pages/GameSession'
-import './App.css'
+import { RouterProvider } from "react-router-dom";
+import { router } from "./routes";
+import { I18nProvider } from "./i18n";
 
-function App() {
+export default function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/character-creation" element={<CharacterCreation />} />
-        <Route path="/campaign-hub" element={<CampaignHub />} />
-        <Route path="/game/:campaignId" element={<GameSession />} />
-      </Routes>
-    </Router>
-  )
+    <I18nProvider>
+      <RouterProvider router={router} />
+    </I18nProvider>
+  );
 }
-
-export default App
 

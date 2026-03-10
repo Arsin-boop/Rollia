@@ -3,13 +3,13 @@ import { useState, useRef, useEffect, useMemo, useCallback, type ReactNode, type
 import { useParams } from 'react-router-dom'
 import {
   BookOpen,
+  Check,
+  Shield,
   User,
   Package,
   Users,
-  Book,
-  Sparkles,
   Send,
-  MessageCircle
+  X,
 } from 'lucide-react'
 import {
   API_ORIGIN,
@@ -33,6 +33,7 @@ import {
   type ActionIntent
 } from '../utils/api'
 import './GameSession.css'
+import { useI18n } from '../i18n'
 
 type Message = {
   id: string
@@ -85,7 +86,8 @@ type RollState =
       resolvedAt: number
     }
 
-type SidebarSection = 'quests' | 'rumors' | 'stats' | 'inventory' | 'npcs' | 'spells' | 'boons'
+type SidebarSection = 'journal' | 'stats' | 'loadout' | 'social'
+type LoadoutTab = 'inventory' | 'spells'
 
 type QuestStatus = 'active' | 'completed' | 'failed'
 
@@ -120,6 +122,10 @@ type InventoryItem = {
   name: string
   description: string
   tags: string[]
+  damage?: string
+  armorClass?: number
+  slot?: 'weapon' | 'armor' | 'equipment'
+  equipped?: boolean
   consumable?: boolean
   effects?: {
     hp?: number
@@ -169,6 +175,25 @@ type StoredCharacterProfile = {
   }
   avatarUrl?: string | null
   avatarStatus?: 'pending' | 'ready' | 'failed'
+  activeCampaignId?: string | null
+  updatedAt?: string
+}
+
+type PersistedCampaignState = {
+  messages: Array<{
+    id: string
+    type: 'player' | 'dm' | 'system'
+    content: string
+    timestamp: string
+    sceneHeader?: string
+    diceRoll?: {
+      type: string
+      result: number
+      rolls: number[]
+    }
+  }>
+  chatHistory: ChatMessage[]
+  sceneSummary?: string
 }
 
 const DEFAULT_STATS = {
@@ -189,6 +214,9 @@ const XP_THRESHOLDS = [
 ]
 
 const CHARACTER_STORAGE_KEY = 'dnd-ai-character'
+const TEMPLATE_CHARACTER_STORAGE_KEY = 'character'
+const ACTIVE_CAMPAIGN_KEY = 'activeCampaignId'
+const CAMPAIGN_STATE_KEY_PREFIX = 'campaign_state_'
 const CHARACTER_TAG_REGEX =
   /\[CHARACTER\s+name="([^"]+)"(?:\s+color="([^"]+)")?\s*\](.*?)\[\/CHARACTER\]/gis
 const NPC_TAG_REGEX = /<npc\s+id="([^"]+)"[^>]*>([\s\S]*?)<\/npc>/gi
@@ -201,6 +229,20 @@ const GLOW_TAG_REGEX = /<glow([^>]*)>([\s\S]*?)<\/glow>/gi
 const HIGHLIGHT_TAG_REGEX =
   /<span\s+class="([^"]*\bhl\b[^"]*)"\s*>([\s\S]*?)<\/span>/gi
 const GLOW_ATTR_REGEX = /(\w+)="([^"]+)"/gi
+
+const sanitizeLogText = (value: string): string => {
+  if (!value) return ''
+  return value
+    .replace(/<npc\s+id="[^"]+"[^>]*>/gi, '')
+    .replace(/<\/npc>/gi, '')
+    .replace(/<glow[^>]*>/gi, '')
+    .replace(/<\/glow>/gi, '')
+    .replace(/<\/?span[^>]*>/gi, '')
+    .replace(/\[\/?(?:QUEST|RUMOR|RELATION|BATTLE)[^\]]*\]/gi, '')
+    .replace(/\[EFFECT[^\]]*\]/gi, '')
+    .replace(/\r/g, '')
+    .trim()
+}
 
 const DEFAULT_NPC_PALETTE: NPCPaletteEntry[] = [
   { id: 'ember1', color: '#ffd88a', glow: '0 0 6px rgba(255, 216, 138, 0.35), 0 0 12px rgba(255, 216, 138, 0.15)' },
@@ -231,6 +273,7 @@ const SUMMARY_INTERVAL = 12
 const SUMMARY_KEEP_LATEST = 2
 const MIN_BACKSTORY_LENGTH = 200
 const MIN_MESSAGES_FOR_BACKSTORY = 6
+const DM_DISPLAY_NAME = 'Dungeon Master'
 /* const INITIAL_DM_OPENING = `Dungeon Master
 
 The Gilded Griffin · Taproom · Morning
@@ -257,7 +300,8 @@ const extractSceneHeader = (content: string) => {
   if (!content) {
     return { header: '', body: '' }
   }
-  const lines = content.split('\n')
+  const normalized = content.replace(/\\u00B7/gi, '·')
+  const lines = normalized.split('\n')
   let index = 0
   while (index < lines.length && !lines[index].trim()) {
     index += 1
@@ -269,8 +313,13 @@ const extractSceneHeader = (content: string) => {
     index += 1
   }
   const headerCandidate = lines[index]?.trim() || ''
-  if (!headerCandidate || (!headerCandidate.includes('·') && !headerCandidate.includes('-'))) {
-    return { header: '', body: content.trim() }
+  const hasHeaderSeparator =
+    headerCandidate.includes('·') ||
+    headerCandidate.includes('•') ||
+    headerCandidate.includes('|') ||
+    /\s-\s/.test(headerCandidate)
+  if (!headerCandidate || !hasHeaderSeparator) {
+    return { header: '', body: normalized.trim() }
   }
   index += 1
   while (index < lines.length && !lines[index].trim()) {
@@ -400,6 +449,84 @@ const buildAbilitiesFromProfile = (profile: StoredCharacterProfile | null): Char
   return buildAbilitiesFromFeatures(profile.customClassData)
 }
 
+const toItemSlug = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+
+const buildGeneratedLoadoutItems = (classData?: CustomClassResponse | null): InventoryItem[] => {
+  if (!classData) return []
+
+  const items: InventoryItem[] = []
+  if (classData.startingWeapon?.name) {
+    items.push({
+      id: `weapon-${toItemSlug(classData.startingWeapon.name) || 'starter-weapon'}`,
+      name: classData.startingWeapon.name,
+      description:
+        classData.startingWeapon.description || 'A starting weapon tailored to your class.',
+      tags:
+        Array.isArray(classData.startingWeapon.tags) && classData.startingWeapon.tags.length
+          ? classData.startingWeapon.tags
+          : ['equipment', 'weapon'],
+      damage: classData.startingWeapon.damage || '1d6',
+      slot: 'weapon',
+      equipped: true
+    })
+  }
+  if (classData.startingArmor?.name) {
+    items.push({
+      id: `armor-${toItemSlug(classData.startingArmor.name) || 'starter-armor'}`,
+      name: classData.startingArmor.name,
+      description:
+        classData.startingArmor.description || 'A starting armor set tailored to your class.',
+      tags:
+        Array.isArray(classData.startingArmor.tags) && classData.startingArmor.tags.length
+          ? classData.startingArmor.tags
+          : ['equipment', 'armor'],
+      armorClass: Number.isFinite(classData.startingArmor.armorClass)
+        ? classData.startingArmor.armorClass
+        : 12,
+      slot: 'armor',
+      equipped: true
+    })
+  }
+  return items
+}
+
+const mergeUniqueInventoryItems = (
+  baseItems: InventoryItem[],
+  extraItems: InventoryItem[]
+): InventoryItem[] => {
+  if (!extraItems.length) return baseItems
+  const merged = [...baseItems]
+  const existing = new Set(
+    baseItems.map(item => `${item.name || ''}`.trim().toLowerCase()).filter(Boolean)
+  )
+  extraItems.forEach(item => {
+    const key = (item.name || '').trim().toLowerCase()
+    if (!key || existing.has(key)) return
+    existing.add(key)
+    merged.push(item)
+  })
+  return merged
+}
+
+const mergeUniqueEquipment = (baseEquipment: string[], items: InventoryItem[]): string[] => {
+  const names = items.map(item => item.name).filter(Boolean)
+  if (!names.length) return baseEquipment
+  const existing = new Set(baseEquipment.map(item => item.trim().toLowerCase()).filter(Boolean))
+  const merged = [...baseEquipment]
+  names.forEach(name => {
+    const key = name.trim().toLowerCase()
+    if (!key || existing.has(key)) return
+    existing.add(key)
+    merged.push(name)
+  })
+  return merged
+}
+
 const computeResourcesFromProfile = (profile: StoredCharacterProfile | null) => {
   if (!profile) {
     return { hp: 24, mp: 16 }
@@ -433,13 +560,32 @@ const getAffinityBadge = (affinity: number): string => {
 }
 
 const normalizeNpcName = (name: string): string => {
+  if (!name) return ''
+  const lowered = name.toLowerCase()
+  if (/\bcorin\b/.test(lowered) || lowered.includes('корин')) {
+    return 'corin'
+  }
   return name
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/[^a-z0-9а-яё\s]/g, '')
     .replace(/\bthe\b/g, '')
     .replace(/\b(barkeep|bartender|innkeeper)\b/g, '')
+    .replace(/\b(трактирщик|бармен|хозяин таверны)\b/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+const canonicalNpcId = (id?: string, name?: string): string => {
+  const safeId = (id || '').trim().toLowerCase()
+  const safeName = (name || '').trim().toLowerCase()
+  if (
+    safeId === 'corin-blackbriar' ||
+    /\bcorin\b/.test(safeName) ||
+    safeName.includes('корин')
+  ) {
+    return 'corin-blackbriar'
+  }
+  return safeId || normalizeNpcName(name || '') || 'unknown-npc'
 }
 
 const colorFromName = (name: string): string => {
@@ -485,12 +631,183 @@ const colorFromName = (name: string): string => {
 }
 
 const createMessageId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+const parseStoredProfile = (raw: string | null): StoredCharacterProfile | null => {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed as StoredCharacterProfile
+  } catch {
+    return null
+  }
+}
+
+const parseCampaignState = (raw: string | null): PersistedCampaignState | null => {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed as PersistedCampaignState
+  } catch {
+    return null
+  }
+}
+
+const toTimestamp = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const ms = Date.parse(value)
+    return Number.isFinite(ms) ? ms : 0
+  }
+  return 0
+}
+
+const pickFreshestProfile = (
+  legacyProfile: StoredCharacterProfile | null,
+  templateProfile: StoredCharacterProfile | null
+): StoredCharacterProfile | null => {
+  if (!legacyProfile && !templateProfile) return null
+  if (!legacyProfile) return templateProfile
+  if (!templateProfile) return legacyProfile
+
+  const legacyStamp = toTimestamp((legacyProfile as any).updatedAt)
+  const templateStamp = toTimestamp((templateProfile as any).updatedAt)
+
+  if (templateStamp > legacyStamp) return templateProfile
+  if (legacyStamp > templateStamp) return legacyProfile
+
+  // If timestamps are absent/equal, prefer template payload when identity differs.
+  const legacyName = (legacyProfile.name || '').trim().toLowerCase()
+  const templateName = (templateProfile.name || '').trim().toLowerCase()
+  const legacyClass = (legacyProfile.class || '').trim().toLowerCase()
+  const templateClass = (templateProfile.class || '').trim().toLowerCase()
+
+  if (templateName && templateClass && (templateName !== legacyName || templateClass !== legacyClass)) {
+    return templateProfile
+  }
+
+  return legacyProfile
+}
+
+const DiceRollHeader = ({
+  roll,
+  t
+}: {
+  roll: RollState
+  t: (key: string) => string
+}) => {
+  const [displayValue, setDisplayValue] = useState<number>(() => {
+    if (roll.status === 'done') {
+      return roll.d20
+    }
+    return Math.floor(Math.random() * 20) + 1
+  })
+  const [showStatBonus, setShowStatBonus] = useState(false)
+  const [showProfBonus, setShowProfBonus] = useState(false)
+  const [showTotal, setShowTotal] = useState(false)
+  const [showResult, setShowResult] = useState(false)
+
+  useEffect(() => {
+    if (roll.status !== 'rolling') {
+      return
+    }
+    setShowStatBonus(false)
+    setShowProfBonus(false)
+    setShowTotal(false)
+    setShowResult(false)
+    const interval = window.setInterval(() => {
+      setDisplayValue(Math.floor(Math.random() * 20) + 1)
+    }, 50)
+    return () => window.clearInterval(interval)
+  }, [roll.status, 'startedAt' in roll ? roll.startedAt : 0])
+
+  useEffect(() => {
+    if (roll.status !== 'done') {
+      return
+    }
+    setDisplayValue(roll.d20)
+    setShowStatBonus(false)
+    setShowProfBonus(false)
+    setShowTotal(false)
+    setShowResult(false)
+    const statTimer = window.setTimeout(() => setShowStatBonus(true), 120)
+    const profTimer = window.setTimeout(() => setShowProfBonus(true), 320)
+    const totalTimer = window.setTimeout(() => setShowTotal(true), 520)
+    const raf1 = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setShowResult(true))
+    })
+    return () => {
+      window.clearTimeout(statTimer)
+      window.clearTimeout(profTimer)
+      window.clearTimeout(totalTimer)
+      window.cancelAnimationFrame(raf1)
+    }
+  }, [roll.status, 'resolvedAt' in roll ? roll.resolvedAt : 0, 'd20' in roll ? roll.d20 : 0])
+
+  if (roll.status === 'idle') {
+    return null
+  }
+
+  const dcLabel = roll.request.dc ? `DC ${roll.request.dc}` : t('gameSession.dice.dcUnknown')
+  const statLine =
+    roll.status === 'done'
+      ? `${roll.statBonus >= 0 ? '+' : ''}${roll.statBonus} ${roll.request.stat}`
+      : ''
+  const profLine =
+    roll.status === 'done'
+      ? `${roll.proficiencyBonus >= 0 ? '+' : ''}${roll.proficiencyBonus} ${t('gameSession.dice.proficiency')}`
+      : ''
+
+  return (
+    <div className={`roll-inline ${roll.status}`}>
+      <div className="roll-inline-header">
+        <div className="roll-inline-title">{roll.request.label}</div>
+        <div className="roll-inline-meta">
+          <span>{roll.request.stat}</span>
+          <span className="roll-inline-dot">·</span>
+          <span>{dcLabel}</span>
+        </div>
+      </div>
+      <div className="roll-inline-number">
+        <span className={`roll-inline-value ${roll.status === 'rolling' ? 'flicker' : ''}`}>
+          {displayValue}
+        </span>
+      </div>
+      {roll.status === 'done' && (
+        <>
+          <div className="roll-inline-breakdown">
+            <span className={`roll-inline-line ${showStatBonus ? 'show' : ''}`}>
+              {statLine}
+            </span>
+            <span className={`roll-inline-line ${showProfBonus ? 'show' : ''}`}>
+              {profLine}
+            </span>
+            <span className={`roll-inline-line ${showTotal ? 'show' : ''}`}>
+              {t('gameSession.dice.total')} {roll.total}
+            </span>
+          </div>
+          <div
+            className={`roll-inline-result ${showResult ? 'show' : ''} ${
+              roll.success ? 'success' : 'fail'
+            }`}
+          >
+            {roll.success ? t('gameSession.dice.success') : t('gameSession.dice.fail')}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 const GameSession = () => {
   const { campaignId } = useParams()
+  const { t, language } = useI18n()
   const [messages, setMessages] = useState<Message[]>([])
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [activeSidebar, setActiveSidebar] = useState<SidebarSection>('stats')
+  const [activeLoadoutTab, setActiveLoadoutTab] = useState<LoadoutTab>('inventory')
   const [isLoading, setIsLoading] = useState(false)
   const [characterColors, setCharacterColors] = useState<Record<string, string>>({})
   const [npcRegistryById, setNpcRegistryById] = useState<Record<string, NPCRegistryEntry>>({})
@@ -514,8 +831,9 @@ const GameSession = () => {
   const [expandedRumorIds, setExpandedRumorIds] = useState<Set<string>>(new Set())
   const [expandedNpcIds, setExpandedNpcIds] = useState<Set<string>>(new Set())
   const [expandedSpellIds, setExpandedSpellIds] = useState<Set<string>>(new Set())
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [expandedEquipmentItem, setExpandedEquipmentItem] = useState<string | null>(null)
   const [activeSpellId, setActiveSpellId] = useState<string | null>(null)
+  const [campaignStateLoaded, setCampaignStateLoaded] = useState(false)
   const battleUiEnabled = false
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -531,6 +849,49 @@ const GameSession = () => {
   const statusUpdateInFlightRef = useRef(false)
   const lastSceneHeaderRef = useRef<string>('')
   const openingGeneratedRef = useRef(false)
+  const statusDetailLabel = useCallback(
+    (kind: 'level' | 'tier' | 'severity' | 'modifiers' | 'restrictions' | 'cues' | 'mechanics' | 'trigger' | 'duration' | 'source' | 'cure') => {
+      const keyByKind = {
+        level: 'gameSession.statusDetail.level',
+        tier: 'gameSession.statusDetail.tier',
+        severity: 'gameSession.statusDetail.severity',
+        modifiers: 'gameSession.statusDetail.modifiers',
+        restrictions: 'gameSession.statusDetail.restrictions',
+        cues: 'gameSession.statusDetail.cues',
+        mechanics: 'gameSession.statusDetail.mechanics',
+        trigger: 'gameSession.statusDetail.trigger',
+        duration: 'gameSession.statusDetail.duration',
+        source: 'gameSession.statusDetail.source',
+        cure: 'gameSession.statusDetail.cure'
+      } as const
+      return t(keyByKind[kind])
+    },
+    [t]
+  )
+
+  const getQuestStatusLabel = useCallback(
+    (status: QuestStatus) => t(`gameSession.questStatus.${status}`),
+    [t]
+  )
+
+  const getAffinityLabel = useCallback(
+    (affinity: number) => {
+      const badge = getAffinityBadge(affinity)
+      switch (badge) {
+        case 'Hostile':
+          return t('gameSession.affinity.hostile')
+        case 'Wary':
+          return t('gameSession.affinity.wary')
+        case 'Friendly':
+          return t('gameSession.affinity.friendly')
+        case 'Allied':
+          return t('gameSession.affinity.allied')
+        default:
+          return t('gameSession.affinity.neutral')
+      }
+    },
+    [t]
+  )
 
   const registerCharacterColors = useCallback((content: string) => {
     if (!content) return
@@ -556,6 +917,10 @@ const GameSession = () => {
     if (typeof window === 'undefined') return
     try {
       localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(profile))
+      localStorage.setItem(TEMPLATE_CHARACTER_STORAGE_KEY, JSON.stringify(profile))
+      if (profile.activeCampaignId) {
+        localStorage.setItem(ACTIVE_CAMPAIGN_KEY, profile.activeCampaignId)
+      }
     } catch (error) {
       console.error('Failed to persist profile:', error)
     }
@@ -578,14 +943,165 @@ const GameSession = () => {
       return
     }
     try {
-      const stored = localStorage.getItem(CHARACTER_STORAGE_KEY)
-      if (stored) {
-        setCharacterProfile(JSON.parse(stored))
+      const legacy = parseStoredProfile(localStorage.getItem(CHARACTER_STORAGE_KEY))
+      const template = parseStoredProfile(localStorage.getItem(TEMPLATE_CHARACTER_STORAGE_KEY))
+      const freshest = pickFreshestProfile(legacy, template)
+      if (freshest) {
+        setCharacterProfile(freshest)
+        localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(freshest))
+        localStorage.setItem(TEMPLATE_CHARACTER_STORAGE_KEY, JSON.stringify(freshest))
       }
     } catch (error) {
       console.error('Failed to load stored character profile:', error)
     }
   }, [])
+
+  useEffect(() => {
+    if (!campaignId) return
+    localStorage.setItem(ACTIVE_CAMPAIGN_KEY, campaignId)
+    const sessionKey = `session_${campaignId}`
+    if (!localStorage.getItem(sessionKey)) {
+      localStorage.setItem(
+        sessionKey,
+        JSON.stringify({
+          id: campaignId,
+          name: `Campaign ${campaignId}`,
+          description: '',
+          createdAt: new Date().toISOString()
+        })
+      )
+    }
+  }, [campaignId])
+
+  useEffect(() => {
+    if (!campaignId) return
+    setCampaignStateLoaded(false)
+    const storageKey = `${CAMPAIGN_STATE_KEY_PREFIX}${campaignId}`
+    const stored = parseCampaignState(localStorage.getItem(storageKey))
+    if (!stored) {
+      setMessages([])
+      setChatHistory([])
+      setSceneSummary('')
+      lastSceneHeaderRef.current = ''
+      openingGeneratedRef.current = false
+      setCampaignStateLoaded(true)
+      return
+    }
+
+    const restoredMessages: Message[] = Array.isArray(stored.messages)
+      ? stored.messages.map(entry => ({
+          ...entry,
+          timestamp: new Date(entry.timestamp)
+        }))
+      : []
+    const restoredHistory: ChatMessage[] = Array.isArray(stored.chatHistory) ? stored.chatHistory : []
+    const restoredSummary = typeof stored.sceneSummary === 'string' ? stored.sceneSummary : ''
+
+    setMessages(restoredMessages)
+    setChatHistory(restoredHistory)
+    setSceneSummary(restoredSummary)
+    const lastHeader = [...restoredMessages]
+      .reverse()
+      .find(message => message.type === 'dm' && message.sceneHeader)?.sceneHeader
+    lastSceneHeaderRef.current = lastHeader || ''
+    if (restoredMessages.length || restoredHistory.length) {
+      openingGeneratedRef.current = true
+    }
+    setCampaignStateLoaded(true)
+  }, [campaignId])
+
+  useEffect(() => {
+    if (!campaignId) return
+    if (!campaignStateLoaded) return
+    const storageKey = `${CAMPAIGN_STATE_KEY_PREFIX}${campaignId}`
+    const payload: PersistedCampaignState = {
+      messages: messages.map(message => ({
+        ...message,
+        timestamp: message.timestamp.toISOString()
+      })),
+      chatHistory,
+      sceneSummary
+    }
+    localStorage.setItem(storageKey, JSON.stringify(payload))
+  }, [campaignId, messages, chatHistory, sceneSummary, campaignStateLoaded])
+
+  const transcriptText = useMemo(() => {
+    const campaignLabel = campaignId || t('gameSession.default.soloTale')
+    const lines: string[] = [
+      `${t('gameSession.campaign')}: ${campaignLabel}`,
+      `${t('gameSession.exportedAt')}: ${new Date().toISOString()}`,
+      ''
+    ]
+
+    for (const message of messages) {
+      const timeLabel = message.timestamp.toLocaleString()
+      const actorLabel =
+        message.type === 'dm'
+          ? DM_DISPLAY_NAME
+          : message.type === 'player'
+          ? characterProfile?.name || t('gameSession.you')
+          : t('gameSession.system')
+      const content = sanitizeLogText(message.content)
+      const block: string[] = [`[${timeLabel}] ${actorLabel}`]
+
+      if (message.type === 'dm' && message.sceneHeader) {
+        block.push(`${t('gameSession.scene')}: ${message.sceneHeader}`)
+      }
+
+      if (message.type === 'player' && message.roll?.status === 'done') {
+        block.push(
+          `${t('gameSession.check')}: ${message.roll.request.label} | ${
+            message.roll.success ? t('gameSession.dice.success') : t('gameSession.dice.fail')
+          } | ${t('gameSession.dice.total')} ${message.roll.total}`
+        )
+      }
+
+      if (content) {
+        block.push(content)
+      }
+
+      lines.push(block.join('\n'))
+      lines.push('')
+    }
+
+    return lines.join('\n').trim()
+  }, [campaignId, messages, characterProfile?.name, t])
+
+  const handleExportTranscript = useCallback(() => {
+    const campaignKey = (campaignId || 'solo').replace(/[^a-zA-Z0-9_-]+/g, '_')
+    const timestamp = new Date().toISOString().replace(/[:]/g, '-')
+    const fileName = `campaign-${campaignKey}-log-${timestamp}.txt`
+    const blob = new Blob([transcriptText], { type: 'text/plain;charset=utf-8' })
+    const url = window.URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = fileName
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    window.URL.revokeObjectURL(url)
+  }, [campaignId, transcriptText])
+
+  useEffect(() => {
+    const handleGlobalExport = () => {
+      if (!messages.length) return
+      handleExportTranscript()
+    }
+    window.addEventListener('rollia:export-log', handleGlobalExport as EventListener)
+    return () => {
+      window.removeEventListener('rollia:export-log', handleGlobalExport as EventListener)
+    }
+  }, [handleExportTranscript, messages.length])
+
+  useEffect(() => {
+    if (!campaignId || !characterProfile) return
+    if (characterProfile.activeCampaignId === campaignId) return
+    updateStoredProfile(prev => ({
+      ...prev,
+      activeCampaignId: campaignId,
+      updatedAt: new Date().toISOString()
+    }))
+  }, [campaignId, characterProfile, updateStoredProfile])
 
   useEffect(() => {
     if (!characterProfile) return
@@ -612,7 +1128,7 @@ const GameSession = () => {
         if (!prev) return prev
         const merged = new Map<string, NPCRelation>()
         prev.npcRelations?.forEach(rel => {
-          const key = normalizeNpcName(rel.name) || rel.id
+          const key = canonicalNpcId(rel.id, rel.name)
           const existing = merged.get(key)
           if (!existing) {
             merged.set(key, { ...rel, id: key })
@@ -633,18 +1149,39 @@ const GameSession = () => {
     if (!characterProfile.spellCooldowns) {
       updateStoredProfile(prev => ({ ...prev, spellCooldowns: {} }))
     }
+    const generatedLoadout = buildGeneratedLoadoutItems(characterProfile.customClassData)
+    const existingEquipment = characterProfile.equipment || []
+    const shouldBackfillEquipment = characterProfile.equipment === undefined
+    const mergedEquipment = shouldBackfillEquipment
+      ? mergeUniqueEquipment(existingEquipment, generatedLoadout)
+      : existingEquipment
+    const shouldUpdateEquipment =
+      shouldBackfillEquipment && mergedEquipment.length !== existingEquipment.length
+
     if (!characterProfile.inventoryItems) {
-      const equipment = characterProfile.equipment || []
-      if (equipment.length) {
-        const converted = equipment.map((name, index) => ({
-          id: `${name.toLowerCase().replace(/\s+/g, '-')}-${index}`,
-          name,
-          description: 'A trusted item from your pack.',
-          tags: ['equipment']
+      const converted = existingEquipment.length
+        ? existingEquipment.map((name, index) => ({
+            id: `${name.toLowerCase().replace(/\s+/g, '-')}-${index}`,
+            name,
+            description: 'A trusted item from your pack.',
+            tags: ['equipment']
+          }))
+        : []
+      const mergedInventory = mergeUniqueInventoryItems(converted, generatedLoadout)
+      updateStoredProfile(prev => ({
+        ...prev,
+        inventoryItems: mergedInventory,
+        equipment: mergedEquipment
+      }))
+    } else {
+      const mergedInventory = mergeUniqueInventoryItems(characterProfile.inventoryItems, generatedLoadout)
+      const shouldUpdateInventory = mergedInventory.length !== characterProfile.inventoryItems.length
+      if (shouldUpdateInventory || shouldUpdateEquipment) {
+        updateStoredProfile(prev => ({
+          ...prev,
+          inventoryItems: mergedInventory,
+          equipment: mergedEquipment
         }))
-        updateStoredProfile(prev => ({ ...prev, inventoryItems: converted }))
-      } else {
-        updateStoredProfile(prev => ({ ...prev, inventoryItems: [] }))
       }
     }
   }, [characterProfile, updateStoredProfile])
@@ -673,7 +1210,7 @@ const GameSession = () => {
     }
 
     backstorySummaryAttemptedRef.current = true
-    summarizeBackstory(characterProfile.backstory)
+    summarizeBackstory(characterProfile.backstory, language)
       .then(summary => {
         if (!summary) return
         updateStoredProfile(prev => ({
@@ -684,7 +1221,7 @@ const GameSession = () => {
       .catch(error => {
         console.error('Backstory summary failed:', error)
       })
-  }, [characterProfile, messages.length, updateStoredProfile])
+  }, [characterProfile, messages.length, updateStoredProfile, language])
 
   useEffect(() => {
     if (!characterProfile) return
@@ -694,8 +1231,9 @@ const GameSession = () => {
     questInitRef.current = true
     generateQuestFromBackstory(
       characterProfile.backstory,
-      characterProfile.name || 'Hero',
-      characterProfile.class || 'Adventurer'
+      characterProfile.name || t('gameSession.default.hero'),
+      characterProfile.class || t('gameSession.default.adventurer'),
+      language
     )
       .then((quest) => {
         updateStoredProfile(prev => ({
@@ -719,7 +1257,7 @@ const GameSession = () => {
         questInitRef.current = false
         console.error('Initial quest generation failed:', error)
       })
-  }, [characterProfile, updateStoredProfile])
+  }, [characterProfile, updateStoredProfile, t, language])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -739,17 +1277,24 @@ const GameSession = () => {
   const mergedNpcRelations = useMemo(() => {
     const base = new Map<string, NPCRelation>()
     npcRelations.forEach(relation => {
-      base.set(normalizeNpcName(relation.name) || relation.id, relation)
+      const key = canonicalNpcId(relation.id, relation.name)
+      if (!base.has(key)) {
+        base.set(key, { ...relation, id: key })
+      }
     })
     Object.values(npcRegistryById).forEach(npc => {
-      const key = normalizeNpcName(npc.name) || npc.id
-      if (!base.has(key)) {
+      const key = canonicalNpcId(npc.id, npc.name)
+      const existing = base.get(key)
+      if (!existing) {
         base.set(key, {
-          id: npc.id,
+          id: key,
           name: npc.name,
           affinity: 0,
           notes: []
         })
+      } else if (npc.name && existing.name !== npc.name) {
+        // Prefer the latest backend-localized NPC name for current UI language.
+        base.set(key, { ...existing, name: npc.name })
       }
     })
     return Array.from(base.values())
@@ -875,10 +1420,10 @@ const GameSession = () => {
       const relations = [...(prev.npcRelations || [])]
       let changed = false
       knownNpcs.forEach(npc => {
-        const normalized = normalizeNpcName(npc.name)
-        if (!relations.some(entry => normalizeNpcName(entry.name) === normalized)) {
+        const key = canonicalNpcId(npc.id, npc.name)
+        if (!relations.some(entry => canonicalNpcId(entry.id, entry.name) === key)) {
           relations.push({
-            id: npc.id || normalized || npc.name.toLowerCase().replace(/\s+/g, '-'),
+            id: key,
             name: npc.name,
             affinity: 0,
             notes: []
@@ -996,13 +1541,12 @@ const GameSession = () => {
           }
         })
 
-        const notice = `${item.name} used (${item.effects?.hp ? `${item.effects.hp > 0 ? '+' : ''}${item.effects.hp} HP` : ''}${item.effects?.mp ? `${item.effects?.hp ? ', ' : ''}${item.effects.mp > 0 ? '+' : ''}${item.effects.mp} MP` : ''})`
+        const notice = `${item.name} ${t('gameSession.notice.itemUsed')} (${item.effects?.hp ? `${item.effects.hp > 0 ? '+' : ''}${item.effects.hp} HP` : ''}${item.effects?.mp ? `${item.effects?.hp ? ', ' : ''}${item.effects.mp > 0 ? '+' : ''}${item.effects.mp} MP` : ''})`
         pushSystemMessage(notice)
         addSystemNotice(notice)
-        setSelectedItemId(null)
       }
     },
-    [addSystemNotice, inventoryItems, pushSystemMessage, updateStoredProfile, setSelectedItemId]
+    [addSystemNotice, inventoryItems, pushSystemMessage, updateStoredProfile]
   )
 
   const useSpell = useCallback(
@@ -1010,11 +1554,11 @@ const GameSession = () => {
       const meta = getSpellMeta(spell)
       const cooldownRemaining = spellCooldowns[spell.id] || 0
       if (cooldownRemaining > 0) {
-        pushSystemMessage(`${spell.name} is still recovering (${cooldownRemaining} turns).`)
+        pushSystemMessage(`${spell.name} ${t('gameSession.notice.spellRecovering')} (${cooldownRemaining} ${t('gameSession.turns')}).`)
         return
       }
       if (resources.mp < meta.cost) {
-        pushSystemMessage(`Not enough MP to cast ${spell.name}.`)
+        pushSystemMessage(`${t('gameSession.notice.notEnoughMp')} ${spell.name}.`)
         return
       }
 
@@ -1039,7 +1583,7 @@ const GameSession = () => {
       setActiveSpellId(spell.id)
       setTimeout(() => setActiveSpellId(null), 900)
 
-      const notice = `${spell.name}: ${meta.isHealing ? '+4 HP' : 'cast'} (${meta.cost} MP)`
+      const notice = `${spell.name}: ${meta.isHealing ? '+4 HP' : t('gameSession.notice.cast')} (${meta.cost} MP)`
       pushSystemMessage(notice)
       addSystemNotice(notice)
     },
@@ -1065,7 +1609,7 @@ const GameSession = () => {
             }
           }
         })
-        pushSystemMessage(`You take ${playerDamage} damage.`)
+        pushSystemMessage(`${t('gameSession.notice.youTakeDamage')} ${playerDamage}.`)
       }
     },
     [pushSystemMessage, updateStoredProfile]
@@ -1121,7 +1665,8 @@ const GameSession = () => {
           campaignId: campaignId || 'local',
           intent,
           context: buildGameContext(),
-          playerSnapshot: { hp: resources.hp, mp: resources.mp }
+          playerSnapshot: { hp: resources.hp, mp: resources.mp },
+          language
         })
         setBattleState(response.battle)
         setCombatEvents(response.events)
@@ -1140,7 +1685,7 @@ const GameSession = () => {
         clearSystemNotices()
       } catch (error: any) {
         console.error('Combat action failed:', error)
-        pushSystemMessage(error?.message || 'The clash stutters. Try again.')
+        pushSystemMessage(error?.message || t('gameSession.error.clashStutters'))
       } finally {
         setCombatAction({ action: null })
         setAttemptText('')
@@ -1154,7 +1699,8 @@ const GameSession = () => {
       clearSystemNotices,
       resources.hp,
       resources.mp,
-      pushSystemMessage
+      pushSystemMessage,
+      language
     ]
   )
 
@@ -1169,7 +1715,7 @@ const GameSession = () => {
       }
       summaryInFlightRef.current = true
       try {
-        const summary = await summarizeScene(history)
+        const summary = await summarizeScene(history, language)
         if (!summary) {
           return
         }
@@ -1190,7 +1736,7 @@ const GameSession = () => {
         summaryInFlightRef.current = false
       }
     },
-    []
+    [language]
   )
 
   const handleQuestTag = useCallback(
@@ -1301,11 +1847,11 @@ const GameSession = () => {
       })
 
       if (newQuestTitle) {
-        pushSystemMessage(`Quest tracked: ${newQuestTitle}`)
+        pushSystemMessage(`${t('gameSession.notice.questTracked')}: ${newQuestTitle}`)
       }
 
       if (xpAwarded > 0) {
-        pushSystemMessage(`Quest complete! You gained ${xpAwarded} XP.`)
+        pushSystemMessage(`${t('gameSession.notice.questComplete')} ${xpAwarded} XP.`)
       }
     },
     [updateStoredProfile, pushSystemMessage]
@@ -1382,10 +1928,10 @@ const GameSession = () => {
       updateStoredProfile(prev => {
         if (!prev) return prev
         const relations = [...(prev.npcRelations || [])]
-        const normalized = normalizeNpcName(name)
-        const existingIndex = relations.findIndex(rel => normalizeNpcName(rel.name) === normalized)
+        const key = canonicalNpcId(attributes.id, name)
+        const existingIndex = relations.findIndex(rel => canonicalNpcId(rel.id, rel.name) === key)
         const base = existingIndex >= 0 ? relations[existingIndex] : {
-          id: normalized || name.toLowerCase().replace(/\s+/g, '-'),
+          id: key,
           name,
           affinity: 0,
           notes: []
@@ -1447,7 +1993,7 @@ const GameSession = () => {
           })
           .catch(error => {
             console.error('Failed to start battle:', error)
-            pushSystemMessage('The clash refuses to take shape. Try again.')
+            pushSystemMessage(t('gameSession.error.clashRefuses'))
           })
         return
       }
@@ -1536,7 +2082,7 @@ const GameSession = () => {
         return {
           request: {
             stat: dmResponse.pending_check.stat.toUpperCase() as Stat,
-            label: dmResponse.pending_check.context || 'Check',
+            label: dmResponse.pending_check.context || t('gameSession.check'),
             dc: Number.isFinite(dcValue) ? dcValue : undefined,
             kind: dmResponse.pending_check.type
           },
@@ -1549,7 +2095,7 @@ const GameSession = () => {
       return {
         request: {
           stat: dmResponse.checkRequest.stat.toUpperCase() as Stat,
-          label: dmResponse.checkRequest.context || 'Check',
+          label: dmResponse.checkRequest.context || t('gameSession.check'),
           dc: Number.isFinite(dcValue) ? dcValue : undefined,
           kind: dmResponse.checkRequest.type
         },
@@ -1567,7 +2113,10 @@ const GameSession = () => {
       if (dmResponse.npcRegistry?.length) {
         const registryMap = dmResponse.npcRegistry.reduce<Record<string, NPCRegistryEntry>>(
           (acc, entry) => {
-            acc[entry.id] = entry
+            const key = canonicalNpcId(entry.id, entry.name)
+            if (!acc[key]) {
+              acc[key] = { ...entry, id: key }
+            }
             return acc
           },
           {}
@@ -1586,12 +2135,20 @@ const GameSession = () => {
         setNpcPaletteList(dmResponse.npcPalette)
       }
 
+      const rawNarration = dmResponse.response || dmResponse.narrative || ''
       const cleanedContent = stripNumberedParagraphs(
-        stripStructuredTags(dmResponse.response || '')
+        stripStructuredTags(rawNarration)
       )
-      const { header, body } = extractSceneHeader(cleanedContent)
-      if (header) {
-        lastSceneHeaderRef.current = header
+      const { header: extractedHeader, body } = extractSceneHeader(cleanedContent)
+      const sceneHeaderFromMeta =
+        dmResponse.scene?.location && dmResponse.scene?.time
+          ? `${dmResponse.scene.location} · ${dmResponse.scene.time}`
+          : dmResponse.scene?.location
+          ? dmResponse.scene.location
+          : ''
+      const finalHeader = sceneHeaderFromMeta || extractedHeader
+      if (finalHeader) {
+        lastSceneHeaderRef.current = finalHeader
       }
 
       if (body) {
@@ -1599,7 +2156,7 @@ const GameSession = () => {
           id: createMessageId(),
           type: 'dm',
           content: body,
-          sceneHeader: header || undefined,
+          sceneHeader: finalHeader || undefined,
           timestamp: new Date(),
           diceRoll: dmResponse.diceRolls?.[0]
         }
@@ -1675,7 +2232,7 @@ const GameSession = () => {
       }
       statusUpdateInFlightRef.current = true
       try {
-        const payload = await getStatusUpdate(history, buildStatusStateInput())
+        const payload = await getStatusUpdate(history, buildStatusStateInput(), language)
         applyStatusUpdate(payload)
       } catch (error) {
         console.error('Failed to update status effects:', error)
@@ -1683,7 +2240,7 @@ const GameSession = () => {
         statusUpdateInFlightRef.current = false
       }
     },
-    [applyStatusUpdate, buildStatusStateInput]
+    [applyStatusUpdate, buildStatusStateInput, language]
   )
 
   useEffect(() => {
@@ -1712,7 +2269,7 @@ const GameSession = () => {
       },
       buildGameContext(),
       [],
-      { campaignId, playerSnapshot: { hp: resources.hp, mp: resources.mp } }
+      { campaignId, playerSnapshot: { hp: resources.hp, mp: resources.mp }, language }
     )
       .then(dmResponse => {
         const updatedHistory: ChatMessage[] = [{ role: 'assistant', content: dmResponse.response }]
@@ -1725,7 +2282,7 @@ const GameSession = () => {
       .catch(error => {
         openingGeneratedRef.current = false
         console.error('Failed to generate opening scene:', error)
-        pushSystemMessage(error?.message || 'The opening scene could not be generated. Try again.')
+        pushSystemMessage(error?.message || t('gameSession.error.openingScene'))
       })
       .finally(() => {
         setIsLoading(false)
@@ -1741,7 +2298,8 @@ const GameSession = () => {
     quests,
     resources.hp,
     resources.mp,
-    stats
+    stats,
+    language
   ])
 
   const continueStoryAfterRoll = useCallback(
@@ -1797,7 +2355,8 @@ const GameSession = () => {
               dc: payload.request.dc
             },
             pendingCheckId,
-            playerSnapshot: { hp: resources.hp, mp: resources.mp }
+            playerSnapshot: { hp: resources.hp, mp: resources.mp },
+            language
           }
         )
 
@@ -1817,7 +2376,7 @@ const GameSession = () => {
         handleDMResponseOutput(dmResponse)
       } catch (error: any) {
         console.error('Failed to continue story after roll:', error)
-        pushSystemMessage(error?.message || 'The DM hesitates, try again in a moment.')
+        pushSystemMessage(error?.message || t('gameSession.error.dmHesitates'))
       } finally {
         setIsLoading(false)
       }
@@ -1835,7 +2394,8 @@ const GameSession = () => {
       resources.hp,
       resources.mp,
       stats,
-      tickCooldowns
+      tickCooldowns,
+      language
     ]
   )
 
@@ -2026,7 +2586,6 @@ const GameSession = () => {
       return Math.floor(Math.random() * 20) + 1
     })
     const [showBonus, setShowBonus] = useState(false)
-    const [showResult, setShowResult] = useState(false)
 
     useEffect(() => {
       if (roll.status !== 'rolling') {
@@ -2091,108 +2650,6 @@ const GameSession = () => {
   }
 
   */
-
-  const DiceRollHeader = ({ roll }: { roll: RollState }) => {
-    const [displayValue, setDisplayValue] = useState<number>(() => {
-      if (roll.status === 'done') {
-        return roll.d20
-      }
-      return Math.floor(Math.random() * 20) + 1
-    })
-    const [showStatBonus, setShowStatBonus] = useState(false)
-    const [showProfBonus, setShowProfBonus] = useState(false)
-    const [showTotal, setShowTotal] = useState(false)
-    const [showResult, setShowResult] = useState(false)
-
-    useEffect(() => {
-      if (roll.status !== 'rolling') {
-        return
-      }
-      setShowStatBonus(false)
-      setShowProfBonus(false)
-      setShowTotal(false)
-      setShowResult(false)
-      const interval = window.setInterval(() => {
-        setDisplayValue(Math.floor(Math.random() * 20) + 1)
-      }, 50)
-      return () => window.clearInterval(interval)
-    }, [roll.status, 'startedAt' in roll ? roll.startedAt : 0])
-
-    useEffect(() => {
-      if (roll.status !== 'done') {
-        return
-      }
-      setDisplayValue(roll.d20)
-      setShowStatBonus(false)
-      setShowProfBonus(false)
-      setShowTotal(false)
-      setShowResult(false)
-      const statTimer = window.setTimeout(() => setShowStatBonus(true), 120)
-      const profTimer = window.setTimeout(() => setShowProfBonus(true), 320)
-      const totalTimer = window.setTimeout(() => setShowTotal(true), 520)
-      const resultTimer = window.setTimeout(() => setShowResult(true), 720)
-      return () => {
-        window.clearTimeout(statTimer)
-        window.clearTimeout(profTimer)
-        window.clearTimeout(totalTimer)
-        window.clearTimeout(resultTimer)
-      }
-    }, [roll.status, 'resolvedAt' in roll ? roll.resolvedAt : 0, 'd20' in roll ? roll.d20 : 0])
-
-    if (roll.status === 'idle') {
-      return null
-    }
-
-    const dcLabel = roll.request.dc ? `DC ${roll.request.dc}` : 'DC ?'
-    const statLine =
-      roll.status === 'done'
-        ? `${roll.statBonus >= 0 ? '+' : ''}${roll.statBonus} ${roll.request.stat}`
-        : ''
-    const profLine =
-      roll.status === 'done'
-        ? `${roll.proficiencyBonus >= 0 ? '+' : ''}${roll.proficiencyBonus} Proficiency`
-        : ''
-
-    return (
-      <div className={`roll-inline ${roll.status}`}>
-        <div className="roll-inline-header">
-          <div className="roll-inline-title">{roll.request.label}</div>
-          <div className="roll-inline-meta">
-            <span>{roll.request.stat}</span>
-            <span className="roll-inline-dot">·</span>
-            <span>{dcLabel}</span>
-          </div>
-        </div>
-        <div className="roll-inline-number">
-          <span className={`roll-inline-value ${roll.status === 'rolling' ? 'flicker' : ''}`}>
-            {displayValue}
-          </span>
-        </div>
-        {roll.status === 'done' && (
-          <>
-            <div className="roll-inline-breakdown">
-              <span className={`roll-inline-line ${showStatBonus ? 'show' : ''}`}>
-                {statLine}
-              </span>
-              <span className={`roll-inline-line ${showProfBonus ? 'show' : ''}`}>
-                {profLine}
-              </span>
-              <span className={`roll-inline-line ${showTotal ? 'show' : ''}`}>
-                Total {roll.total}
-              </span>
-            </div>
-            <div
-              className={`roll-inline-result ${showResult ? 'show' : ''} ${
-                roll.success ? 'success' : 'fail'
-              }`}
-            >
-              {roll.success ? 'SUCCESS' : 'FAIL'}
-            </div>
-          </>
-        )}
-      </div>
-    )
-  }
 
   const resolvePaletteEntry = useCallback(
     (paletteId: string | undefined, keySeed: string): NPCPaletteEntry => {
@@ -2364,7 +2821,7 @@ const GameSession = () => {
           },
           buildGameContext(),
           historyWithPlayer,
-          { campaignId, playerSnapshot: { hp: resources.hp, mp: resources.mp } }
+          { campaignId, playerSnapshot: { hp: resources.hp, mp: resources.mp }, language }
         )
 
         const updatedHistory: ChatMessage[] = [
@@ -2378,7 +2835,7 @@ const GameSession = () => {
         handleDMResponseOutput(dmResponse)
       } catch (error: any) {
         console.error('Failed to reach DM:', error)
-        pushSystemMessage(error?.message || 'The weave is silent. Please try again.')
+        pushSystemMessage(error?.message || t('gameSession.error.weaveSilent'))
       } finally {
         setIsLoading(false)
       }
@@ -2398,7 +2855,8 @@ const GameSession = () => {
       pushSystemMessage,
       tickCooldowns,
       resources.hp,
-      resources.mp
+      resources.mp,
+      language
     ]
   )
 
@@ -2412,11 +2870,106 @@ const GameSession = () => {
     [handleSendMessage]
   )
   const renderSidebarContent = () => {
+    const slotLabel = (slot: 'head' | 'leftHand' | 'rightHand' | 'body' | 'arms' | 'legs' | 'accessory') => {
+      const labels =
+        language === 'ru'
+          ? {
+              head: 'Голова',
+              leftHand: 'Левая рука',
+              rightHand: 'Правая рука',
+              body: 'Тело',
+              arms: 'Руки',
+              legs: 'Ноги',
+              accessory: 'Аксессуар'
+            }
+          : {
+              head: 'Head',
+              leftHand: 'Left Hand',
+              rightHand: 'Right Hand',
+              body: 'Body',
+              arms: 'Arms',
+              legs: 'Legs',
+              accessory: 'Accessory'
+            }
+      return labels[slot]
+    }
+    const emptySlotText = language === 'ru' ? 'Пусто' : 'Empty'
+    const equipmentTitle = language === 'ru' ? 'Снаряжение' : 'Equipment'
+    const equipActionLabel = language === 'ru' ? 'Одеть' : 'Equip'
+    const unequipActionLabel = language === 'ru' ? 'Снять' : 'Unequip'
+    const damageLabel = language === 'ru' ? 'Урон' : 'DMG'
+    const armorLabel = 'AC'
+    const chargesLabel = language === 'ru' ? 'Заряды' : 'Charges'
+    const hpLabel = 'HP'
+    const mpLabel = 'MP'
+    const allItemNames = [
+      ...inventoryItems.map(item => item.name).filter(Boolean),
+      ...equipment.filter(Boolean)
+    ]
+    const equipmentPool = Array.from(new Set(allItemNames))
+    const equippedItemNames = Array.from(new Set(equipment.filter(Boolean)))
+    const firstByKeywords = (keywords: string[], source: string[]) =>
+      source.find(name => keywords.some(keyword => name.toLowerCase().includes(keyword))) || null
+    const weaponName =
+      inventoryItems.find(item => item.slot === 'weapon' || item.tags.some(tag => tag.toLowerCase() === 'weapon'))
+        ?.name && equipment.includes(
+          inventoryItems.find(item => item.slot === 'weapon' || item.tags.some(tag => tag.toLowerCase() === 'weapon'))
+            ?.name || ''
+        )
+        ? inventoryItems.find(item => item.slot === 'weapon' || item.tags.some(tag => tag.toLowerCase() === 'weapon'))
+            ?.name || null
+        : firstByKeywords(['sword', 'blade', 'axe', 'mace', 'staff', 'bow', 'dagger', 'weapon', 'меч', 'клин', 'топор', 'булава', 'посох', 'лук', 'кинжал', 'оруж'], equippedItemNames)
+    const armorName =
+      inventoryItems.find(item => item.slot === 'armor' || item.tags.some(tag => tag.toLowerCase() === 'armor'))
+        ?.name && equipment.includes(
+          inventoryItems.find(item => item.slot === 'armor' || item.tags.some(tag => tag.toLowerCase() === 'armor'))
+            ?.name || ''
+        )
+        ? inventoryItems.find(item => item.slot === 'armor' || item.tags.some(tag => tag.toLowerCase() === 'armor'))
+            ?.name || null
+        : firstByKeywords(['armor', 'mail', 'plate', 'robe', 'leather', 'брон', 'доспех', 'латы', 'роб'], equippedItemNames)
+    const leftHandName = firstByKeywords(['shield', 'buckler', 'щит'], equippedItemNames)
+    const headName = firstByKeywords(['hood', 'helm', 'helmet', 'hat', 'cap', 'шлем', 'капюш', 'шап'], equippedItemNames)
+    const armsName = firstByKeywords(['gauntlet', 'glove', 'bracer', 'перчат', 'наруч'], equippedItemNames)
+    const legsName = firstByKeywords(['boot', 'greaves', 'pants', 'leggings', 'сапог', 'понож', 'штаны'], equippedItemNames)
+    const accessoryName = firstByKeywords(['ring', 'amulet', 'charm', 'bracelet', 'кольц', 'амулет', 'талисман', 'браслет'], equippedItemNames)
+    const slotValues = {
+      head: headName || emptySlotText,
+      leftHand: leftHandName || emptySlotText,
+      rightHand: weaponName || emptySlotText,
+      body: armorName || emptySlotText,
+      arms: armsName || emptySlotText,
+      legs: legsName || emptySlotText,
+      accessory: accessoryName || emptySlotText
+    }
+    const isEmptyValue = (value: string) => value === emptySlotText
+    const findItemMeta = (name: string) =>
+      inventoryItems.find(item => item.name.trim().toLowerCase() === name.trim().toLowerCase()) || null
+    const formatItemStats = (item: InventoryItem | null): string => {
+      if (!item) return ''
+      const parts: string[] = []
+      if (item.armorClass !== undefined) parts.push(`${armorLabel} ${item.armorClass}`)
+      if (item.damage) parts.push(`${damageLabel} ${item.damage}`)
+      if (item.charges !== undefined) parts.push(`${chargesLabel} ${item.charges}`)
+      if (item.effects?.hp) parts.push(`${hpLabel} ${item.effects.hp > 0 ? '+' : ''}${item.effects.hp}`)
+      if (item.effects?.mp) parts.push(`${mpLabel} ${item.effects.mp > 0 ? '+' : ''}${item.effects.mp}`)
+      return parts.join(' · ')
+    }
+    const slotStats = {
+      head: isEmptyValue(slotValues.head) ? '' : formatItemStats(findItemMeta(slotValues.head)),
+      leftHand: isEmptyValue(slotValues.leftHand) ? '' : formatItemStats(findItemMeta(slotValues.leftHand)),
+      rightHand: isEmptyValue(slotValues.rightHand) ? '' : formatItemStats(findItemMeta(slotValues.rightHand)),
+      body: isEmptyValue(slotValues.body) ? '' : formatItemStats(findItemMeta(slotValues.body)),
+      arms: isEmptyValue(slotValues.arms) ? '' : formatItemStats(findItemMeta(slotValues.arms)),
+      legs: isEmptyValue(slotValues.legs) ? '' : formatItemStats(findItemMeta(slotValues.legs)),
+      accessory: isEmptyValue(slotValues.accessory) ? '' : formatItemStats(findItemMeta(slotValues.accessory))
+    }
+
     switch (activeSidebar) {
-      case 'quests':
+      case 'journal':
         return (
           <>
-            <h3>Quest Log</h3>
+            <h3>{t('gameSession.questLog')}</h3>
             <div className="quest-list">
               {quests.length ? (
                 quests.map(quest => (
@@ -2432,7 +2985,7 @@ const GameSession = () => {
                       <div>
                         <h4>{quest.title}</h4>
                         <span className="quest-status">
-                          {quest.status.charAt(0).toUpperCase() + quest.status.slice(1)}
+                          {getQuestStatusLabel(quest.status)}
                         </span>
                       </div>
                       <span className="quest-xp">{quest.xp} XP</span>
@@ -2471,15 +3024,10 @@ const GameSession = () => {
                   </div>
                 ))
               ) : (
-                <p className="empty-text">No quests recorded yet.</p>
+                <p className="empty-text">{t('gameSession.empty.noQuests')}</p>
               )}
             </div>
-          </>
-        )
-      case 'rumors':
-        return (
-          <>
-            <h3>Rumors</h3>
+            <h3 className="sidebar-subheading">{t('gameSession.rumors')}</h3>
             <div className="quest-list">
               {rumors.length ? (
                 rumors.map(rumor => (
@@ -2493,7 +3041,7 @@ const GameSession = () => {
                       onClick={() => toggleExpanded(setExpandedRumorIds, rumor.id)}
                     >
                       <h4>{rumor.title}</h4>
-                      <span className="quest-xp">Unverified</span>
+                      <span className="quest-xp">{t('gameSession.unverified')}</span>
                     </button>
                     {expandedRumorIds.has(rumor.id) && (
                       <div className="expandable-body">
@@ -2510,7 +3058,7 @@ const GameSession = () => {
                   </div>
                 ))
               ) : (
-                <p className="empty-text">No rumors collected.</p>
+                <p className="empty-text">{t('gameSession.empty.noRumors')}</p>
               )}
             </div>
           </>
@@ -2518,7 +3066,7 @@ const GameSession = () => {
       case 'stats':
         return (
           <>
-            <h3>Character Stats</h3>
+            <h3>{t('gameSession.characterStats')}</h3>
             <div className="stats-grid">
               {Object.entries(stats).map(([stat, value]) => (
                 <div className="stat-item" key={stat}>
@@ -2530,11 +3078,11 @@ const GameSession = () => {
             <div className="stats-other">
               <div className="inventory-item">
                 <div>
-                  <strong>Level</strong>
+                  <strong>{t('gameSession.level')}</strong>
                   <p>{level}</p>
                 </div>
                 <div>
-                  <strong>XP</strong>
+                  <strong>{t('gameSession.xp')}</strong>
                   <p>
                     {xp} / {nextThreshold}
                   </p>
@@ -2542,8 +3090,8 @@ const GameSession = () => {
               </div>
               <div className="inventory-item status-card">
                 <div>
-                  <strong>Status</strong>
-                  <p>{statusEffects.length ? 'Active' : 'None'}</p>
+                  <strong>{t('gameSession.status')}</strong>
+                  <p>{statusEffects.length ? t('gameSession.active') : t('gameSession.none')}</p>
                 </div>
                 {statusEffects.length ? (
                   <div className="effects-list">
@@ -2572,18 +3120,18 @@ const GameSession = () => {
                     }
                     const severityLabel =
                       match.severity && match.id === 'exhaustion'
-                        ? `Level: ${match.severity}`
+                        ? `${statusDetailLabel('level')}: ${match.severity}`
                         : match.severity && match.id === 'corruption'
-                        ? `Tier: ${match.severity}`
+                        ? `${statusDetailLabel('tier')}: ${match.severity}`
                         : match.severity
-                        ? `Severity: ${match.severity}`
+                        ? `${statusDetailLabel('severity')}: ${match.severity}`
                         : ''
                     const formatModifiers = (modifiers?: StatusEffect['modifiers']) => {
                       if (!modifiers) return ''
                       const parts = Object.entries(modifiers)
                         .filter(([, value]) => value)
                         .map(([key, value]) => `${key}: ${value}`)
-                      return parts.length ? `Modifiers: ${parts.join(', ')}` : ''
+                      return parts.length ? `${statusDetailLabel('modifiers')}: ${parts.join(', ')}` : ''
                     }
 
                     const formatRestrictions = (restrictions?: StatusEffect['restrictions']) => {
@@ -2591,26 +3139,26 @@ const GameSession = () => {
                       const parts = Object.entries(restrictions)
                         .filter(([, value]) => value !== undefined)
                         .map(([key, value]) => `${key}: ${value}`)
-                      return parts.length ? `Restrictions: ${parts.join(', ')}` : ''
+                      return parts.length ? `${statusDetailLabel('restrictions')}: ${parts.join(', ')}` : ''
                     }
 
                     const cues =
                       match.narrationCues && match.narrationCues.length
-                        ? `Cues: ${match.narrationCues.join(', ')}`
+                        ? `${statusDetailLabel('cues')}: ${match.narrationCues.join(', ')}`
                         : ''
 
                     const detailParts = [
                       severityLabel,
-                      match.mechanics ? `Mechanics: ${match.mechanics}` : '',
-                      match.trigger ? `Trigger: ${match.trigger}` : '',
+                      match.mechanics ? `${statusDetailLabel('mechanics')}: ${match.mechanics}` : '',
+                      match.trigger ? `${statusDetailLabel('trigger')}: ${match.trigger}` : '',
                       formatModifiers(match.modifiers),
                       formatRestrictions(match.restrictions),
                       cues,
                       match.duration
-                        ? `Duration: ${match.duration.type}${match.duration.value ? ` ${match.duration.value}` : ''}`
+                        ? `${statusDetailLabel('duration')}: ${match.duration.type}${match.duration.value ? ` ${match.duration.value}` : ''}`
                         : '',
-                      match.source ? `Source: ${match.source}` : '',
-                      match.cure ? `Cure: ${match.cure}` : ''
+                      match.source ? `${statusDetailLabel('source')}: ${match.source}` : '',
+                      match.cure ? `${statusDetailLabel('cure')}: ${match.cure}` : ''
                     ].filter(Boolean)
                     return detailParts.join(' ')
                   })()}
@@ -2619,60 +3167,255 @@ const GameSession = () => {
             </div>
           </>
         )
-      case 'inventory':
+      case 'loadout':
         return (
           <>
-            <h3>Inventory</h3>
-            {inventoryItems.length ? (
-              <div className="inventory-list">
-                {inventoryItems.map(item => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    className={`inventory-item expandable ${selectedItemId === item.id ? 'open' : ''}`}
-                    onClick={() => setSelectedItemId(prev => (prev === item.id ? null : item.id))}
-                  >
-                    <div>
-                      <strong>{item.name}</strong>
-                      <p className="item-tags">{item.tags.join(', ')}</p>
+            <h3>{t('gameSession.loadout')}</h3>
+            <div className="sidebar-subtabs">
+              <button
+                type="button"
+                className={`sidebar-subtab ${activeLoadoutTab === 'inventory' ? 'active' : ''}`}
+                onClick={() => setActiveLoadoutTab('inventory')}
+              >
+                {t('gameSession.inventory')}
+              </button>
+              <button
+                type="button"
+                className={`sidebar-subtab ${activeLoadoutTab === 'spells' ? 'active' : ''}`}
+                onClick={() => setActiveLoadoutTab('spells')}
+              >
+                {t('gameSession.spells')}
+              </button>
+            </div>
+
+            {activeLoadoutTab === 'inventory' ? (
+              <>
+                {/* Equipment Box */}
+                <div className="bg-[#1C1B22]/80 rounded-lg p-3 border border-[#C6A75E]/30">
+                  <h4 className="text-xs font-semibold text-[#C6A75E] mb-3 uppercase tracking-wide flex items-center gap-2">
+                    <Shield className="size-3.5" />
+                    {equipmentTitle}
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2 p-2.5 bg-[#23222A]/60 rounded-lg border border-[#6C5CE7]/20 hover:border-[#6C5CE7]/40 transition-all cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#B8BCC8] text-xs">{slotLabel('head')}</span>
+                        <span className={`text-xs ${isEmptyValue(slotValues.head) ? 'text-[#8f94a3]' : 'text-[#E0E3EA]'}`}>{slotValues.head}</span>
+                      </div>
+                      {slotStats.head ? <p className="equipment-slot-stats">{slotStats.head}</p> : null}
                     </div>
-                    <span className="item-count">{item.consumable ? 'Use' : 'Inspect'}</span>
-                  </button>
+                    <div className="p-2.5 bg-[#23222A]/60 rounded-lg border border-[#6C5CE7]/20 hover:border-[#6C5CE7]/40 transition-all cursor-pointer">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[#B8BCC8] text-xs">{slotLabel('leftHand')}</span>
+                        <span className={`text-xs font-medium ${isEmptyValue(slotValues.leftHand) ? 'text-[#8f94a3]' : 'text-[#E0E3EA]'}`}>{slotValues.leftHand}</span>
+                      </div>
+                      {slotStats.leftHand ? <p className="equipment-slot-stats">{slotStats.leftHand}</p> : null}
+                    </div>
+                    <div className="p-2.5 bg-[#23222A]/60 rounded-lg border border-[#6C5CE7]/20 hover:border-[#6C5CE7]/40 transition-all cursor-pointer">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[#B8BCC8] text-xs">{slotLabel('rightHand')}</span>
+                        <span className={`text-xs font-medium ${isEmptyValue(slotValues.rightHand) ? 'text-[#8f94a3]' : 'text-[#E0E3EA]'}`}>{slotValues.rightHand}</span>
+                      </div>
+                      {slotStats.rightHand ? <p className="equipment-slot-stats">{slotStats.rightHand}</p> : null}
+                    </div>
+                    <div className="col-span-2 p-2.5 bg-[#23222A]/60 rounded-lg border border-[#6C5CE7]/20 hover:border-[#6C5CE7]/40 transition-all cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#B8BCC8] text-xs">{slotLabel('body')}</span>
+                        <span className={`text-xs ${isEmptyValue(slotValues.body) ? 'text-[#8f94a3]' : 'text-[#E0E3EA]'}`}>{slotValues.body}</span>
+                      </div>
+                      {slotStats.body ? <p className="equipment-slot-stats">{slotStats.body}</p> : null}
+                    </div>
+                    <div className="p-2.5 bg-[#23222A]/60 rounded-lg border border-[#6C5CE7]/20 hover:border-[#6C5CE7]/40 transition-all cursor-pointer">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[#B8BCC8] text-xs">{slotLabel('arms')}</span>
+                        <span className={`text-xs font-medium ${isEmptyValue(slotValues.arms) ? 'text-[#8f94a3]' : 'text-[#E0E3EA]'}`}>{slotValues.arms}</span>
+                      </div>
+                      {slotStats.arms ? <p className="equipment-slot-stats">{slotStats.arms}</p> : null}
+                    </div>
+                    <div className="p-2.5 bg-[#23222A]/60 rounded-lg border border-[#6C5CE7]/20 hover:border-[#6C5CE7]/40 transition-all cursor-pointer">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[#B8BCC8] text-xs">{slotLabel('legs')}</span>
+                        <span className={`text-xs font-medium ${isEmptyValue(slotValues.legs) ? 'text-[#8f94a3]' : 'text-[#E0E3EA]'}`}>{slotValues.legs}</span>
+                      </div>
+                      {slotStats.legs ? <p className="equipment-slot-stats">{slotStats.legs}</p> : null}
+                    </div>
+                    <div className="col-span-2 p-2.5 bg-[#23222A]/60 rounded-lg border border-[#C6A75E]/30 hover:border-[#C6A75E]/50 transition-all cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#B8BCC8] text-xs">{slotLabel('accessory')}</span>
+                        <span className={`text-xs font-medium ${isEmptyValue(slotValues.accessory) ? 'text-[#8f94a3]' : 'text-[#C6A75E]'}`}>{slotValues.accessory}</span>
+                      </div>
+                      {slotStats.accessory ? <p className="equipment-slot-stats">{slotStats.accessory}</p> : null}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {unlockedSkills.length ? (
+                  <>
+                    <h4 className="sidebar-subheading">{t('gameSession.techniques')}</h4>
+                    <div className="spell-list">
+                      {unlockedSkills.map(skill => (
+                        <div className={`spell-item expandable ${expandedSpellIds.has(skill.id) ? 'open' : ''}`} key={skill.id}>
+                          <button
+                            type="button"
+                            className="expandable-header"
+                            onClick={() => toggleExpanded(setExpandedSpellIds, skill.id)}
+                          >
+                            <strong>{skill.name}</strong>
+                            <span className="item-count">{t('gameSession.ready')}</span>
+                          </button>
+                          {expandedSpellIds.has(skill.id) && (
+                            <div className="expandable-body">
+                              <p>{skill.description}</p>
+                              <button
+                                type="button"
+                                className="roll-btn optional"
+                                onClick={() => {
+                                  pushSystemMessage(`${skill.name} ${t('gameSession.notice.skillUsed')}`)
+                                  addSystemNotice(`${skill.name} ${t('gameSession.notice.skillUsed')}`)
+                                }}
+                              >
+                                {t('gameSession.useTechnique')}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="empty-text">{t('gameSession.empty.noTechniques')}</p>
+                )}
+
+                {unlockedSpells.length ? (
+                  <>
+                    <h4 className="sidebar-subheading">{t('gameSession.spells')}</h4>
+                    <div className="spell-list">
+                      {unlockedSpells.map(spell => (
+                        <div className={`spell-item expandable ${expandedSpellIds.has(spell.id) ? 'open' : ''} ${activeSpellId === spell.id ? 'casting' : ''}`} key={spell.id}>
+                          <button
+                            type="button"
+                            className="expandable-header"
+                            onClick={() => toggleExpanded(setExpandedSpellIds, spell.id)}
+                          >
+                            <strong>{spell.name}</strong>
+                            <span className="item-count">
+                              {spellCooldowns[spell.id] ? `CD ${spellCooldowns[spell.id]}` : t('gameSession.ready')}
+                            </span>
+                          </button>
+                          {expandedSpellIds.has(spell.id) && (
+                            <div className="expandable-body">
+                              <p>{spell.description}</p>
+                              <button type="button" className="roll-btn optional" onClick={() => useSpell(spell)}>
+                                {t('gameSession.castSpell')}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="empty-text">{t('gameSession.empty.noSpells')}</p>
+                )}
+              </>
+            )}
+
+            <h4 className="sidebar-subheading">{t('gameSession.equipped')}</h4>
+            {equipmentPool.length ? (
+              <div className="boon-list">
+                {equipmentPool.map((entry, index) => {
+                  const isEquipped = equipment.includes(entry)
+                  const itemMeta = inventoryItems.find(item => item.name === entry)
+                  const itemStats = formatItemStats(itemMeta || null)
+                  const itemDescription =
+                    itemMeta?.description ||
+                    (language === 'ru'
+                      ? 'Описание для этого предмета пока отсутствует.'
+                      : 'No description is available for this item yet.')
+                  const itemKey = `${entry}-${index}`
+                  const isExpanded = expandedEquipmentItem === itemKey
+                  return (
+                  <div className={`inventory-item equipment-entry ${isExpanded ? 'expanded' : ''}`} key={itemKey}>
+                    <div className="equipment-entry-main">
+                      <button
+                        type="button"
+                        className="equipment-name-btn"
+                        onClick={() => setExpandedEquipmentItem(prev => (prev === itemKey ? null : itemKey))}
+                      >
+                        {entry}
+                      </button>
+                      {itemStats ? <span className="equipment-inline-stats">{itemStats}</span> : null}
+                      <div className="equipment-actions">
+                        {isEquipped ? (
+                          <button
+                            type="button"
+                            className="equipment-action-btn unequip"
+                            title={unequipActionLabel}
+                            aria-label={unequipActionLabel}
+                            onClick={() =>
+                              updateStoredProfile(prev => {
+                                if (!prev) return prev
+                                const next = (prev.equipment || []).filter(item => item !== entry)
+                                return { ...prev, equipment: next }
+                              })
+                            }
+                          >
+                            <X size={12} />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="equipment-action-btn equip"
+                            title={equipActionLabel}
+                            aria-label={equipActionLabel}
+                            onClick={() =>
+                              updateStoredProfile(prev => {
+                                if (!prev) return prev
+                                const current = prev.equipment || []
+                                if (current.includes(entry)) return prev
+                                return { ...prev, equipment: [...current, entry] }
+                              })
+                            }
+                          >
+                            <Check size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {isExpanded && (
+                      <>
+                        <p className="equipment-description">{itemDescription}</p>
+                        {itemStats ? <p className="equipment-description stats">{itemStats}</p> : null}
+                      </>
+                    )}
+                  </div>
+                )})}
+              </div>
+            ) : (
+              <p className="empty-text">{t('gameSession.empty.noItemsEquipped')}</p>
+            )}
+
+            <h4 className="sidebar-subheading">{t('gameSession.artifactsAndBoons')}</h4>
+            {artifacts.length ? (
+              <div className="boon-list">
+                {artifacts.map((artifact, index) => (
+                  <div className="inventory-item" key={`${artifact}-${index}`}>
+                    <span>{artifact}</span>
+                    <span className="item-count">{t('gameSession.bound')}</span>
+                  </div>
                 ))}
               </div>
             ) : (
-              <p className="empty-text">No equipment recorded.</p>
-            )}
-            {selectedItemId && (
-              <div className="details-panel">
-                {(() => {
-                  const item = inventoryItems.find(entry => entry.id === selectedItemId)
-                  if (!item) return null
-                  return (
-                    <>
-                      <h4>{item.name}</h4>
-                      <p>{item.description}</p>
-                      <div className="item-tags">
-                        {item.tags.map(tag => (
-                          <span key={`${item.id}-${tag}`} className="effect-tag">{tag}</span>
-                        ))}
-                      </div>
-                      {item.consumable && (
-                        <button type="button" className="roll-btn optional" onClick={() => useItem(item.id)}>
-                          Use item
-                        </button>
-                      )}
-                    </>
-                  )
-                })()}
-              </div>
+              <p className="empty-text">{t('gameSession.empty.noArtifacts')}</p>
             )}
           </>
         )
-      case 'npcs':
+      case 'social':
         return (
           <>
-            <h3>NPC Relationships</h3>
+            <h3>{t('gameSession.npcRelationships')}</h3>
             {mergedNpcRelations.length ? (
               <div className="npc-list">
                 {mergedNpcRelations.map(npc => (
@@ -2688,14 +3431,14 @@ const GameSession = () => {
                       <div className="expandable-body">
                         <div className="relation-bar">
                           <span className={`relation-fill tier-${getAffinityTierIndex(npc.affinity)}`} />
-                          <span className="relation-label">{getAffinityBadge(npc.affinity)}</span>
+                          <span className="relation-label">{getAffinityLabel(npc.affinity)}</span>
                         </div>
                         {npc.notes.length ? (
                           npc.notes.map((note, index) => (
                             <p key={`${npc.id}-note-${index}`}>{note}</p>
                           ))
                         ) : (
-                          <p className="empty-text">No notable exchanges yet.</p>
+                          <p className="empty-text">{t('gameSession.empty.noNpcNotes')}</p>
                         )}
                       </div>
                     )}
@@ -2703,99 +3446,7 @@ const GameSession = () => {
                 ))}
               </div>
             ) : (
-              <p className="empty-text">No relationships tracked yet.</p>
-            )}
-          </>
-        )
-      case 'spells':
-        return (
-          <>
-            <h3>Spellbook &amp; Skills</h3>
-            {unlockedSkills.length ? (
-              <>
-                <h4>Techniques</h4>
-                <div className="spell-list">
-                  {unlockedSkills.map(skill => (
-                    <div className={`spell-item expandable ${expandedSpellIds.has(skill.id) ? 'open' : ''}`} key={skill.id}>
-                      <button
-                        type="button"
-                        className="expandable-header"
-                        onClick={() => toggleExpanded(setExpandedSpellIds, skill.id)}
-                      >
-                        <strong>{skill.name}</strong>
-                        <span className="item-count">Ready</span>
-                      </button>
-                      {expandedSpellIds.has(skill.id) && (
-                        <div className="expandable-body">
-                          <p>{skill.description}</p>
-                          <button
-                            type="button"
-                            className="roll-btn optional"
-                            onClick={() => {
-                              pushSystemMessage(`${skill.name} used.`)
-                              addSystemNotice(`${skill.name} used.`)
-                            }}
-                          >
-                            Use technique
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="empty-text">No combat techniques unlocked yet.</p>
-            )}
-
-            {unlockedSpells.length ? (
-              <>
-                <h4>Spells</h4>
-                <div className="spell-list">
-                  {unlockedSpells.map(spell => (
-                    <div className={`spell-item expandable ${expandedSpellIds.has(spell.id) ? 'open' : ''} ${activeSpellId === spell.id ? 'casting' : ''}`} key={spell.id}>
-                      <button
-                        type="button"
-                        className="expandable-header"
-                        onClick={() => toggleExpanded(setExpandedSpellIds, spell.id)}
-                      >
-                        <strong>{spell.name}</strong>
-                        <span className="item-count">
-                          {spellCooldowns[spell.id] ? `CD ${spellCooldowns[spell.id]}` : 'Ready'}
-                        </span>
-                      </button>
-                      {expandedSpellIds.has(spell.id) && (
-                        <div className="expandable-body">
-                          <p>{spell.description}</p>
-                          <button type="button" className="roll-btn optional" onClick={() => useSpell(spell)}>
-                            Cast spell
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="empty-text">No spells prepared.</p>
-            )}
-          </>
-        )
-      case 'boons':
-        return (
-          <>
-            <h3>Artifacts &amp; Boons</h3>
-            {artifacts.length ? (
-              <div className="boon-list">
-                {artifacts.map((artifact, index) => (
-                  <div className="inventory-item" key={`${artifact}-${index}`}>
-                    <span>{artifact}</span>
-                    <span className="item-count">Bound</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="empty-text">No artifacts have attuned to you yet.</p>
+              <p className="empty-text">{t('gameSession.empty.noRelationships')}</p>
             )}
           </>
         )
@@ -2805,17 +3456,14 @@ const GameSession = () => {
   }
 
   const sidebarButtons = [
-    { section: 'quests' as SidebarSection, icon: BookOpen, label: 'Quests' },
-    { section: 'rumors' as SidebarSection, icon: MessageCircle, label: 'Rumors' },
-    { section: 'stats' as SidebarSection, icon: User, label: 'Stats' },
-    { section: 'inventory' as SidebarSection, icon: Package, label: 'Inventory' },
-    { section: 'npcs' as SidebarSection, icon: Users, label: 'NPCs' },
-    { section: 'spells' as SidebarSection, icon: Book, label: 'Spellbook' },
-    { section: 'boons' as SidebarSection, icon: Sparkles, label: 'Boons' }
+    { section: 'journal' as SidebarSection, icon: BookOpen, label: t('gameSession.journal') },
+    { section: 'stats' as SidebarSection, icon: User, label: t('gameSession.stats') },
+    { section: 'loadout' as SidebarSection, icon: Package, label: t('gameSession.loadout') },
+    { section: 'social' as SidebarSection, icon: Users, label: t('gameSession.npcs') }
   ]
 
   return (
-    <div className="game-session">
+    <div className="game-session gs-redesign">
       <aside className="left-sidebar">
         <div className="sidebar-buttons">
           {sidebarButtons.map(button => (
@@ -2827,6 +3475,7 @@ const GameSession = () => {
               type="button"
             >
               <button.icon size={20} />
+              <span className="sidebar-btn-label">{button.label}</span>
             </button>
           ))}
         </div>
@@ -2839,7 +3488,7 @@ const GameSession = () => {
         {battleUiEnabled && battleState && battleState.phase !== 'ended' && (
           <div className="battle-panel">
             <div className="battle-header">
-              <h4>Combat Mode - Round {battleState.round}</h4>
+              <h4>{t('gameSession.combatModeRound')} {battleState.round}</h4>
               <span>{battleState.phase.replace('_', ' ')}</span>
             </div>
             <div className="battle-enemies">
@@ -2861,14 +3510,16 @@ const GameSession = () => {
         )}
 
         <div className="chat-header">
-          <h2>The Gilded Griffin</h2>
-          <p>Campaign {campaignId || 'Solo Tale'} - Level {level} {characterProfile?.class || 'Adventurer'}</p>
+          <div className="chat-header-main">
+            <h2>The Gilded Griffin</h2>
+            <p>{t('gameSession.campaign')} {campaignId || t('gameSession.default.soloTale')} - {t('gameSession.level')} {level} {characterProfile?.class || t('gameSession.default.adventurer')}</p>
+          </div>
         </div>
 
         {battleUiEnabled && battleState && battleState.phase !== 'ended' && (
           <div className="battle-panel">
             <div className="battle-header">
-              <h4>Combat Mode - Round {battleState.round}</h4>
+              <h4>{t('gameSession.combatModeRound')} {battleState.round}</h4>
               <span>{battleState.phase.replace('_', ' ')}</span>
             </div>
             <div className="battle-enemies">
@@ -2887,17 +3538,17 @@ const GameSession = () => {
               ))}
             </div>
             <div className="combat-actions">
-              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'attack' })}>Attack</button>
-              <button type="button" className="roll-btn optional" onClick={() => sendCombatIntent({ action: 'defend', actor: 'player' })}>Defend</button>
-              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'move' })}>Move</button>
-              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'item' })}>Item</button>
-              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'spell' })}>Spell</button>
-              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'attempt' })}>Attempt</button>
+              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'attack' })}>{t('gameSession.combat.attack')}</button>
+              <button type="button" className="roll-btn optional" onClick={() => sendCombatIntent({ action: 'defend', actor: 'player' })}>{t('gameSession.combat.defend')}</button>
+              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'move' })}>{t('gameSession.combat.move')}</button>
+              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'item' })}>{t('gameSession.combat.item')}</button>
+              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'spell' })}>{t('gameSession.combat.spell')}</button>
+              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'attempt' })}>{t('gameSession.combat.attempt')}</button>
             </div>
 
             {combatAction.action === 'attack' && (
               <div className="combat-panel">
-                <p>Choose a target:</p>
+                <p>{t('gameSession.combat.chooseTarget')}</p>
                 <div className="combat-targets">
                   {getEnemyTargets().map(enemy => (
                     <button
@@ -2915,16 +3566,20 @@ const GameSession = () => {
 
             {combatAction.action === 'move' && (
               <div className="combat-panel">
-                <p>Choose movement:</p>
+                <p>{t('gameSession.combat.chooseMovement')}</p>
                 <div className="combat-targets">
-                  {['closer', 'farther', 'cover'].map(option => (
+                  {[
+                    { value: 'closer', label: t('gameSession.combat.moveCloser') },
+                    { value: 'farther', label: t('gameSession.combat.moveFarther') },
+                    { value: 'cover', label: t('gameSession.combat.moveCover') }
+                  ].map(option => (
                     <button
-                      key={option}
+                      key={option.value}
                       type="button"
                       className="roll-btn required"
-                      onClick={() => sendCombatIntent({ action: 'move', actor: 'player', params: { move_type: option } })}
+                      onClick={() => sendCombatIntent({ action: 'move', actor: 'player', params: { move_type: option.value } })}
                     >
-                      {option}
+                      {option.label}
                     </button>
                   ))}
                 </div>
@@ -2933,7 +3588,7 @@ const GameSession = () => {
 
             {combatAction.action === 'item' && (
               <div className="combat-panel">
-                <p>Select an item:</p>
+                <p>{t('gameSession.combat.selectItem')}</p>
                 <div className="combat-targets">
                   {inventoryItems.filter(item => item.consumable).map(item => (
                     <button
@@ -2954,7 +3609,7 @@ const GameSession = () => {
 
             {combatAction.action === 'spell' && (
               <div className="combat-panel">
-                <p>Select a spell:</p>
+                <p>{t('gameSession.combat.selectSpell')}</p>
                 <div className="combat-targets">
                   {unlockedSpells.map(spell => (
                     <button
@@ -2975,7 +3630,7 @@ const GameSession = () => {
 
             {combatAction.action === 'attempt' && (
               <div className="combat-panel">
-                <p>Describe your attempt:</p>
+                <p>{t('gameSession.combat.describeAttempt')}</p>
                 <textarea
                   className="combat-attempt-input"
                   rows={2}
@@ -3013,10 +3668,10 @@ const GameSession = () => {
                 <div className="message-header">
                   <span className="message-type">
                     {message.type === 'dm'
-                      ? 'AI Dungeon Master'
+                      ? DM_DISPLAY_NAME
                       : message.type === 'player'
-                      ? characterProfile?.name || 'You'
-                      : 'System'}
+                      ? characterProfile?.name || t('gameSession.you')
+                      : t('gameSession.system')}
                   </span>
                   <span className="message-time">
                     {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -3029,7 +3684,7 @@ const GameSession = () => {
                   className={`message-content ${message.type === 'dm' ? 'dm-bubble dmBubble' : ''}`}
                 >
                   {message.type === 'player' && message.roll && message.roll.status !== 'idle' && (
-                    <DiceRollHeader roll={message.roll} />
+                    <DiceRollHeader roll={message.roll} t={t} />
                   )}
                   {message.type === 'dm'
                     ? renderMessageContent(message.content)
@@ -3046,7 +3701,7 @@ const GameSession = () => {
             ref={inputRef}
             className="chat-input"
             rows={3}
-            placeholder="Describe your action..."
+            placeholder={t('gameSession.chatPlaceholder')}
             value={inputValue}
             onChange={event => setInputValue(event.target.value)}
             onKeyDown={handleInputKeyDown}
@@ -3057,7 +3712,7 @@ const GameSession = () => {
               type="submit"
               className="send-btn"
               disabled={!inputValue.trim() || isLoading}
-              aria-label="Send action"
+              aria-label={t('gameSession.sendAction')}
             >
               {isLoading ? <span className="loading-spinner" /> : <Send size={18} />}
             </button>
@@ -3067,18 +3722,18 @@ const GameSession = () => {
 
       <aside className="right-sidebar">
         <div className="player-info">
-          <h3>Adventurer</h3>
+          <h3>{t('gameSession.default.adventurer')}</h3>
             <div className="player-card">
               <div className="player-avatar">
                 {resolvedAvatarUrl ? (
-                  <img src={resolvedAvatarUrl} alt={`${characterProfile?.name || 'Player'} avatar`} />
+                  <img src={resolvedAvatarUrl} alt={`${characterProfile?.name || t('gameSession.player')} ${t('gameSession.avatar')}`} />
                 ) : (
                   <span>{characterProfile?.name?.charAt(0) || '?'}</span>
                 )}
               </div>
             <div className="player-details">
-              <h4>{characterProfile?.name || 'Unnamed Hero'}</h4>
-              <p>{characterProfile?.class || 'Wanderer'}</p>
+              <h4>{characterProfile?.name || t('gameSession.default.unnamedHero')}</h4>
+              <p>{characterProfile?.class || t('gameSession.default.wanderer')}</p>
             </div>
             <div className="player-stats">
               <div className="stat-bar">
@@ -3106,7 +3761,7 @@ const GameSession = () => {
               </div>
             </div>
             <div className="status-effects">
-              <span className="status-label">Unlocked Abilities</span>
+              <span className="status-label">{t('gameSession.unlockedAbilities')}</span>
               <div className="effects-list">
                 {unlockedAbilities.length ? (
                   unlockedAbilities.slice(0, 4).map(ability => (
@@ -3115,7 +3770,7 @@ const GameSession = () => {
                     </span>
                   ))
                 ) : (
-                  <span className="effect-tag">None yet</span>
+                  <span className="effect-tag">{t('gameSession.noneYet')}</span>
                 )}
               </div>
             </div>

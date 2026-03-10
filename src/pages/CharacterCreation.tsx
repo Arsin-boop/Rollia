@@ -28,6 +28,17 @@ type CharacterAbility = {
   requiresArtifact?: string[]
 }
 
+type GeneratedLoadoutItem = {
+  id: string
+  name: string
+  description: string
+  tags: string[]
+  damage?: string
+  armorClass?: number
+  slot?: 'weapon' | 'armor'
+  equipped?: boolean
+}
+
 const STAGES = ['name', 'class', 'backstory', 'appearance', 'review'] as const
 type Stage = typeof STAGES[number]
 
@@ -39,6 +50,7 @@ const VANILLA_CLASSES = [
 
 const CHARACTER_STORAGE_KEY = 'dnd-ai-character'
 const CHARACTER_ID_KEY = 'dnd-ai-character-id'
+const CHARACTER_COLLECTION_KEY = 'rollia_characters_v1'
 
 const formatStatBonus = (value: number) => {
   const bonus = Math.floor((value - 10) / 2)
@@ -232,6 +244,54 @@ const computeResources = (classData?: CustomClassResponse) => {
   return { hp, mp }
 }
 
+const toSlug = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+
+const buildStartingLoadout = (
+  classData?: CustomClassResponse
+): { equipmentNames: string[]; inventoryItems: GeneratedLoadoutItem[] } => {
+  if (!classData) {
+    return { equipmentNames: [], inventoryItems: [] }
+  }
+
+  const inventoryItems: GeneratedLoadoutItem[] = []
+  const equipmentNames: string[] = []
+
+  if (classData.startingWeapon?.name) {
+    const weapon = classData.startingWeapon
+    equipmentNames.push(weapon.name)
+    inventoryItems.push({
+      id: `weapon-${toSlug(weapon.name) || 'starter-weapon'}`,
+      name: weapon.name,
+      description: weapon.description || 'A starting weapon tailored to your class.',
+      tags: Array.isArray(weapon.tags) && weapon.tags.length ? weapon.tags : ['equipment', 'weapon'],
+      damage: weapon.damage || '1d6',
+      slot: 'weapon',
+      equipped: true
+    })
+  }
+
+  if (classData.startingArmor?.name) {
+    const armor = classData.startingArmor
+    equipmentNames.push(armor.name)
+    inventoryItems.push({
+      id: `armor-${toSlug(armor.name) || 'starter-armor'}`,
+      name: armor.name,
+      description: armor.description || 'A starting armor set tailored to your class.',
+      tags: Array.isArray(armor.tags) && armor.tags.length ? armor.tags : ['equipment', 'armor'],
+      armorClass: Number.isFinite(armor.armorClass) ? armor.armorClass : 12,
+      slot: 'armor',
+      equipped: true
+    })
+  }
+
+  return { equipmentNames, inventoryItems }
+}
+
 const CharacterCreation = () => {
   const navigate = useNavigate()
   const [currentStage, setCurrentStage] = useState<Stage>('name')
@@ -305,16 +365,19 @@ const CharacterCreation = () => {
     }
 
     const abilityDeck = characterData.abilityDeck || buildAbilityDeck(selectedClassData)
+    const startingLoadout = buildStartingLoadout(selectedClassData)
 
     const payload = {
       ...characterData,
+      id: characterId || `${Date.now()}`,
       class: selectedClassData.className,
       customClassData: selectedClassData,
       abilityDeck,
       quests: [],
       xp: 0,
       level: 1,
-      equipment: [] as string[],
+      equipment: startingLoadout.equipmentNames,
+      inventoryItems: startingLoadout.inventoryItems,
       artifacts: [] as string[],
       isCustomClass,
       resources: computeResources(selectedClassData),
@@ -327,6 +390,19 @@ const CharacterCreation = () => {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(payload))
+        const raw = localStorage.getItem(CHARACTER_COLLECTION_KEY)
+        const parsed = raw ? JSON.parse(raw) : []
+        const list = Array.isArray(parsed) ? parsed : []
+        const next = [...list]
+        const payloadId = String(payload.characterId || payload.name || Date.now())
+        const normalizedPayload = { ...payload, id: payloadId, updatedAt: new Date().toISOString() }
+        const index = next.findIndex((entry: any) => entry && entry.id === payloadId)
+        if (index >= 0) {
+          next[index] = { ...next[index], ...normalizedPayload }
+        } else {
+          next.unshift(normalizedPayload)
+        }
+        localStorage.setItem(CHARACTER_COLLECTION_KEY, JSON.stringify(next))
       } catch (error) {
         console.error('Failed to store character profile:', error)
       }

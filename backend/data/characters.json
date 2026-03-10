@@ -16,55 +16,43 @@
   {
     "id": "95339415-5267-4adf-8034-b817038bd508",
     "createdAt": "2026-01-15T13:22:05.591Z",
-    "updatedAt": "2026-01-21T11:44:57.569Z",
+    "updatedAt": "2026-02-27T15:16:37.889Z",
     "avatarStatus": "failed",
     "avatarUrl": null,
-    "avatarHash": "a7cdb69827613f413f8b83556945471143c8dfc57606c9df60b0078cebc2e85d",
-    "name": "Ash",
-    "class": "Umbra Mage",
-    "classDescription": "A shadow mage who phases through walls and binds foes with starless chains.",
-    "backstory": "Ash was born in Emberhollow, a city where houses huddled close together as if trying to keep warm against the eternal winds from the ashen wastes. His childhood was filled with the crackle of coals and the smell of smoke: forges, hearths, distant fires—everything blended into one постоянный фон, and the air itself seemed steeped in loss. His mother sang him lullabies that carried more sorrow than sleep, and his father came home each evening silent and worn, as if every day left a piece of his soul in the flames.\n\nThe night Emberhollow burned, the sky turned the color of spilled blood. Fire devoured the streets like a living thing, and the screams of the people were swallowed by the roar of collapsing roofs. He remembered running, stumbling, the heat searing his lungs, and the moment his mother’s hand slipped from his grasp. He called for her until his voice broke, but only the crack of falling beams answered. He found his father later—motionless beneath a shroud of ash, as though the city itself had laid him to rest.\n\nHe survived, but the fire never truly left him. The scar on his cheek is not only from flame, but from guilt: for running, for living, for failing to save those he loved. Since that night he has wandered from town to town, carrying the name Emberhollow like both a curse and a reminder. In every hearth he sees the echo of that inferno; in every scent of smoke he hears his mother’s voice, lost to the blaze.\n\nHe smiles rarely, and when he does, there is more pain than joy in it. Yet he keeps moving, because somewhere in the world, he believes, there is a place where fire no longer devours, but only gives warmth. And perhaps there, at last, his scars will stop pulling him back into the ashes.",
-    "appearance": "A lean, travel-worn figure in their mid-twenties, standing with a relaxed but alert posture, as if every muscle remembers the weight of past danger. Dark, slightly unkempt hair falls to the shoulders, often tied back with a simple leather cord. Sharp eyes — the kind that constantly scan a room, measuring exits, shadows, and people alike — carry a quiet mix of curiosity and fatigue.\n\nTheir face bears faint scars: a thin line along the cheekbone, another barely visible across the brow, marks of battles that were survived rather than forgotten. The skin is lightly weathered by wind and road dust, hinting at long journeys and restless nights under open skies.\n\nClothing is practical yet personal: a fitted leather coat worn at the edges, reinforced at the shoulders and forearms; dark trousers tucked into sturdy boots, their soles scratched by stone and tavern floors alike. A simple metal pendant hangs at the chest — its symbol unclear, but clearly meaningful. A short blade rests at the hip, more a companion than a threat, its hilt polished by habitual touch.\n\nOverall, the character looks like someone who belongs equally in a crowded tavern and on a silent road at dusk — not a hero from songs yet, but someone the songs might one day be about.",
-    "avatarError": "ModelsLab response did not include image data. keys=status,message message=error You cannot use this model as a trial account holder without a plan, subscribe to a plan or fund your wallet to continue",
-    "appearanceDescription": "A lean, travel-worn figure in their mid-twenties, standing with a relaxed but alert posture, as if every muscle remembers the weight of past danger. Dark, slightly unkempt hair falls to the shoulders, often tied back with a simple leather cord. Sharp eyes — the kind that constantly scan a room, measuring exits, shadows, and people alike — carry a quiet mix of curiosity and fatigue.\n\nTheir face bears faint scars: a thin line along the cheekbone, another barely visible across the brow, marks of battles that were survived rather than forgotten. The skin is lightly weathered by wind and road dust, hinting at long journeys and restless nights under open skies.\n\nClothing is practical yet personal: a fitted leather coat worn at the edges, reinforced at the shoulders and forearms; dark trousers tucked into sturdy boots, their soles scratched by stone and tavern floors alike. A simple metal pendant hangs at the chest — its symbol unclear, but clearly meaningful. A short blade rests at the hip, more a companion than a threat, its hilt polished by habitual touch.\n\nOverall, the character looks like someone who belongs equally in a crowded tavern and on a silent road at dusk — not a hero from songs yet, but someone the songs might one day be about.",
+    "avatarHash": "0afbfea544ed00b434d175872d69c90b9ddc2c2bb790b02886e78db5c3916fdb",
+    "name": "asd",
+    "class": "Barbarian",
+    "classDescription": "",
+    "backstory": "asd",
+    "appearance": "asd",
+    "avatarError": "ModelsLab response did not include image data. keys=status,message message=error Out of credits! Subscribe now or fund your wallet to keep generating seamlessly",
+    "appearanceDescription": "asd",
     "appearanceSpec": {
       "sex": "unknown",
       "genderPresentation": "unknown",
-      "ageRange": "20s",
-      "hairLength": "medium",
-      "bodyType": "slim",
-      "notableFeatures": [
-        "faint scars on cheekbone and brow",
-        "sharp eyes"
-      ],
-      "clothingStyle": [
-        "practical",
-        "leather coat",
-        "sturdy boots"
-      ],
-      "palette": [
-        "dark",
-        "weathered"
-      ],
-      "confidence": 0.8
+      "ageRange": "unknown",
+      "hairLength": "unknown",
+      "bodyType": "unknown",
+      "notableFeatures": [],
+      "clothingStyle": [],
+      "palette": [],
+      "confidence": 0
     },
     "appearanceSpecMeta": {
-      "confidence": 0.8,
+      "confidence": 0,
       "warnings": [
         "sex_unknown",
         "gender_presentation_unknown"
       ]
     },
     "avatarPrompt": {
-      "prompt": "Best quality, masterpiece, ultra high resolution, 4k, highly detailed, sharp focus, professional fantasy illustration, artbook quality, realistic lighting, high dynamic range, global illumination, fine details, crisp edges, no noise, no blur. Centered head-and-shoulders portrait, looking directly at the viewer, symmetrical composition, face and upper torso only, clean neutral background, suitable for circular avatar crop. dark anime style, semi-realistic, cinematic lighting, dramatic shadows, high detail, sharp focus. Class: Umbra Mage. Visual motifs: hooded, aura, chains, shadow, collar. adult adventurer, realistic fantasy portrait. age 20s, slim build, medium hair. faint scars on cheekbone and brow, sharp eyes. practical, leather coat, sturdy boots. dark, weathered. Appearance description: A lean, travel-worn figure in their mid-twenties, standing with a relaxed but alert posture, as if every muscle remembers the weight of past danger. Dark, slightly unkempt hair falls to the shoulders, often tied back with a simple leather cord. Sharp eyes — the kind that constantly scan a room, measuring exits, shadows, and people alike — carry a quiet mix of curiosity and fatigue. Their face bears faint scars: a thin line along the cheekbone, another barely visible across the brow, marks of battles that were survived rather than forgotten. The skin is lightly weathered by wind and road dust, hinting at long journeys and restless nights under open skies. Clothing is practical yet personal: a fitted leather coat worn at the edges, reinforced at the shoulders and forearms; dark trousers tucked into sturdy boots, their soles scratched by stone and tavern floors alike. A simple metal pendant hangs at the chest — its symbol unclear, but clearly meaningful. A short blade rests at the hip, more a companion than a threat, its hilt polished by habitual touch. Overall, the character looks like someone who belongs equally in a crowded tavern and on a silent road at dusk — not a hero from songs yet, but someone the songs might one day be about..",
+      "prompt": "Best quality, masterpiece, ultra high resolution, 4k, highly detailed, sharp focus, professional fantasy illustration, artbook quality, realistic lighting, high dynamic range, global illumination, fine details, crisp edges, no noise, no blur. Centered head-and-shoulders portrait, looking directly at the viewer, symmetrical composition, face and upper torso only, clean neutral background, suitable for circular avatar crop. dark anime style, semi-realistic, cinematic lighting, dramatic shadows, high detail, sharp focus. Class: Barbarian. Visual motifs: rugged fur collar, intense presence, scar hints. adult adventurer, realistic fantasy portrait. Appearance description: asd.",
       "negativePrompt": "low quality, worst quality, blurry, noisy, grainy, jpeg artifacts, watermark, text, logo, signature, deformed, bad anatomy, extra fingers, extra limbs, multiple faces, cropped face, out of frame, full body, character sheet, multiple poses, turnarounds, lineup, concept art sheet, reference sheet, standing figure, weapon showcase, scene, environment, background characters"
     },
     "derivedAvatarClassTags": [
-      "hooded",
-      "aura",
-      "chains",
-      "shadow",
-      "collar"
+      "rugged fur collar",
+      "intense presence",
+      "scar hints"
     ]
   },
   {
@@ -121,5 +109,153 @@
       "negativePrompt": "low quality, worst quality, blurry, noisy, grainy, jpeg artifacts, watermark, text, logo, signature, deformed, bad anatomy, extra fingers, extra limbs, multiple faces, cropped face, out of frame, full body, character sheet, multiple poses, turnarounds, lineup, concept art sheet, reference sheet, standing figure, weapon showcase, scene, environment, background characters"
     },
     "avatarError": "ModelsLab response did not include image data. keys=status,message message=error You cannot use this model as a trial account holder without a plan, subscribe to a plan or fund your wallet to continue"
+  },
+  {
+    "id": "0aa6c210-245d-419c-ab39-597eb4c2592d",
+    "createdAt": "2026-02-28T13:19:57.088Z",
+    "updatedAt": "2026-03-01T17:37:31.670Z",
+    "avatarStatus": "failed",
+    "avatarUrl": null,
+    "avatarHash": "9c7d018364a73aa9dcf5a445636fa863bcb30b44f7d14a95cd0239ad35ec0f46",
+    "name": "Игорь",
+    "class": "Ночной страж",
+    "backstory": "Из города Хэмлвэр, его ведет желание мести, родившиеся из-за его тяжелого детства, и смерти его родителей, и кто их убил - так и не известно",
+    "appearance": "Красивый и высокий",
+    "appearanceDescription": "Красивый и высокий",
+    "appearanceSpec": {
+      "sex": "unknown",
+      "genderPresentation": "unknown",
+      "ageRange": "unknown",
+      "hairLength": "unknown",
+      "bodyType": "unknown",
+      "notableFeatures": [],
+      "clothingStyle": [],
+      "palette": [],
+      "confidence": 0
+    },
+    "appearanceSpecMeta": {
+      "confidence": 0,
+      "warnings": [
+        "sex_unknown",
+        "gender_presentation_unknown"
+      ]
+    },
+    "derivedAvatarClassTags": [],
+    "avatarPrompt": {
+      "prompt": "Best quality, masterpiece, ultra high resolution, 4k, highly detailed, sharp focus, professional fantasy illustration, artbook quality, realistic lighting, high dynamic range, global illumination, fine details, crisp edges, no noise, no blur. Centered head-and-shoulders portrait, looking directly at the viewer, symmetrical composition, face and upper torso only, clean neutral background, suitable for circular avatar crop. dark anime style, semi-realistic, cinematic lighting, dramatic shadows, high detail, sharp focus. Class: Ночной страж. adult adventurer, realistic fantasy portrait. Appearance description: Красивый и высокий.",
+      "negativePrompt": "low quality, worst quality, blurry, noisy, grainy, jpeg artifacts, watermark, text, logo, signature, deformed, bad anatomy, extra fingers, extra limbs, multiple faces, cropped face, out of frame, full body, character sheet, multiple poses, turnarounds, lineup, concept art sheet, reference sheet, standing figure, weapon showcase, scene, environment, background characters"
+    },
+    "avatarError": "ModelsLab response did not include image data. keys=status,message message=error Invalid API Key. Get API key from: https://modelslab.com/dashboard/api-keys"
+  },
+  {
+    "id": "86a7e4ec-a60b-4297-8fd4-39bb31a7447a",
+    "createdAt": "2026-02-28T13:19:57.262Z",
+    "updatedAt": "2026-02-28T13:19:58.076Z",
+    "avatarStatus": "failed",
+    "avatarUrl": null,
+    "avatarHash": "c4d5aa873965a80cb37a083b9fd229e5f9a2906ffac4c59b0dc0d853dcda863c",
+    "name": "d",
+    "class": "rogue",
+    "backstory": "asd",
+    "appearance": "asd",
+    "appearanceDescription": "asd",
+    "appearanceSpec": {
+      "sex": "unknown",
+      "genderPresentation": "unknown",
+      "ageRange": "unknown",
+      "hairLength": "unknown",
+      "bodyType": "unknown",
+      "notableFeatures": [],
+      "clothingStyle": [],
+      "palette": [],
+      "confidence": 0
+    },
+    "appearanceSpecMeta": {
+      "confidence": 0,
+      "warnings": [
+        "sex_unknown",
+        "gender_presentation_unknown"
+      ]
+    },
+    "derivedAvatarClassTags": [],
+    "avatarPrompt": {
+      "prompt": "Best quality, masterpiece, ultra high resolution, 4k, highly detailed, sharp focus, professional fantasy illustration, artbook quality, realistic lighting, high dynamic range, global illumination, fine details, crisp edges, no noise, no blur. Centered head-and-shoulders portrait, looking directly at the viewer, symmetrical composition, face and upper torso only, clean neutral background, suitable for circular avatar crop. dark anime style, semi-realistic, cinematic lighting, dramatic shadows, high detail, sharp focus. Class: rogue. adult adventurer, realistic fantasy portrait. Appearance description: asd.",
+      "negativePrompt": "low quality, worst quality, blurry, noisy, grainy, jpeg artifacts, watermark, text, logo, signature, deformed, bad anatomy, extra fingers, extra limbs, multiple faces, cropped face, out of frame, full body, character sheet, multiple poses, turnarounds, lineup, concept art sheet, reference sheet, standing figure, weapon showcase, scene, environment, background characters"
+    },
+    "avatarError": "ModelsLab response did not include image data. keys=status,message message=error Out of credits! Subscribe now or fund your wallet to keep generating seamlessly"
+  },
+  {
+    "id": "385fe269-77af-468e-955d-f4312ad6e5b0",
+    "createdAt": "2026-03-01T10:21:47.705Z",
+    "updatedAt": "2026-03-01T10:21:48.473Z",
+    "avatarStatus": "failed",
+    "avatarUrl": null,
+    "avatarHash": "871dae4af183ff684df0bc16f7a8b0284d9a10e1de9070a757d16522a28d5805",
+    "name": "Jack",
+    "class": "Dark knight",
+    "backstory": "adsf",
+    "appearance": "asdf",
+    "appearanceDescription": "asdf",
+    "appearanceSpec": {
+      "sex": "unknown",
+      "genderPresentation": "unknown",
+      "ageRange": "unknown",
+      "hairLength": "unknown",
+      "bodyType": "unknown",
+      "notableFeatures": [],
+      "clothingStyle": [],
+      "palette": [],
+      "confidence": 0
+    },
+    "appearanceSpecMeta": {
+      "confidence": 0,
+      "warnings": [
+        "sex_unknown",
+        "gender_presentation_unknown"
+      ]
+    },
+    "derivedAvatarClassTags": [],
+    "avatarPrompt": {
+      "prompt": "Best quality, masterpiece, ultra high resolution, 4k, highly detailed, sharp focus, professional fantasy illustration, artbook quality, realistic lighting, high dynamic range, global illumination, fine details, crisp edges, no noise, no blur. Centered head-and-shoulders portrait, looking directly at the viewer, symmetrical composition, face and upper torso only, clean neutral background, suitable for circular avatar crop. dark anime style, semi-realistic, cinematic lighting, dramatic shadows, high detail, sharp focus. Class: Dark knight. adult adventurer, realistic fantasy portrait. Appearance description: asdf.",
+      "negativePrompt": "low quality, worst quality, blurry, noisy, grainy, jpeg artifacts, watermark, text, logo, signature, deformed, bad anatomy, extra fingers, extra limbs, multiple faces, cropped face, out of frame, full body, character sheet, multiple poses, turnarounds, lineup, concept art sheet, reference sheet, standing figure, weapon showcase, scene, environment, background characters"
+    },
+    "avatarError": "ModelsLab response did not include image data. keys=status,message message=error Invalid API Key. Get API key from: https://modelslab.com/dashboard/api-keys"
+  },
+  {
+    "id": "b1ee331f-2b0d-4ecb-9a71-483260fceeb9",
+    "createdAt": "2026-03-01T10:21:47.760Z",
+    "updatedAt": "2026-03-04T21:40:40.917Z",
+    "avatarStatus": "failed",
+    "avatarUrl": null,
+    "avatarHash": "705e0d437fac796f99b3713b9cd8811788fd672485ed796c572626e56001943d",
+    "name": "Игорь",
+    "class": "Темный мечник",
+    "backstory": "фыв",
+    "appearance": "фыв",
+    "appearanceDescription": "фыв",
+    "appearanceSpec": {
+      "sex": "unknown",
+      "genderPresentation": "unknown",
+      "ageRange": "unknown",
+      "hairLength": "unknown",
+      "bodyType": "unknown",
+      "notableFeatures": [],
+      "clothingStyle": [],
+      "palette": [],
+      "confidence": 0
+    },
+    "appearanceSpecMeta": {
+      "confidence": 0,
+      "warnings": [
+        "sex_unknown",
+        "gender_presentation_unknown"
+      ]
+    },
+    "derivedAvatarClassTags": [],
+    "avatarPrompt": {
+      "prompt": "Best quality, masterpiece, ultra high resolution, 4k, highly detailed, sharp focus, professional fantasy illustration, artbook quality, realistic lighting, high dynamic range, global illumination, fine details, crisp edges, no noise, no blur. Centered head-and-shoulders portrait, looking directly at the viewer, symmetrical composition, face and upper torso only, clean neutral background, suitable for circular avatar crop. dark anime style, semi-realistic, cinematic lighting, dramatic shadows, high detail, sharp focus. Class: Темный мечник. adult adventurer, realistic fantasy portrait. Appearance description: фыв.",
+      "negativePrompt": "low quality, worst quality, blurry, noisy, grainy, jpeg artifacts, watermark, text, logo, signature, deformed, bad anatomy, extra fingers, extra limbs, multiple faces, cropped face, out of frame, full body, character sheet, multiple poses, turnarounds, lineup, concept art sheet, reference sheet, standing figure, weapon showcase, scene, environment, background characters"
+    },
+    "avatarError": "ModelsLab response did not include image data. keys=status,message message=error Invalid API Key. Get API key from: https://modelslab.com/dashboard/api-keys"
   }
 ]

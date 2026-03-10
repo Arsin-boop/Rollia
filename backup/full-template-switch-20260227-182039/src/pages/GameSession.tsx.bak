@@ -1,0 +1,2603 @@
+﻿
+import { useState, useRef, useEffect, useMemo, useCallback, type ReactNode } from 'react'
+import { useParams } from 'react-router-dom'
+import {
+  BookOpen,
+  User,
+  Package,
+  Users,
+  Book,
+  Sparkles,
+  Send,
+  MessageCircle
+} from 'lucide-react'
+import {
+  getDMResponse,
+  rollDice,
+  generateQuestFromBackstory,
+  summarizeScene,
+  summarizeBackstory,
+  getStatusUpdate,
+  startBattle,
+  actBattle,
+  getBattleState,
+  type CustomClassResponse,
+  type DMResponse,
+  type ChatMessage,
+  type StatusEffect,
+  type StatusUpdatePayload,
+  type StatusStateInput,
+  type CombatState,
+  type CombatEvent,
+  type ActionIntent
+} from '../utils/api'
+import './GameSession.css'
+
+type Message = {
+  id: string
+  type: 'player' | 'dm' | 'system'
+  content: string
+  timestamp: Date
+  sceneHeader?: string
+  diceRoll?: {
+    type: string
+    result: number
+    rolls: number[]
+  }
+  roll?: null | {
+    type: 'none' | 'check' | 'save' | 'attack' | 'contest'
+    label: string
+    total?: number
+    die?: number
+    modifier?: number
+    outcome?: 'success' | 'fail' | 'crit_success' | 'crit_fail' | 'neutral'
+    displayText?: string
+  }
+}
+
+type RollMeta = NonNullable<Message['roll']>
+
+type SidebarSection = 'quests' | 'rumors' | 'stats' | 'inventory' | 'npcs' | 'spells' | 'boons'
+
+type QuestStatus = 'active' | 'completed' | 'failed'
+
+type Quest = {
+  id: string
+  title: string
+  description: string
+  xp: number
+  status: QuestStatus
+  progress?: string
+  objectives?: string[]
+  log: string[]
+  objectiveStatus?: boolean[]
+}
+
+type Rumor = {
+  id: string
+  title: string
+  detail: string
+  log?: string[]
+}
+
+type NPCRelation = {
+  id: string
+  name: string
+  affinity: number
+  notes: string[]
+}
+
+type InventoryItem = {
+  id: string
+  name: string
+  description: string
+  tags: string[]
+  consumable?: boolean
+  effects?: {
+    hp?: number
+    mp?: number
+  }
+  charges?: number
+}
+
+type RollOutcome = {
+  label: string
+  result: number
+  success: boolean
+}
+
+type PendingRoll = {
+  label: string
+  notation: string
+  stat?: string
+}
+
+type CharacterAbility = {
+  id: string
+  name: string
+  description: string
+  unlockLevel: number
+  requiresEquipment?: string[]
+  requiresArtifact?: string[]
+  type?: 'spell' | 'skill'
+}
+
+type StoredCharacterProfile = {
+  name: string
+  class: string
+  classDescription?: string
+  customClassData?: CustomClassResponse | null
+  backstory?: string
+  backstorySummary?: string
+  appearance?: string
+  isCustomClass?: boolean
+  xp?: number
+  level?: number
+  quests?: Quest[]
+  rumors?: Rumor[]
+  equipment?: string[]
+  inventoryItems?: InventoryItem[]
+  artifacts?: string[]
+  abilities?: CharacterAbility[]
+  abilityDeck?: CharacterAbility[]
+  statusEffects?: StatusEffect[]
+  sceneId?: number
+  sceneStatusBudget?: { newApplied: 0 | 1 }
+  npcRelations?: NPCRelation[]
+  systemNotices?: string[]
+  spellCooldowns?: Record<string, number>
+  resources?: {
+    hp: number
+    mp: number
+  }
+}
+
+const DEFAULT_STATS = {
+  strength: 10,
+  dexterity: 14,
+  constitution: 12,
+  intelligence: 13,
+  wisdom: 15,
+  charisma: 11
+}
+
+const XP_THRESHOLDS = [
+  0, 300, 900, 2700, 6500,
+  14000, 23000, 34000, 48000,
+  64000, 85000, 100000, 120000,
+  140000, 165000, 195000, 225000,
+  265000, 305000, 355000
+]
+
+const CHARACTER_STORAGE_KEY = 'dnd-ai-character'
+const CHARACTER_TAG_REGEX = /\[CHARACTER\s+name="([^"]+)"\s+color="([^"]+)"\](.*?)\[\/CHARACTER\]/gis
+const QUEST_TAG_REGEX = /\[QUEST([^\]]*)\]([\s\S]*?)\[\/QUEST\]/gi
+const RUMOR_TAG_REGEX = /\[RUMOR([^\]]*)\]([\s\S]*?)\[\/RUMOR\]/gi
+const RELATION_TAG_REGEX = /\[RELATION([^\]]*)\]([\s\S]*?)\[\/RELATION\]/gi
+const BATTLE_TAG_REGEX = /\[BATTLE([^\]]*)\]([\s\S]*?)\[\/BATTLE\]/gi
+const EFFECT_TAG_REGEX = /\[EFFECT([^\]]*)\]/gi
+const ATTRIBUTE_REGEX = /(\w+)="([^"]+)"/gi
+const DEFAULT_PENDING_ROLL = { label: 'Requested roll', notation: 'd20' }
+const MIN_SUCCESS_THRESHOLD = 12
+const SUMMARY_INTERVAL = 12
+const SUMMARY_KEEP_LATEST = 2
+const INITIAL_DM_OPENING = `A heavy oak door creaks open and a wash of lanternlight spills over you. The scent of spice-warmed cider and pine smoke clings to the air as you step into The Gilded Griffin, the most storied tavern in Everlume. Patrons pause their dice games to measure you with curious eyes.
+
+[CHARACTER name="Corin the Barkeep" color="#d97706"]"Easy there, traveler,"[/CHARACTER] rumbles the broad-shouldered barkeep, polishing a glass with a comet blue cloth. [CHARACTER name="Corin the Barkeep" color="#d97706"]"Legends say the Griffin appears only to those ready to change their fate. Pull up a stool, warm your bones, and I will tell you how this hall became a crossroads for heroes."[/CHARACTER]
+
+The hearth crackles. Rain ticks against stained-glass windows etched with ancient quests. Somewhere above, a lute picks up a hopeful melody. Corin leans closer, eyes twinkling. [CHARACTER name="Corin the Barkeep" color="#d97706"]"So then, friend... what is it you seek within these walls?"[/CHARACTER]`
+
+const extractSceneHeader = (content: string) => {
+  const match = content.match(/^([^\n]+)\n\n([\s\S]*)$/)
+  if (!match) {
+    return { header: '', body: content }
+  }
+  const header = match[1].includes('·') ? match[1].trim() : ''
+  if (!header) {
+    return { header: '', body: content }
+  }
+  return { header, body: match[2] || '' }
+}
+
+const getLevelFromXP = (xp: number): number => {
+  for (let i = XP_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (xp >= XP_THRESHOLDS[i]) {
+      return i + 1
+    }
+  }
+  return 1
+}
+
+const parseAttributes = (input: string): Record<string, string> => {
+  const attributes: Record<string, string> = {}
+  let match: RegExpExecArray | null
+  while ((match = ATTRIBUTE_REGEX.exec(input)) !== null) {
+    attributes[match[1].toLowerCase()] = match[2]
+  }
+  ATTRIBUTE_REGEX.lastIndex = 0
+  return attributes
+}
+
+const parseEnemies = (input?: string): Array<{ name: string; hp: number }> => {
+  if (!input) return []
+  return input.split('|').map(token => {
+    const [name, hp] = token.split(':')
+    return { name: name?.trim() || 'Foe', hp: hp ? Number(hp) : 10 }
+  })
+}
+
+const classifyCombatText = (text: string): ActionIntent => {
+  const lower = text.toLowerCase()
+  const actionMap: Array<{ action: ActionIntent['action']; pattern: RegExp }> = [
+    { action: 'attack', pattern: /(attack|hit|strike|stab|slash|shoot)/i },
+    { action: 'defend', pattern: /(defend|block|parry|guard)/i },
+    { action: 'move', pattern: /(move|run|dash|step|retreat|advance|cover)/i },
+    { action: 'item', pattern: /(use item|drink|potion|bandage)/i },
+    { action: 'spell', pattern: /(cast|spell|incant|magic)/i }
+  ]
+
+  const matched = actionMap.find(entry => entry.pattern.test(lower))
+  return {
+    action: matched?.action || 'attempt',
+    actor: 'player',
+    target: null,
+    free_text: text
+  }
+}
+
+const extractNotationFromRollType = (rollType?: string | null) => {
+  if (!rollType) {
+    return DEFAULT_PENDING_ROLL
+  }
+  const match = rollType.match(/(\d*d\d+([+-]\d+)?)/i)
+  const notation = match ? match[1] : 'd20'
+  const labelRaw = match ? rollType.replace(match[1], '').trim() : rollType.trim()
+  const statMatch = labelRaw.match(/\b(STR|DEX|CON|INT|WIS|CHA)\b/i)
+  const stat = statMatch ? statMatch[1].toUpperCase() : undefined
+  const label = labelRaw
+    .replace(/\b(STR|DEX|CON|INT|WIS|CHA)\b/i, '')
+    .replace(/^\s*to\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return {
+    label: label || 'Requested roll',
+    notation,
+    stat
+  }
+}
+
+const buildCheckLabel = (checkRequest?: {
+  stat?: string
+  context?: string
+}): string => {
+  if (!checkRequest?.stat) {
+    return 'Requested roll'
+  }
+  const context = checkRequest.context ? `to ${checkRequest.context}` : ''
+  return `${checkRequest.stat.toUpperCase()}${context ? ` ${context}` : ''}`.trim()
+}
+
+const isAbilityUnlocked = (
+  ability: CharacterAbility,
+  level: number,
+  equipment: string[],
+  artifacts: string[]
+) => {
+  const levelOk = level >= (ability.unlockLevel || 1)
+  const normalizedEquipment = equipment.map(item => item.toLowerCase())
+  const normalizedArtifacts = artifacts.map(item => item.toLowerCase())
+
+  const equipmentOk =
+    !ability.requiresEquipment?.length ||
+    ability.requiresEquipment.some(req => normalizedEquipment.includes(req.toLowerCase()))
+
+  const artifactOk =
+    !ability.requiresArtifact?.length ||
+    ability.requiresArtifact.some(req => normalizedArtifacts.includes(req.toLowerCase()))
+
+  return levelOk && equipmentOk && artifactOk
+}
+
+const buildAbilitiesFromFeatures = (classData?: CustomClassResponse | null): CharacterAbility[] => {
+  if (!classData?.features?.length) {
+    return []
+  }
+  return classData.features.map((feature, index) => {
+    const [namePart] = feature.split(':')
+    const isSpell = /spell|magic|arcane|ritual|chant|bolt|blast|aura|hex|prayer/i.test(feature)
+    const fallbackLabel = isSpell ? 'Spell' : 'Skill'
+    const derivedName = namePart?.trim()
+      ? namePart.trim()
+      : feature
+          .replace(/^feature\s*[:\-]?\s*/i, '')
+          .trim()
+          .split(/\s+/)
+          .slice(0, 4)
+          .join(' ')
+    const finalName = derivedName || `${fallbackLabel} Technique`
+    return {
+      id: `${classData.className || 'class'}-${index}`,
+      name: finalName.replace(/^feature\s*/i, '').trim(),
+      description: feature.replace(/^feature\s*[:\-]?\s*/i, '').trim(),
+      type: isSpell ? 'spell' : 'skill',
+      unlockLevel: index === 0 ? 1 : Math.min(1 + index * 2, 20)
+    }
+  })
+}
+
+const buildAbilitiesFromProfile = (profile: StoredCharacterProfile | null): CharacterAbility[] => {
+  if (!profile) return []
+  if (profile.abilityDeck?.length) return profile.abilityDeck
+  if (profile.abilities?.length) return profile.abilities
+  return buildAbilitiesFromFeatures(profile.customClassData)
+}
+
+const computeResourcesFromProfile = (profile: StoredCharacterProfile | null) => {
+  if (!profile) {
+    return { hp: 24, mp: 16 }
+  }
+  if (profile.resources) {
+    return profile.resources
+  }
+  const stats = profile.customClassData?.stats || DEFAULT_STATS
+  const hitDie = Number(profile.customClassData?.hitDie?.replace('d', '')) || 8
+  const hp = Math.max(1, hitDie + (stats.constitution || DEFAULT_STATS.constitution))
+  const mp = Math.max(
+    8,
+    Math.round(((stats.intelligence || 10) + (stats.wisdom || 10) + (stats.charisma || 10)) / 3)
+  )
+  return { hp, mp }
+}
+
+const AFFINITY_TIERS = ['Hostile', 'Wary', 'Neutral', 'Friendly', 'Allied'] as const
+
+const getAffinityTierIndex = (affinity: number): number => {
+  if (affinity >= 40) return 4
+  if (affinity >= 20) return 3
+  if (affinity >= 5) return 2
+  if (affinity <= -30) return 0
+  if (affinity <= -10) return 1
+  return 2
+}
+
+const getAffinityBadge = (affinity: number): string => {
+  return AFFINITY_TIERS[getAffinityTierIndex(affinity)] || 'Neutral'
+}
+
+const normalizeNpcName = (name: string): string => {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\bthe\b/g, '')
+    .replace(/\b(barkeep|bartender|innkeeper)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const createMessageId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+const GameSession = () => {
+  const showNoRollBadge = false
+  const { campaignId } = useParams()
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      type: 'dm',
+      content: INITIAL_DM_OPENING,
+      timestamp: new Date()
+    }
+  ])
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
+    { role: 'assistant', content: INITIAL_DM_OPENING }
+  ])
+  const [inputValue, setInputValue] = useState('')
+  const [activeSidebar, setActiveSidebar] = useState<SidebarSection>('stats')
+  const [isLoading, setIsLoading] = useState(false)
+  const [characterColors, setCharacterColors] = useState<Record<string, string>>({})
+  const [battleState, setBattleState] = useState<CombatState | null>(null)
+  const [combatEvents, setCombatEvents] = useState<CombatEvent[]>([])
+  const [combatAction, setCombatAction] = useState<{ action: ActionIntent['action'] | null; target?: string | null }>({
+    action: null
+  })
+  const [attemptText, setAttemptText] = useState('')
+  const [characterProfile, setCharacterProfile] = useState<StoredCharacterProfile | null>(null)
+  const [pendingRequiredRoll, setPendingRequiredRoll] = useState<PendingRoll | null>(null)
+  const [pendingOptionalRoll, setPendingOptionalRoll] = useState<PendingRoll | null>(null)
+  const [pendingCheck, setPendingCheck] = useState<DMResponse['pending_check'] | null>(null)
+  const [sceneSummary, setSceneSummary] = useState('')
+  const [activeStatusName, setActiveStatusName] = useState<string | null>(null)
+  const [expandedQuestIds, setExpandedQuestIds] = useState<Set<string>>(new Set())
+  const [expandedRumorIds, setExpandedRumorIds] = useState<Set<string>>(new Set())
+  const [expandedNpcIds, setExpandedNpcIds] = useState<Set<string>>(new Set())
+  const [expandedSpellIds, setExpandedSpellIds] = useState<Set<string>>(new Set())
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [activeSpellId, setActiveSpellId] = useState<string | null>(null)
+  const [rollUiState, setRollUiState] = useState<{
+    isRolling: boolean
+    label?: string
+  }>({ isRolling: false })
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const questInitRef = useRef(false)
+  const lastPlayerActionRef = useRef('')
+  const lastPlayerMessageIdRef = useRef<string | null>(null)
+  const summaryInFlightRef = useRef(false)
+  const statusUpdateInFlightRef = useRef(false)
+  const lastSceneHeaderRef = useRef<string>('')
+
+  const registerCharacterColors = useCallback((content: string) => {
+    if (!content) return
+    const matches = Array.from(content.matchAll(/\[CHARACTER\s+name="([^"]+)"\s+color="([^"]+)"\]/gi))
+    if (!matches.length) return
+
+    setCharacterColors(prev => {
+      let changed = false
+      const updated = { ...prev }
+      matches.forEach(([, name, color]) => {
+        const trimmedName = name.trim()
+        const trimmedColor = color.trim()
+        if (trimmedName && trimmedColor && !updated[trimmedName]) {
+          updated[trimmedName] = trimmedColor
+          changed = true
+        }
+      })
+      return changed ? updated : prev
+    })
+  }, [])
+
+  const persistProfile = useCallback((profile: StoredCharacterProfile) => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(profile))
+    } catch (error) {
+      console.error('Failed to persist profile:', error)
+    }
+  }, [])
+
+  const updateStoredProfile = useCallback(
+    (updater: (prev: StoredCharacterProfile) => StoredCharacterProfile) => {
+      setCharacterProfile(prev => {
+        if (!prev) return prev
+        const nextProfile = updater(prev)
+        persistProfile(nextProfile)
+        return nextProfile
+      })
+    },
+    [persistProfile]
+  )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+    try {
+      const stored = localStorage.getItem(CHARACTER_STORAGE_KEY)
+      if (stored) {
+        setCharacterProfile(JSON.parse(stored))
+      }
+    } catch (error) {
+      console.error('Failed to load stored character profile:', error)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!characterProfile) return
+    if (!characterProfile.quests) {
+      updateStoredProfile(prev => ({ ...prev, quests: [] }))
+    }
+    if (characterProfile.xp === undefined) {
+      updateStoredProfile(prev => ({ ...prev, xp: 0 }))
+    }
+    if (!characterProfile.statusEffects) {
+      updateStoredProfile(prev => ({ ...prev, statusEffects: [] }))
+    }
+    if (!characterProfile.sceneId) {
+      updateStoredProfile(prev => ({ ...prev, sceneId: 1 }))
+    }
+    if (!characterProfile.sceneStatusBudget) {
+      updateStoredProfile(prev => ({ ...prev, sceneStatusBudget: { newApplied: 0 } }))
+    }
+    if (!characterProfile.rumors) {
+      updateStoredProfile(prev => ({ ...prev, rumors: [] }))
+    }
+    if (!characterProfile.npcRelations) {
+      updateStoredProfile(prev => ({ ...prev, npcRelations: [] }))
+    }
+    if (characterProfile.npcRelations?.length) {
+      updateStoredProfile(prev => {
+        if (!prev) return prev
+        const merged = new Map<string, NPCRelation>()
+        prev.npcRelations?.forEach(rel => {
+          const key = normalizeNpcName(rel.name) || rel.id
+          const existing = merged.get(key)
+          if (!existing) {
+            merged.set(key, { ...rel, id: key })
+          } else {
+            merged.set(key, {
+              ...existing,
+              affinity: Math.max(existing.affinity, rel.affinity),
+              notes: [...existing.notes, ...rel.notes]
+            })
+          }
+        })
+        return { ...prev, npcRelations: Array.from(merged.values()) }
+      })
+    }
+    if (!characterProfile.systemNotices) {
+      updateStoredProfile(prev => ({ ...prev, systemNotices: [] }))
+    }
+    if (!characterProfile.spellCooldowns) {
+      updateStoredProfile(prev => ({ ...prev, spellCooldowns: {} }))
+    }
+    if (!characterProfile.inventoryItems) {
+      const equipment = characterProfile.equipment || []
+      if (equipment.length) {
+        const converted = equipment.map((name, index) => ({
+          id: `${name.toLowerCase().replace(/\s+/g, '-')}-${index}`,
+          name,
+          description: 'A trusted item from your pack.',
+          tags: ['equipment']
+        }))
+        updateStoredProfile(prev => ({ ...prev, inventoryItems: converted }))
+      } else {
+        updateStoredProfile(prev => ({ ...prev, inventoryItems: [] }))
+      }
+    }
+  }, [characterProfile, updateStoredProfile])
+
+  useEffect(() => {
+    if (!campaignId) return
+    getBattleState(campaignId)
+      .then(response => {
+        if (response.battle && response.battle.phase !== 'ended') {
+          setBattleState(response.battle)
+        }
+      })
+      .catch(() => {})
+  }, [campaignId])
+
+  useEffect(() => {
+    if (!characterProfile?.backstory || characterProfile.backstorySummary) {
+      return
+    }
+
+    summarizeBackstory(characterProfile.backstory)
+      .then(summary => {
+        if (!summary) return
+        updateStoredProfile(prev => ({
+          ...prev,
+          backstorySummary: summary
+        }))
+      })
+      .catch(error => {
+        console.error('Backstory summary failed:', error)
+      })
+  }, [characterProfile, updateStoredProfile])
+
+  useEffect(() => {
+    if (!characterProfile) return
+    if ((characterProfile.quests?.length || 0) > 0) return
+    if (!characterProfile.backstory || questInitRef.current) return
+
+    questInitRef.current = true
+    generateQuestFromBackstory(
+      characterProfile.backstory,
+      characterProfile.name || 'Hero',
+      characterProfile.class || 'Adventurer'
+    )
+      .then((quest) => {
+        updateStoredProfile(prev => ({
+          ...prev,
+          quests: [
+            ...(prev.quests || []),
+            {
+              id: quest.id,
+              title: quest.title,
+              description: quest.summary,
+              xp: quest.xp,
+              status: 'active',
+              progress: quest.hook,
+              objectives: quest.objectives,
+              log: [quest.hook]
+            }
+          ]
+        }))
+      })
+      .catch(error => {
+        questInitRef.current = false
+        console.error('Initial quest generation failed:', error)
+      })
+  }, [characterProfile, updateStoredProfile])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  useEffect(() => {
+    const lastDM = [...messages].reverse().find(message => message.type === 'dm')
+    if (lastDM) {
+      registerCharacterColors(lastDM.content)
+    }
+  }, [messages, registerCharacterColors])
+  const stats = useMemo(() => characterProfile?.customClassData?.stats || DEFAULT_STATS, [characterProfile])
+  const resources = useMemo(() => computeResourcesFromProfile(characterProfile), [characterProfile])
+  const quests = characterProfile?.quests || []
+  const rumors = characterProfile?.rumors || []
+  const npcRelations = characterProfile?.npcRelations || []
+  const inventoryItems = characterProfile?.inventoryItems || []
+  const systemNotices = characterProfile?.systemNotices || []
+  const spellCooldowns = characterProfile?.spellCooldowns || {}
+  const xp = characterProfile?.xp ?? 0
+  const level = characterProfile?.level ?? getLevelFromXP(xp)
+  const statusEffects = characterProfile?.statusEffects || []
+  const sceneId = characterProfile?.sceneId ?? 1
+  const sceneStatusBudget = characterProfile?.sceneStatusBudget || { newApplied: 0 }
+
+  const getModifierFromLabel = useCallback(
+    (label: string, statOverride?: string) => {
+      const lower = label.toLowerCase()
+      const override = statOverride?.toLowerCase()
+      const statMap: Record<string, { key: keyof typeof DEFAULT_STATS; short: string }> = {
+        strength: { key: 'strength', short: 'STR' },
+        str: { key: 'strength', short: 'STR' },
+        dexterity: { key: 'dexterity', short: 'DEX' },
+        dex: { key: 'dexterity', short: 'DEX' },
+        constitution: { key: 'constitution', short: 'CON' },
+        con: { key: 'constitution', short: 'CON' },
+        intelligence: { key: 'intelligence', short: 'INT' },
+        int: { key: 'intelligence', short: 'INT' },
+        wisdom: { key: 'wisdom', short: 'WIS' },
+        wis: { key: 'wisdom', short: 'WIS' },
+        charisma: { key: 'charisma', short: 'CHA' },
+        cha: { key: 'charisma', short: 'CHA' }
+      }
+
+      const match = Object.keys(statMap).find(key => lower.includes(key) || (override && override === key))
+      if (!match) {
+        return null
+      }
+
+      const stat = statMap[match]
+      const score = stats[stat.key] ?? 10
+      const modifier = Math.floor((score - 10) / 2)
+      return { modifier, label: stat.short }
+    },
+    [stats]
+  )
+
+  useEffect(() => {
+    if (!characterProfile) return
+    if ((characterProfile.level ?? 1) !== level) {
+      updateStoredProfile(prev => ({ ...prev, level }))
+    }
+  }, [characterProfile, level, updateStoredProfile])
+
+  const currentThreshold = XP_THRESHOLDS[Math.max(0, level - 1)] ?? 0
+  const nextThreshold =
+    XP_THRESHOLDS[Math.min(XP_THRESHOLDS.length - 1, level)] ?? XP_THRESHOLDS[XP_THRESHOLDS.length - 1]
+  const xpProgress = Math.min(
+    100,
+    Math.max(0, ((xp - currentThreshold) / Math.max(1, nextThreshold - currentThreshold)) * 100)
+  )
+
+  const abilityDeck = useMemo<CharacterAbility[]>(() => buildAbilitiesFromProfile(characterProfile), [characterProfile])
+  const equipment = characterProfile?.equipment || []
+  const artifacts = characterProfile?.artifacts || []
+
+  const unlockedAbilities = useMemo(
+    () =>
+      abilityDeck.filter(ability =>
+        isAbilityUnlocked(
+          ability,
+          level,
+          equipment.length ? equipment : ["traveler's garb"],
+          artifacts
+        )
+      ),
+    [abilityDeck, level, equipment, artifacts]
+  )
+
+  const unlockedSpells = useMemo(
+    () => unlockedAbilities.filter(ability => ability.type === 'spell'),
+    [unlockedAbilities]
+  )
+  const unlockedSkills = useMemo(
+    () => unlockedAbilities.filter(ability => ability.type !== 'spell'),
+    [unlockedAbilities]
+  )
+
+  const knownNpcs = useMemo(
+    () =>
+      Object.entries(characterColors).map(([name, color]) => ({
+        name,
+        color
+      })),
+    [characterColors]
+  )
+
+  useEffect(() => {
+    if (!knownNpcs.length || !characterProfile) return
+    updateStoredProfile(prev => {
+      if (!prev) return prev
+      const relations = [...(prev.npcRelations || [])]
+      let changed = false
+      knownNpcs.forEach(npc => {
+        const normalized = normalizeNpcName(npc.name)
+        if (!relations.some(entry => normalizeNpcName(entry.name) === normalized)) {
+          relations.push({
+            id: normalized || npc.name.toLowerCase().replace(/\s+/g, '-'),
+            name: npc.name,
+            affinity: 0,
+            notes: []
+          })
+          changed = true
+        }
+      })
+      return changed ? { ...prev, npcRelations: relations } : prev
+    })
+  }, [characterProfile, knownNpcs, updateStoredProfile])
+
+  const pushSystemMessage = useCallback((content: string) => {
+    setMessages(prev => [
+      ...prev,
+      {
+        id: createMessageId(),
+        type: 'system',
+        content,
+        timestamp: new Date()
+      }
+    ])
+  }, [])
+
+  const updateMessageRoll = useCallback(
+    (messageId: string, roll: Message['roll']) => {
+      setMessages(prev =>
+        prev.map(message => {
+          if (message.id !== messageId) {
+            return message
+          }
+          return {
+            ...message,
+            roll
+          }
+        })
+      )
+    },
+    []
+  )
+
+  const toggleExpanded = useCallback((setState: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) => {
+    setState(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
+
+  const performPlayerRoll = useCallback(
+    async (
+      rollInfo: { label: string; notation: string; stat?: string } | null,
+      rollType: RollMeta['type']
+    ): Promise<{ label: string; result: number; success: boolean } | null> => {
+      if (!rollInfo) return null
+
+      setRollUiState({ isRolling: true, label: rollInfo.label })
+
+      try {
+        const diceResult = await rollDice(rollInfo.notation)
+        const rollValue =
+          typeof diceResult.total === 'number'
+            ? diceResult.total
+            : typeof diceResult.result === 'number'
+            ? diceResult.result
+            : diceResult.rolls?.reduce((sum, val) => sum + val, 0) || 0
+        const modifierInfo = getModifierFromLabel(rollInfo.label, rollInfo.stat)
+        const modifierValue = modifierInfo?.modifier ?? 0
+        const total = rollValue + modifierValue
+        const success = total >= MIN_SUCCESS_THRESHOLD
+        const natural = rollInfo.notation.toLowerCase().includes('d20')
+          ? diceResult.rolls?.[0]
+          : undefined
+        const outcome = natural === 20
+          ? 'crit_success'
+          : natural === 1
+          ? 'crit_fail'
+          : success
+          ? 'success'
+          : 'fail'
+        const rollBadge = {
+          type: rollType === 'none' ? 'check' : rollType,
+          label: rollInfo.label,
+          total,
+          die: natural,
+          modifier: modifierValue,
+          outcome
+        } as Message['roll']
+
+        if (lastPlayerMessageIdRef.current) {
+          updateMessageRoll(lastPlayerMessageIdRef.current, rollBadge)
+        }
+
+        setRollUiState({ isRolling: false, label: rollInfo.label })
+        return { label: rollInfo.label, result: total, success }
+      } catch (error) {
+        console.error('Dice roll failed:', error)
+        setRollUiState({ isRolling: false })
+        return null
+      }
+    },
+    [getModifierFromLabel, updateMessageRoll]
+  )
+
+  const addSystemNotice = useCallback(
+    (notice: string) => {
+      updateStoredProfile(prev => {
+        if (!prev) return prev
+        const nextNotices = [...(prev.systemNotices || []), notice]
+        return { ...prev, systemNotices: nextNotices }
+      })
+    },
+    [updateStoredProfile]
+  )
+
+  const clearSystemNotices = useCallback(() => {
+    updateStoredProfile(prev => {
+      if (!prev) return prev
+      return { ...prev, systemNotices: [] }
+    })
+  }, [updateStoredProfile])
+
+  const tickCooldowns = useCallback(() => {
+    updateStoredProfile(prev => {
+      if (!prev) return prev
+      const cooldowns = { ...(prev.spellCooldowns || {}) }
+      let changed = false
+      Object.keys(cooldowns).forEach(key => {
+        if (cooldowns[key] > 0) {
+          cooldowns[key] = cooldowns[key] - 1
+          changed = true
+        }
+      })
+      return changed ? { ...prev, spellCooldowns: cooldowns } : prev
+    })
+  }, [updateStoredProfile])
+
+  const getSpellMeta = useCallback((spell: CharacterAbility) => {
+    const name = spell.name.toLowerCase()
+    const desc = spell.description.toLowerCase()
+    const isHealing = /heal|restore|mend|soothe/.test(name + desc)
+    const cost = isHealing ? 4 : 3
+    const cooldown = isHealing ? 3 : 2
+    return { cost, cooldown, isHealing }
+  }, [])
+
+  const useItem = useCallback(
+    (itemId: string) => {
+      const item = inventoryItems.find(entry => entry.id === itemId)
+      if (!item) return
+
+      if (item.consumable) {
+        updateStoredProfile(prev => {
+          if (!prev) return prev
+          const baseResources = prev.resources ?? computeResourcesFromProfile(prev)
+          const hpDelta = item.effects?.hp || 0
+          const mpDelta = item.effects?.mp || 0
+          const updatedItems = (prev.inventoryItems || []).filter(entry => entry.id !== itemId)
+
+          return {
+            ...prev,
+            resources: {
+              hp: Math.max(0, baseResources.hp + hpDelta),
+              mp: Math.max(0, baseResources.mp + mpDelta)
+            },
+            inventoryItems: updatedItems
+          }
+        })
+
+        const notice = `${item.name} used (${item.effects?.hp ? `${item.effects.hp > 0 ? '+' : ''}${item.effects.hp} HP` : ''}${item.effects?.mp ? `${item.effects?.hp ? ', ' : ''}${item.effects.mp > 0 ? '+' : ''}${item.effects.mp} MP` : ''})`
+        pushSystemMessage(notice)
+        addSystemNotice(notice)
+        setSelectedItemId(null)
+      }
+    },
+    [addSystemNotice, inventoryItems, pushSystemMessage, updateStoredProfile, setSelectedItemId]
+  )
+
+  const useSpell = useCallback(
+    (spell: CharacterAbility) => {
+      const meta = getSpellMeta(spell)
+      const cooldownRemaining = spellCooldowns[spell.id] || 0
+      if (cooldownRemaining > 0) {
+        pushSystemMessage(`${spell.name} is still recovering (${cooldownRemaining} turns).`)
+        return
+      }
+      if (resources.mp < meta.cost) {
+        pushSystemMessage(`Not enough MP to cast ${spell.name}.`)
+        return
+      }
+
+      updateStoredProfile(prev => {
+        if (!prev) return prev
+        const baseResources = prev.resources ?? computeResourcesFromProfile(prev)
+        const updatedResources = {
+          hp: baseResources.hp + (meta.isHealing ? 4 : 0),
+          mp: Math.max(0, baseResources.mp - meta.cost)
+        }
+
+        const cooldowns = { ...(prev.spellCooldowns || {}) }
+        cooldowns[spell.id] = meta.cooldown
+
+        return {
+          ...prev,
+          resources: updatedResources,
+          spellCooldowns: cooldowns
+        }
+      })
+
+      setActiveSpellId(spell.id)
+      setTimeout(() => setActiveSpellId(null), 900)
+
+      const notice = `${spell.name}: ${meta.isHealing ? '+4 HP' : 'cast'} (${meta.cost} MP)`
+      pushSystemMessage(notice)
+      addSystemNotice(notice)
+    },
+    [addSystemNotice, getSpellMeta, pushSystemMessage, resources.mp, spellCooldowns, updateStoredProfile]
+  )
+
+  const applyCombatEvents = useCallback(
+    (events: CombatEvent[]) => {
+      if (!events.length) return
+      const playerDamage = events
+        .filter(event => event.type === 'DAMAGE_APPLIED' && event.data?.target === 'player')
+        .reduce((sum, event) => sum + (Number(event.data?.amount) || 0), 0)
+
+      if (playerDamage > 0) {
+        updateStoredProfile(prev => {
+          if (!prev) return prev
+          const baseResources = prev.resources ?? computeResourcesFromProfile(prev)
+          return {
+            ...prev,
+            resources: {
+              hp: Math.max(0, baseResources.hp - playerDamage),
+              mp: baseResources.mp
+            }
+          }
+        })
+        pushSystemMessage(`You take ${playerDamage} damage.`)
+      }
+    },
+    [pushSystemMessage, updateStoredProfile]
+  )
+
+  const getEnemyTargets = useCallback(() => {
+    if (!battleState) return []
+    return battleState.entities.filter(entity => entity.type === 'enemy' && entity.hp > 0)
+  }, [battleState])
+
+  const resolveTargetFromText = useCallback(
+    (text: string) => {
+      const enemies = getEnemyTargets()
+      if (!enemies.length) return null
+      const match = enemies.find(enemy => text.toLowerCase().includes(enemy.name.toLowerCase()))
+      return match ? match.id : enemies[0].id
+    },
+    [getEnemyTargets]
+  )
+
+  const buildGameContext = useCallback(
+    () => {
+      const segments: string[] = []
+      if (campaignId) {
+        segments.push(`Campaign: ${campaignId}`)
+      }
+      if (sceneSummary) {
+        segments.push(`Scene summary:\n${sceneSummary}`)
+      }
+      if (characterProfile?.backstorySummary) {
+        segments.push(`Backstory key moments:\n${characterProfile.backstorySummary}`)
+      }
+      if (statusEffects.length) {
+        const symptomLines = statusEffects
+          .map(effect => effect.symptoms?.[0])
+          .filter(Boolean)
+        const impactLines = statusEffects
+          .flatMap(effect => effect.impacts || [])
+          .filter(Boolean)
+        if (symptomLines.length) {
+          segments.push(`Active symptoms: ${symptomLines.join('; ')}`)
+        }
+        if (impactLines.length) {
+          segments.push(`Active impacts: ${impactLines.join('; ')}`)
+        }
+      }
+      if (systemNotices.length) {
+        segments.push(`Recent system events: ${systemNotices.join(' | ')}`)
+      }
+      return segments.join('\n')
+    },
+    [campaignId, sceneSummary, statusEffects, systemNotices, characterProfile?.backstorySummary]
+  )
+
+  const sendCombatIntent = useCallback(
+    async (intent: ActionIntent) => {
+      if (!battleState) return
+      try {
+        const response = await actBattle({
+          campaignId: campaignId || 'local',
+          intent,
+          context: buildGameContext(),
+          playerSnapshot: { hp: resources.hp, mp: resources.mp }
+        })
+        setBattleState(response.battle)
+        setCombatEvents(response.events)
+        applyCombatEvents(response.events)
+
+        if (response.narration) {
+          const dmMessage: Message = {
+            id: createMessageId(),
+            type: 'dm',
+            content: response.narration,
+            timestamp: new Date()
+          }
+          setMessages(prev => [...prev, dmMessage])
+          setChatHistory(prev => [...prev, { role: 'assistant', content: response.narration }])
+        }
+        clearSystemNotices()
+      } catch (error: any) {
+        console.error('Combat action failed:', error)
+        pushSystemMessage(error?.message || 'The clash stutters. Try again.')
+      } finally {
+        setCombatAction({ action: null })
+        setAttemptText('')
+      }
+    },
+    [
+      applyCombatEvents,
+      battleState,
+      buildGameContext,
+      campaignId,
+      clearSystemNotices,
+      resources.hp,
+      resources.mp,
+      pushSystemMessage
+    ]
+  )
+
+  const maybeSummarizeHistory = useCallback(
+    async (history: ChatMessage[]) => {
+      if (summaryInFlightRef.current) {
+        return
+      }
+      const nonSystemCount = history.filter(entry => entry.role !== 'system').length
+      if (nonSystemCount < SUMMARY_INTERVAL) {
+        return
+      }
+      summaryInFlightRef.current = true
+      try {
+        const summary = await summarizeScene(history)
+        if (!summary) {
+          return
+        }
+        setSceneSummary(summary)
+        const tail = history.slice(-SUMMARY_KEEP_LATEST)
+        const summarizedHistory: ChatMessage[] = [
+          { role: 'system', content: `Scene summary:\n${summary}` },
+          ...tail
+        ]
+        setChatHistory(summarizedHistory)
+        updateStoredProfile(prev => ({
+          ...prev,
+          sceneId: (prev.sceneId ?? 1) + 1,
+          sceneStatusBudget: { newApplied: 0 }
+        }))
+      } catch (error) {
+        console.error('Failed to summarize scene:', error)
+      } finally {
+        summaryInFlightRef.current = false
+      }
+    },
+    []
+  )
+
+  const handleQuestTag = useCallback(
+    (attrText: string, body: string) => {
+      const attributes = parseAttributes(attrText)
+      let xpAwarded = 0
+      let newQuestTitle: string | null = null
+
+      updateStoredProfile(prev => {
+        if (!prev) return prev
+
+        const questsClone = [...(prev.quests || [])]
+        const questId =
+          attributes.id ||
+          (attributes.title ? attributes.title.toLowerCase().replace(/\s+/g, '-') : `quest-${Date.now()}`)
+        const statusToken = attributes.status?.toLowerCase() || 'offer'
+        const xpValue = Number(attributes.xp) || 0
+        const trimmedBody = body?.trim() || ''
+      const objectives = attributes.objectives
+        ? attributes.objectives.split('|').map(item => item.trim()).filter(Boolean)
+        : undefined
+      const completedObjectives = attributes.complete
+        ? attributes.complete.split(',').map(item => Number(item.trim())).filter(Number.isFinite)
+        : []
+
+        const existingIndex = questsClone.findIndex(quest => quest.id === questId)
+        const prevQuest = existingIndex >= 0 ? questsClone[existingIndex] : undefined
+
+        const quest: Quest = prevQuest
+          ? { ...prevQuest }
+          : {
+              id: questId,
+              title: attributes.title || `Quest ${questsClone.length + 1}`,
+              description: trimmedBody || attributes.summary || 'An opportunity unfolds.',
+              xp: xpValue || 150,
+              status: 'active',
+              progress: trimmedBody,
+              objectives: objectives || [],
+              log: trimmedBody ? [trimmedBody] : []
+            }
+
+        if (!prevQuest) {
+          newQuestTitle = quest.title
+        }
+
+        if (attributes.title) {
+          quest.title = attributes.title
+        }
+
+        if (trimmedBody) {
+          quest.description = quest.description || trimmedBody
+          quest.progress = trimmedBody
+          quest.log = [...(quest.log || []), trimmedBody]
+        }
+
+        if (objectives) {
+          quest.objectives = objectives
+          if (!quest.objectiveStatus || quest.objectiveStatus.length !== objectives.length) {
+            quest.objectiveStatus = objectives.map(() => false)
+          }
+        }
+
+        if (xpValue) {
+          quest.xp = xpValue
+        }
+
+        const wasCompleted = prevQuest?.status === 'completed'
+
+        if (statusToken === 'complete') {
+          quest.status = 'completed'
+          if (!wasCompleted) {
+            xpAwarded = quest.xp || xpValue || 0
+          }
+          if (quest.objectives?.length) {
+            quest.objectiveStatus = quest.objectives.map(() => true)
+          }
+        } else if (statusToken === 'fail') {
+          quest.status = 'failed'
+        } else {
+          quest.status = 'active'
+        }
+
+        if (completedObjectives.length && quest.objectiveStatus) {
+          completedObjectives.forEach(index => {
+            if (index >= 0 && index < quest.objectiveStatus!.length) {
+              quest.objectiveStatus![index] = true
+            }
+          })
+        }
+
+        if (existingIndex >= 0) {
+          questsClone[existingIndex] = quest
+        } else {
+          questsClone.push(quest)
+        }
+
+        let updatedXP = prev.xp ?? 0
+        if (xpAwarded > 0) {
+          updatedXP += xpAwarded
+        }
+
+        return {
+          ...prev,
+          quests: questsClone,
+          xp: updatedXP,
+          level: getLevelFromXP(updatedXP)
+        }
+      })
+
+      if (newQuestTitle) {
+        pushSystemMessage(`Quest tracked: ${newQuestTitle}`)
+      }
+
+      if (xpAwarded > 0) {
+        pushSystemMessage(`Quest complete! You gained ${xpAwarded} XP.`)
+      }
+    },
+    [updateStoredProfile, pushSystemMessage]
+  )
+
+  const toggleQuestObjective = useCallback(
+    (questId: string, index: number) => {
+      updateStoredProfile(prev => {
+        if (!prev) return prev
+        const questsClone = [...(prev.quests || [])]
+        const questIndex = questsClone.findIndex(quest => quest.id === questId)
+        if (questIndex === -1) return prev
+        const quest = { ...questsClone[questIndex] }
+        const objectives = quest.objectives || []
+        const status = quest.objectiveStatus || objectives.map(() => false)
+        if (index < 0 || index >= objectives.length) return prev
+        status[index] = !status[index]
+        quest.objectiveStatus = status
+        questsClone[questIndex] = quest
+        return { ...prev, quests: questsClone }
+      })
+    },
+    [updateStoredProfile]
+  )
+
+  const handleRumorTag = useCallback(
+    (attrText: string, body: string) => {
+      const attributes = parseAttributes(attrText)
+      const title = attributes.title || 'Unconfirmed lead'
+      const rumorId = attributes.id || title.toLowerCase().replace(/\s+/g, '-')
+      const detail = (body || attributes.detail || '').trim()
+
+      updateStoredProfile(prev => {
+        if (!prev) return prev
+        const rumorsClone = [...(prev.rumors || [])]
+        const existingIndex = rumorsClone.findIndex(rumor => rumor.id === rumorId)
+
+        const rumor: Rumor = existingIndex >= 0
+          ? { ...rumorsClone[existingIndex] }
+          : {
+              id: rumorId,
+              title,
+              detail: detail || attributes.detail || 'An unfinished whisper lingers.',
+              log: []
+            }
+
+        if (title) {
+          rumor.title = title
+        }
+        if (detail) {
+          rumor.detail = rumor.detail || detail
+          rumor.log = [...(rumor.log || []), detail]
+        }
+
+        if (existingIndex >= 0) {
+          rumorsClone[existingIndex] = rumor
+        } else {
+          rumorsClone.push(rumor)
+        }
+
+        return { ...prev, rumors: rumorsClone }
+      })
+    },
+    [updateStoredProfile]
+  )
+
+  const handleRelationTag = useCallback(
+    (attrText: string, body: string) => {
+      const attributes = parseAttributes(attrText)
+      const name = attributes.name || attributes.npc || 'Unknown'
+      const affinityDelta = Number(attributes.affinity || 0)
+      const note = (body || attributes.note || '').trim()
+
+      updateStoredProfile(prev => {
+        if (!prev) return prev
+        const relations = [...(prev.npcRelations || [])]
+        const normalized = normalizeNpcName(name)
+        const existingIndex = relations.findIndex(rel => normalizeNpcName(rel.name) === normalized)
+        const base = existingIndex >= 0 ? relations[existingIndex] : {
+          id: normalized || name.toLowerCase().replace(/\s+/g, '-'),
+          name,
+          affinity: 0,
+          notes: []
+        }
+
+        const updated: NPCRelation = {
+          ...base,
+          affinity: base.affinity + (Number.isFinite(affinityDelta) ? affinityDelta : 0),
+          notes: note ? [...base.notes, note] : base.notes
+        }
+
+        if (existingIndex >= 0) {
+          relations[existingIndex] = updated
+        } else {
+          relations.push(updated)
+        }
+
+        return { ...prev, npcRelations: relations }
+      })
+    },
+    [updateStoredProfile]
+  )
+
+  const handleBattleTag = useCallback(
+    (attrText: string, body: string) => {
+      const attributes = parseAttributes(attrText)
+      const action = (attributes.action || 'update').toLowerCase()
+      const trimmedBody = body?.trim()
+
+      if (action === 'start') {
+        const enemies = parseEnemies(attributes.enemies)
+        const playerEntity = {
+          id: 'player',
+          name: characterProfile?.name || 'Player',
+          hp: resources.hp,
+          hp_max: resources.hp,
+          mp: resources.mp,
+          mp_max: resources.mp
+        }
+        startBattle({
+          campaignId: campaignId || 'local',
+          player: playerEntity,
+          enemies: enemies.map((enemy, index) => ({
+            id: `enemy-${index}`,
+            name: enemy.name,
+            hp: enemy.hp
+          }))
+        })
+          .then(response => {
+            setBattleState(response.battle)
+            setCombatEvents(response.events || [])
+            if (trimmedBody) {
+              pushSystemMessage(trimmedBody)
+            }
+          })
+          .catch(error => {
+            console.error('Failed to start battle:', error)
+            pushSystemMessage('The clash refuses to take shape. Try again.')
+          })
+        return
+      }
+
+      if (action === 'end') {
+        setBattleState(prev => (prev ? { ...prev, phase: 'ended' } : prev))
+        if (trimmedBody) {
+          pushSystemMessage(trimmedBody)
+        }
+      }
+    },
+    [campaignId, characterProfile, pushSystemMessage, resources.hp, resources.mp]
+  )
+
+  const handleEffectTag = useCallback(
+    (attrText: string) => {
+      const attributes = parseAttributes(attrText)
+      const hpMatch = attrText.match(/hp\s*=\s*([+-]?\d+)/i)
+      const mpMatch = attrText.match(/mp\s*=\s*([+-]?\d+)/i)
+      const hpDelta = hpMatch ? Number(hpMatch[1]) : 0
+      const mpDelta = mpMatch ? Number(mpMatch[1]) : 0
+      updateStoredProfile(prev => {
+        if (!prev) return prev
+
+        const baseResources = prev.resources ?? computeResourcesFromProfile(prev)
+        const nextHp = Math.max(0, baseResources.hp + (Number.isFinite(hpDelta) ? hpDelta : 0))
+        const nextMp = Math.max(0, baseResources.mp + (Number.isFinite(mpDelta) ? mpDelta : 0))
+        return {
+          ...prev,
+          resources: {
+            hp: nextHp,
+            mp: nextMp
+          }
+        }
+      })
+
+      if (Number.isFinite(hpDelta) && hpDelta !== 0) {
+        pushSystemMessage(`HP ${hpDelta > 0 ? '+' : ''}${hpDelta}`)
+      }
+      if (Number.isFinite(mpDelta) && mpDelta !== 0) {
+        pushSystemMessage(`MP ${mpDelta > 0 ? '+' : ''}${mpDelta}`)
+      }
+    },
+    [pushSystemMessage, updateStoredProfile]
+  )
+
+  const stripStructuredTags = useCallback(
+    (content: string) => {
+      if (!content) return ''
+      let processed = content
+
+      processed = processed.replace(QUEST_TAG_REGEX, (_match, attrs, body) => {
+        handleQuestTag(attrs, body || '')
+        return body || ''
+      })
+
+      processed = processed.replace(RUMOR_TAG_REGEX, (_match, attrs, body) => {
+        handleRumorTag(attrs, body || '')
+        return body || ''
+      })
+
+      processed = processed.replace(RELATION_TAG_REGEX, (_match, attrs, body) => {
+        handleRelationTag(attrs, body || '')
+        return body || ''
+      })
+
+      processed = processed.replace(BATTLE_TAG_REGEX, (_match, attrs, body) => {
+        handleBattleTag(attrs, body || '')
+        return body || ''
+      })
+
+      processed = processed.replace(EFFECT_TAG_REGEX, (_match, attrs) => {
+        handleEffectTag(attrs || '')
+        return ''
+      })
+
+      return processed.trim()
+    },
+    [handleQuestTag, handleRumorTag, handleRelationTag, handleBattleTag, handleEffectTag]
+  )
+
+  const handleDMResponseOutput = useCallback(
+    (dmResponse: DMResponse) => {
+      const cleanedContent = stripStructuredTags(dmResponse.response || '')
+      const { header, body } = extractSceneHeader(cleanedContent)
+      const shouldShowHeader = header && header !== lastSceneHeaderRef.current
+      if (header) {
+        lastSceneHeaderRef.current = header
+      }
+
+      if (body) {
+        const dmMessage: Message = {
+          id: createMessageId(),
+          type: 'dm',
+          content: body,
+          sceneHeader: shouldShowHeader ? header : undefined,
+          timestamp: new Date(),
+          diceRoll: dmResponse.diceRolls?.[0]
+        }
+        setMessages(prev => [...prev, dmMessage])
+      }
+
+        if (dmResponse.pending_check) {
+          setPendingCheck(dmResponse.pending_check)
+          setPendingRequiredRoll({
+            label: buildCheckLabel({
+              stat: dmResponse.pending_check.stat,
+              context: dmResponse.pending_check.context
+            }),
+            notation: 'd20',
+            stat: dmResponse.pending_check.stat.toUpperCase()
+          })
+          setRollUiState({ isRolling: false })
+        } else if (dmResponse.requiresRoll) {
+          if (dmResponse.checkRequest?.stat) {
+            setPendingRequiredRoll({
+              label: buildCheckLabel(dmResponse.checkRequest),
+              notation: 'd20',
+              stat: dmResponse.checkRequest.stat.toUpperCase()
+            })
+          } else if (dmResponse.rollType) {
+            setPendingRequiredRoll(extractNotationFromRollType(dmResponse.rollType))
+          }
+          setPendingCheck(null)
+          setRollUiState({ isRolling: false })
+        } else {
+          setPendingCheck(null)
+          setPendingRequiredRoll(null)
+        }
+
+      if (dmResponse.optionalRollType) {
+        setPendingOptionalRoll(extractNotationFromRollType(dmResponse.optionalRollType))
+        setRollUiState({ isRolling: false })
+      } else {
+        setPendingOptionalRoll(null)
+      }
+    },
+    [stripStructuredTags]
+  )
+
+  const buildStatusStateInput = useCallback(
+    (): StatusStateInput => ({
+      active_statuses: statusEffects,
+      scene_id: `scene-${sceneId}`,
+      scene_status_budget: { new_applied: sceneStatusBudget.newApplied }
+    }),
+    [sceneId, sceneStatusBudget.newApplied, statusEffects]
+  )
+
+  const applyStatusUpdate = useCallback(
+    (payload: StatusUpdatePayload) => {
+      if (!payload) {
+        return
+      }
+      updateStoredProfile(prev => {
+        if (!prev) return prev
+        const currentStatuses = prev.statusEffects || []
+        const statusById = new Map(currentStatuses.map(status => [status.id, status]))
+        const statusByKey = new Map(currentStatuses.map(status => [status.key, status]))
+
+        payload.remove?.forEach(removal => {
+          if (removal?.id && statusById.has(removal.id)) {
+            statusById.delete(removal.id)
+          }
+          if (removal?.key && statusByKey.has(removal.key)) {
+            const existing = statusByKey.get(removal.key)
+            if (existing) {
+              statusById.delete(existing.id)
+            }
+          }
+        })
+
+        payload.update?.forEach(update => {
+          if (!update?.id) return
+          const existing = statusById.get(update.id)
+          if (existing) {
+            statusById.set(update.id, { ...existing, ...update })
+          }
+        })
+
+        const applying = payload.apply?.length ? payload.apply.slice(0, 1) : []
+        applying.forEach(apply => {
+          if (!apply?.id || !apply?.key) return
+          if (statusById.has(apply.id)) return
+          if ([...statusById.values()].some(status => status.key === apply.key)) return
+          statusById.set(apply.id, apply)
+        })
+
+        const nextStatuses = Array.from(statusById.values())
+        const newApplied = applying.length ? 1 : prev.sceneStatusBudget?.newApplied ?? 0
+
+        return {
+          ...prev,
+          statusEffects: nextStatuses,
+          sceneStatusBudget: { newApplied }
+        }
+      })
+    },
+    [updateStoredProfile]
+  )
+
+  const maybeUpdateStatusEffects = useCallback(
+    async (history: ChatMessage[]) => {
+      if (statusUpdateInFlightRef.current) {
+        return
+      }
+      statusUpdateInFlightRef.current = true
+      try {
+        const payload = await getStatusUpdate(history, buildStatusStateInput())
+        applyStatusUpdate(payload)
+      } catch (error) {
+        console.error('Failed to update status effects:', error)
+      } finally {
+        statusUpdateInFlightRef.current = false
+      }
+    },
+    [applyStatusUpdate, buildStatusStateInput]
+  )
+
+  const continueStoryAfterRoll = useCallback(
+    async ({ label, result, success }: RollOutcome) => {
+      setIsLoading(true)
+      tickCooldowns()
+      try {
+        const followUp = `Roll outcome for ${label}: ${result} (${success ? 'success' : 'failure'}). Prior intent: ${
+          lastPlayerActionRef.current || 'follow-up to DM prompt'
+        }. Describe ONLY the new consequences of this result-do NOT restate the player's prior action or the pre-roll narration. Stay strictly diegetic.`
+
+        const historyWithRoll: ChatMessage[] = [
+          ...chatHistory,
+          {
+            role: 'user',
+            content: followUp
+          }
+        ]
+        setChatHistory(historyWithRoll)
+
+        const dmResponse = await getDMResponse(
+          followUp,
+          {
+            name: characterProfile?.name,
+            class: characterProfile?.class,
+            appearance: characterProfile?.appearance,
+            stats,
+            quests
+          },
+          buildGameContext(),
+          historyWithRoll,
+          {
+            campaignId,
+            rollResult: { total: result, success },
+            pendingCheckId: pendingCheck?.id
+          }
+        )
+
+        const updatedHistory: ChatMessage[] = [
+          ...historyWithRoll,
+          {
+            role: 'assistant',
+            content: dmResponse.response
+          }
+        ]
+        setChatHistory(updatedHistory)
+        void maybeSummarizeHistory(updatedHistory)
+        void maybeUpdateStatusEffects(updatedHistory)
+        clearSystemNotices()
+        handleDMResponseOutput(dmResponse)
+        setPendingCheck(null)
+      } catch (error: any) {
+        console.error('Failed to continue story after roll:', error)
+        pushSystemMessage(error?.message || 'The DM hesitates, try again in a moment.')
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [
+      buildGameContext,
+      characterProfile,
+      chatHistory,
+      clearSystemNotices,
+      pendingCheck,
+      handleDMResponseOutput,
+      maybeSummarizeHistory,
+      maybeUpdateStatusEffects,
+      pushSystemMessage,
+      quests,
+      stats,
+      tickCooldowns
+    ]
+  )
+
+  const executePendingRoll = useCallback(
+    async (roll: PendingRoll | null, kind: 'required' | 'optional') => {
+      if (!roll || isLoading) {
+        return
+      }
+      const rollType = pendingCheck?.type === 'save'
+        ? 'save'
+        : pendingCheck?.type === 'contest'
+        ? 'contest'
+        : 'check'
+      const outcome = await performPlayerRoll(roll, rollType)
+      if (!outcome) {
+        return
+      }
+      if (kind === 'required') {
+        setPendingRequiredRoll(null)
+      } else {
+        setPendingOptionalRoll(null)
+      }
+      await continueStoryAfterRoll(outcome)
+    },
+    [continueStoryAfterRoll, isLoading, performPlayerRoll]
+  )
+
+  const handleRequiredRollClick = useCallback(() => {
+    void executePendingRoll(pendingRequiredRoll, 'required')
+  }, [executePendingRoll, pendingRequiredRoll])
+
+  const handleOptionalRollClick = useCallback(() => {
+    void executePendingRoll(pendingOptionalRoll, 'optional')
+  }, [executePendingRoll, pendingOptionalRoll])
+
+  const renderPlainTextSegment = useCallback((text: string, key: string): ReactNode => {
+    if (!text) return null
+    const lines = text.split('\n')
+    return (
+      <span key={key} className="message-text">
+        {lines.map((line, index) => (
+          <span key={`${key}-${index}`}>
+            {line}
+            {index < lines.length - 1 && <br />}
+          </span>
+        ))}
+      </span>
+    )
+  }, [])
+
+  const getRollBadgeText = useCallback(
+    (roll: Message['roll'] | null | undefined, allowNoRoll: boolean): string | null => {
+      if (!roll) {
+        return allowNoRoll ? 'No Roll' : null
+      }
+      if (roll.type === 'none') {
+        return 'No Roll'
+      }
+      if (roll.displayText) {
+        return roll.displayText
+      }
+      const label = roll.label || 'Roll'
+      if (roll.die === 20) {
+        return `${label} - Nat 20`
+      }
+      if (roll.die === 1) {
+        return `${label} - Nat 1`
+      }
+      if (typeof roll.total === 'number') {
+        const modText =
+          typeof roll.modifier === 'number' && roll.modifier !== 0
+            ? ` (${roll.modifier >= 0 ? '+' : ''}${roll.modifier})`
+            : ''
+        return `${label} - ${roll.total}${modText}`
+      }
+      return label
+    },
+    []
+  )
+
+  const getRollBadgeClass = useCallback((roll: Message['roll'] | null | undefined) => {
+    if (!roll || roll.type === 'none') {
+      return 'neutral'
+    }
+    if (roll.outcome === 'success' || roll.outcome === 'crit_success') {
+      return 'success'
+    }
+    if (roll.outcome === 'fail' || roll.outcome === 'crit_fail') {
+      return 'fail'
+    }
+    return 'neutral'
+  }, [])
+
+  const renderCharacterSegment = useCallback(
+    (name: string, color: string, text: string, key: string): ReactNode => {
+      const resolvedColor = color || characterColors[name] || '#eab308'
+      return (
+        <span key={key} className="character-line" style={{ color: resolvedColor }}>
+          {renderPlainTextSegment(text, `${key}-segment`)}
+        </span>
+      )
+    },
+    [characterColors, renderPlainTextSegment]
+  )
+
+  const renderMessageContent = useCallback(
+    (content: string) => {
+      if (!content) return null
+      const matches = Array.from(content.matchAll(CHARACTER_TAG_REGEX))
+      if (!matches.length) {
+        return renderPlainTextSegment(content, `plain-${content.length}`)
+      }
+
+      const segments: ReactNode[] = []
+      let lastIndex = 0
+
+      matches.forEach((match, idx) => {
+        const [fullMatch, name, color, body] = match
+        const startIndex = match.index ?? 0
+
+        if (startIndex > lastIndex) {
+          segments.push(
+            renderPlainTextSegment(content.slice(lastIndex, startIndex), `text-${lastIndex}-${idx}`)
+          )
+        }
+
+        segments.push(renderCharacterSegment(name, color, body, `character-${idx}-${startIndex}`))
+        lastIndex = startIndex + fullMatch.length
+      })
+
+      if (lastIndex < content.length) {
+        segments.push(renderPlainTextSegment(content.slice(lastIndex), `tail-${lastIndex}`))
+      }
+
+      return segments
+    },
+    [renderPlainTextSegment, renderCharacterSegment]
+  )
+
+  const handleSendMessage = useCallback(
+    async (event?: React.FormEvent) => {
+      event?.preventDefault()
+      const trimmedInput = inputValue.trim()
+      if (!trimmedInput || isLoading) {
+        return
+      }
+      tickCooldowns()
+
+      lastPlayerActionRef.current = trimmedInput
+      setPendingRequiredRoll(null)
+      setPendingOptionalRoll(null)
+
+      setInputValue('')
+
+      const playerMessage: Message = {
+        id: createMessageId(),
+        type: 'player',
+        content: trimmedInput,
+        timestamp: new Date()
+      }
+
+      lastPlayerMessageIdRef.current = playerMessage.id
+      setMessages(prev => [...prev, playerMessage])
+      setIsLoading(true)
+
+      try {
+        const historyWithPlayer: ChatMessage[] = [
+          ...chatHistory,
+          { role: 'user', content: trimmedInput }
+        ]
+        setChatHistory(historyWithPlayer)
+
+        if (battleState && battleState.phase !== 'ended') {
+          const intent = classifyCombatText(trimmedInput)
+          intent.actor = 'player'
+          intent.target = resolveTargetFromText(trimmedInput)
+          await sendCombatIntent(intent)
+          return
+        }
+
+        const dmResponse = await getDMResponse(
+          trimmedInput,
+          {
+            name: characterProfile?.name,
+            class: characterProfile?.class,
+            appearance: characterProfile?.appearance,
+            stats,
+            quests
+          },
+          buildGameContext(),
+          historyWithPlayer,
+          { campaignId }
+        )
+
+        const updatedHistory: ChatMessage[] = [
+          ...historyWithPlayer,
+          { role: 'assistant', content: dmResponse.response }
+        ]
+        setChatHistory(updatedHistory)
+        void maybeSummarizeHistory(updatedHistory)
+        void maybeUpdateStatusEffects(updatedHistory)
+        clearSystemNotices()
+        handleDMResponseOutput(dmResponse)
+      } catch (error: any) {
+        console.error('Failed to reach DM:', error)
+        pushSystemMessage(error?.message || 'The weave is silent. Please try again.')
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [
+      inputValue,
+      isLoading,
+      characterProfile,
+      stats,
+      quests,
+      buildGameContext,
+      handleDMResponseOutput,
+      chatHistory,
+      maybeSummarizeHistory,
+      maybeUpdateStatusEffects,
+      clearSystemNotices,
+      pushSystemMessage,
+      tickCooldowns,
+      battleState,
+      resolveTargetFromText,
+      sendCombatIntent
+    ]
+  )
+
+  const handleInputKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault()
+        void handleSendMessage()
+      }
+    },
+    [handleSendMessage]
+  )
+  const renderSidebarContent = () => {
+    switch (activeSidebar) {
+      case 'quests':
+        return (
+          <>
+            <h3>Quest Log</h3>
+            <div className="quest-list">
+              {quests.length ? (
+                quests.map(quest => (
+                  <div
+                    key={quest.id}
+                    className={`quest-card expandable ${expandedQuestIds.has(quest.id) ? 'open' : ''} ${quest.status === 'completed' ? 'completed' : quest.status === 'failed' ? 'failed' : ''}`}
+                  >
+                    <button
+                      type="button"
+                      className="expandable-header"
+                      onClick={() => toggleExpanded(setExpandedQuestIds, quest.id)}
+                    >
+                      <div>
+                        <h4>{quest.title}</h4>
+                        <span className="quest-status">
+                          {quest.status.charAt(0).toUpperCase() + quest.status.slice(1)}
+                        </span>
+                      </div>
+                      <span className="quest-xp">{quest.xp} XP</span>
+                    </button>
+                    {expandedQuestIds.has(quest.id) && (
+                      <div className="expandable-body">
+                        <p className="quest-description">{quest.description}</p>
+                        {quest.objectives?.length ? (
+                          <ul className="quest-objectives">
+                            {(() => {
+                              const status = quest.objectiveStatus || quest.objectives!.map(() => false)
+                              const firstIncomplete = status.findIndex(done => !done)
+                              const lastVisible = firstIncomplete === -1 ? status.length - 1 : firstIncomplete
+                              return quest.objectives!
+                                .slice(0, lastVisible + 1)
+                                .map((objective, index) => (
+                                  <li key={`${quest.id}-obj-${index}`}>
+                                    <div className="objective-item">
+                                      <span className={`objective-indicator ${status[index] ? 'done' : ''}`} />
+                                      <span>{objective}</span>
+                                    </div>
+                                  </li>
+                                ))
+                            })()}
+                          </ul>
+                        ) : null}
+                        {quest.log?.length ? (
+                          <div className="quest-log">
+                            {quest.log.map((entry, idx) => (
+                              <p key={`${quest.id}-log-${idx}`}>{entry}</p>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="empty-text">No quests recorded yet.</p>
+              )}
+            </div>
+          </>
+        )
+      case 'rumors':
+        return (
+          <>
+            <h3>Rumors</h3>
+            <div className="quest-list">
+              {rumors.length ? (
+                rumors.map(rumor => (
+                  <div
+                    key={rumor.id}
+                    className={`quest-card expandable ${expandedRumorIds.has(rumor.id) ? 'open' : ''}`}
+                  >
+                    <button
+                      type="button"
+                      className="expandable-header"
+                      onClick={() => toggleExpanded(setExpandedRumorIds, rumor.id)}
+                    >
+                      <h4>{rumor.title}</h4>
+                      <span className="quest-xp">Unverified</span>
+                    </button>
+                    {expandedRumorIds.has(rumor.id) && (
+                      <div className="expandable-body">
+                        <p className="quest-description">{rumor.detail}</p>
+                        {rumor.log?.length ? (
+                          <div className="quest-log">
+                            {rumor.log.map((entry, idx) => (
+                              <p key={`${rumor.id}-log-${idx}`}>{entry}</p>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="empty-text">No rumors collected.</p>
+              )}
+            </div>
+          </>
+        )
+      case 'stats':
+        return (
+          <>
+            <h3>Character Stats</h3>
+            <div className="stats-grid">
+              {Object.entries(stats).map(([stat, value]) => (
+                <div className="stat-item" key={stat}>
+                  <span className="stat-label">{stat.slice(0, 3).toUpperCase()}</span>
+                  <span className="stat-value">{value}</span>
+                </div>
+              ))}
+            </div>
+            <div className="stats-other">
+              <div className="inventory-item">
+                <div>
+                  <strong>Level</strong>
+                  <p>{level}</p>
+                </div>
+                <div>
+                  <strong>XP</strong>
+                  <p>
+                    {xp} / {nextThreshold}
+                  </p>
+                </div>
+              </div>
+              <div className="inventory-item status-card">
+                <div>
+                  <strong>Status</strong>
+                  <p>{statusEffects.length ? 'Active' : 'None'}</p>
+                </div>
+                {statusEffects.length ? (
+                  <div className="effects-list">
+                    {statusEffects.map(effect => (
+                      <button
+                        key={effect.id}
+                        type="button"
+                        className="effect-tag"
+                        onClick={() =>
+                          setActiveStatusName(prev => (prev === effect.id ? null : effect.id))
+                        }
+                      >
+                        {effect.symptoms?.[0] || effect.category}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                <div className={`status-detail${activeStatusName ? ' active' : ''}`}>
+                  {(() => {
+                    if (!activeStatusName) {
+                      return null
+                    }
+                    const match = statusEffects.find(effect => effect.id === activeStatusName)
+                    if (!match) {
+                      return null
+                    }
+                    const detailParts = [
+                      ...(match.symptoms?.length ? [`Symptoms: ${match.symptoms.join('; ')}`] : []),
+                      ...(match.impacts?.length ? [`Impacts: ${match.impacts.join('; ')}`] : []),
+                      match.fade_condition ? `Fade: ${match.fade_condition}` : '',
+                      match.duration ? `Duration: ${match.duration.type} ${match.duration.value}` : ''
+                    ].filter(Boolean)
+                    return detailParts.join(' ')
+                  })()}
+                </div>
+              </div>
+            </div>
+          </>
+        )
+      case 'inventory':
+        return (
+          <>
+            <h3>Inventory</h3>
+            {inventoryItems.length ? (
+              <div className="inventory-list">
+                {inventoryItems.map(item => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={`inventory-item expandable ${selectedItemId === item.id ? 'open' : ''}`}
+                    onClick={() => setSelectedItemId(prev => (prev === item.id ? null : item.id))}
+                  >
+                    <div>
+                      <strong>{item.name}</strong>
+                      <p className="item-tags">{item.tags.join(', ')}</p>
+                    </div>
+                    <span className="item-count">{item.consumable ? 'Use' : 'Inspect'}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="empty-text">No equipment recorded.</p>
+            )}
+            {selectedItemId && (
+              <div className="details-panel">
+                {(() => {
+                  const item = inventoryItems.find(entry => entry.id === selectedItemId)
+                  if (!item) return null
+                  return (
+                    <>
+                      <h4>{item.name}</h4>
+                      <p>{item.description}</p>
+                      <div className="item-tags">
+                        {item.tags.map(tag => (
+                          <span key={`${item.id}-${tag}`} className="effect-tag">{tag}</span>
+                        ))}
+                      </div>
+                      {item.consumable && (
+                        <button type="button" className="roll-btn optional" onClick={() => useItem(item.id)}>
+                          Use item
+                        </button>
+                      )}
+                    </>
+                  )
+                })()}
+              </div>
+            )}
+          </>
+        )
+      case 'npcs':
+        return (
+          <>
+            <h3>NPC Relationships</h3>
+            {npcRelations.length ? (
+              <div className="npc-list">
+                {npcRelations.map(npc => (
+                  <div key={npc.id} className={`inventory-item npc-card expandable ${expandedNpcIds.has(npc.id) ? 'open' : ''}`}>
+                    <button
+                      type="button"
+                      className="expandable-header npc-header"
+                      onClick={() => toggleExpanded(setExpandedNpcIds, npc.id)}
+                    >
+                      <span>{npc.name}</span>
+                    </button>
+                    {expandedNpcIds.has(npc.id) && (
+                      <div className="expandable-body">
+                        <div className="relation-bar">
+                          <span className={`relation-fill tier-${getAffinityTierIndex(npc.affinity)}`} />
+                          <span className="relation-label">{getAffinityBadge(npc.affinity)}</span>
+                        </div>
+                        {npc.notes.length ? (
+                          npc.notes.map((note, index) => (
+                            <p key={`${npc.id}-note-${index}`}>{note}</p>
+                          ))
+                        ) : (
+                          <p className="empty-text">No notable exchanges yet.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="empty-text">No relationships tracked yet.</p>
+            )}
+          </>
+        )
+      case 'spells':
+        return (
+          <>
+            <h3>Spellbook &amp; Skills</h3>
+            {unlockedSkills.length ? (
+              <>
+                <h4>Techniques</h4>
+                <div className="spell-list">
+                  {unlockedSkills.map(skill => (
+                    <div className={`spell-item expandable ${expandedSpellIds.has(skill.id) ? 'open' : ''}`} key={skill.id}>
+                      <button
+                        type="button"
+                        className="expandable-header"
+                        onClick={() => toggleExpanded(setExpandedSpellIds, skill.id)}
+                      >
+                        <strong>{skill.name}</strong>
+                        <span className="item-count">Ready</span>
+                      </button>
+                      {expandedSpellIds.has(skill.id) && (
+                        <div className="expandable-body">
+                          <p>{skill.description}</p>
+                          <button
+                            type="button"
+                            className="roll-btn optional"
+                            onClick={() => {
+                              pushSystemMessage(`${skill.name} used.`)
+                              addSystemNotice(`${skill.name} used.`)
+                            }}
+                          >
+                            Use technique
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="empty-text">No combat techniques unlocked yet.</p>
+            )}
+
+            {unlockedSpells.length ? (
+              <>
+                <h4>Spells</h4>
+                <div className="spell-list">
+                  {unlockedSpells.map(spell => (
+                    <div className={`spell-item expandable ${expandedSpellIds.has(spell.id) ? 'open' : ''} ${activeSpellId === spell.id ? 'casting' : ''}`} key={spell.id}>
+                      <button
+                        type="button"
+                        className="expandable-header"
+                        onClick={() => toggleExpanded(setExpandedSpellIds, spell.id)}
+                      >
+                        <strong>{spell.name}</strong>
+                        <span className="item-count">
+                          {spellCooldowns[spell.id] ? `CD ${spellCooldowns[spell.id]}` : 'Ready'}
+                        </span>
+                      </button>
+                      {expandedSpellIds.has(spell.id) && (
+                        <div className="expandable-body">
+                          <p>{spell.description}</p>
+                          <button type="button" className="roll-btn optional" onClick={() => useSpell(spell)}>
+                            Cast spell
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="empty-text">No spells prepared.</p>
+            )}
+          </>
+        )
+      case 'boons':
+        return (
+          <>
+            <h3>Artifacts &amp; Boons</h3>
+            {artifacts.length ? (
+              <div className="boon-list">
+                {artifacts.map((artifact, index) => (
+                  <div className="inventory-item" key={`${artifact}-${index}`}>
+                    <span>{artifact}</span>
+                    <span className="item-count">Bound</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="empty-text">No artifacts have attuned to you yet.</p>
+            )}
+          </>
+        )
+      default:
+        return null
+    }
+  }
+
+  const sidebarButtons = [
+    { section: 'quests' as SidebarSection, icon: BookOpen, label: 'Quests' },
+    { section: 'rumors' as SidebarSection, icon: MessageCircle, label: 'Rumors' },
+    { section: 'stats' as SidebarSection, icon: User, label: 'Stats' },
+    { section: 'inventory' as SidebarSection, icon: Package, label: 'Inventory' },
+    { section: 'npcs' as SidebarSection, icon: Users, label: 'NPCs' },
+    { section: 'spells' as SidebarSection, icon: Book, label: 'Spellbook' },
+    { section: 'boons' as SidebarSection, icon: Sparkles, label: 'Boons' }
+  ]
+
+  return (
+    <div className="game-session">
+      <aside className="left-sidebar">
+        <div className="sidebar-buttons">
+          {sidebarButtons.map(button => (
+            <button
+              key={button.section}
+              className={`sidebar-btn ${activeSidebar === button.section ? 'active' : ''}`}
+              onClick={() => setActiveSidebar(button.section)}
+              title={button.label}
+              type="button"
+            >
+              <button.icon size={20} />
+            </button>
+          ))}
+        </div>
+        <div className="sidebar-panel">
+          <div className="sidebar-content">{renderSidebarContent()}</div>
+        </div>
+      </aside>
+
+      <section className="main-content">
+        {battleState && battleState.phase !== 'ended' && (
+          <div className="battle-panel">
+            <div className="battle-header">
+              <h4>Combat Mode - Round {battleState.round}</h4>
+              <span>{battleState.phase.replace('_', ' ')}</span>
+            </div>
+            <div className="battle-enemies">
+              {battleState.entities
+                .filter(entity => entity.type === 'enemy')
+                .map(enemy => (
+                  <div className="battle-enemy" key={enemy.id}>
+                    <strong>{enemy.name}</strong>
+                    <span>{enemy.hp} / {enemy.hp_max} HP</span>
+                  </div>
+                ))}
+            </div>
+            <div className="battle-log">
+              {combatEvents.slice(-4).map((event, index) => (
+                <p key={`${event.type}-${index}`}>{event.type}</p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="chat-header">
+          <h2>The Gilded Griffin</h2>
+          <p>Campaign {campaignId || 'Solo Tale'} - Level {level} {characterProfile?.class || 'Adventurer'}</p>
+        </div>
+
+        {battleState && battleState.phase !== 'ended' && (
+          <div className="battle-panel">
+            <div className="battle-header">
+              <h4>Combat Mode - Round {battleState.round}</h4>
+              <span>{battleState.phase.replace('_', ' ')}</span>
+            </div>
+            <div className="battle-enemies">
+              {battleState.entities
+                .filter(entity => entity.type === 'enemy')
+                .map(enemy => (
+                  <div className="battle-enemy" key={enemy.id}>
+                    <strong>{enemy.name}</strong>
+                    <span>{enemy.hp} / {enemy.hp_max} HP</span>
+                  </div>
+                ))}
+            </div>
+            <div className="battle-log">
+              {combatEvents.slice(-4).map((event, index) => (
+                <p key={`${event.type}-${index}`}>{event.type}</p>
+              ))}
+            </div>
+            <div className="combat-actions">
+              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'attack' })}>Attack</button>
+              <button type="button" className="roll-btn optional" onClick={() => sendCombatIntent({ action: 'defend', actor: 'player' })}>Defend</button>
+              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'move' })}>Move</button>
+              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'item' })}>Item</button>
+              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'spell' })}>Spell</button>
+              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'attempt' })}>Attempt</button>
+            </div>
+
+            {combatAction.action === 'attack' && (
+              <div className="combat-panel">
+                <p>Choose a target:</p>
+                <div className="combat-targets">
+                  {getEnemyTargets().map(enemy => (
+                    <button
+                      key={enemy.id}
+                      type="button"
+                      className="roll-btn required"
+                      onClick={() => sendCombatIntent({ action: 'attack', actor: 'player', target: enemy.id })}
+                    >
+                      {enemy.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {combatAction.action === 'move' && (
+              <div className="combat-panel">
+                <p>Choose movement:</p>
+                <div className="combat-targets">
+                  {['closer', 'farther', 'cover'].map(option => (
+                    <button
+                      key={option}
+                      type="button"
+                      className="roll-btn required"
+                      onClick={() => sendCombatIntent({ action: 'move', actor: 'player', params: { move_type: option } })}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {combatAction.action === 'item' && (
+              <div className="combat-panel">
+                <p>Select an item:</p>
+                <div className="combat-targets">
+                  {inventoryItems.filter(item => item.consumable).map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="roll-btn required"
+                      onClick={() => {
+                        useItem(item.id)
+                        sendCombatIntent({ action: 'item', actor: 'player', params: { item_id: item.id } })
+                      }}
+                    >
+                      {item.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {combatAction.action === 'spell' && (
+              <div className="combat-panel">
+                <p>Select a spell:</p>
+                <div className="combat-targets">
+                  {unlockedSpells.map(spell => (
+                    <button
+                      key={spell.id}
+                      type="button"
+                      className="roll-btn required"
+                      onClick={() => {
+                        useSpell(spell)
+                        sendCombatIntent({ action: 'spell', actor: 'player', params: { spell_id: spell.id } })
+                      }}
+                    >
+                      {spell.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {combatAction.action === 'attempt' && (
+              <div className="combat-panel">
+                <p>Describe your attempt:</p>
+                <textarea
+                  className="combat-attempt-input"
+                  rows={2}
+                  value={attemptText}
+                  onChange={event => setAttemptText(event.target.value)}
+                />
+                <div className="combat-targets">
+                  {getEnemyTargets().map(enemy => (
+                    <button
+                      key={enemy.id}
+                      type="button"
+                      className="roll-btn required"
+                      onClick={() =>
+                        sendCombatIntent({
+                          action: 'attempt',
+                          actor: 'player',
+                          target: enemy.id,
+                          free_text: attemptText || 'attempt'
+                        })
+                      }
+                    >
+                      {enemy.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="chat-messages">
+          <div className="chat-messages-inner">
+            {messages.map(message => {
+              const allowNoRollBadge = showNoRollBadge && message.type === 'player'
+              const rollBadgeText = getRollBadgeText(message.roll ?? null, allowNoRollBadge)
+              const rollBadgeClass = getRollBadgeClass(message.roll ?? null)
+
+              return (
+                <div key={message.id} className={`message ${message.type}`}>
+                  <div className="message-header">
+                    <span className="message-type">
+                      {message.type === 'dm'
+                        ? 'AI Dungeon Master'
+                        : message.type === 'player'
+                        ? characterProfile?.name || 'You'
+                        : 'System'}
+                    </span>
+                    {rollBadgeText ? (
+                      <span className={`roll-badge ${rollBadgeClass}`}>{rollBadgeText}</span>
+                    ) : null}
+                    <span className="message-time">
+                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  {message.type === 'dm' && message.sceneHeader && (
+                    <div className="scene-header-inline">{message.sceneHeader}</div>
+                  )}
+                  <div className="message-content">
+                    {message.type === 'dm'
+                      ? renderMessageContent(message.content)
+                      : renderPlainTextSegment(message.content, `${message.id}-content`)}
+                  </div>
+                </div>
+              )
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+
+        {pendingRequiredRoll && (
+          <div className="required-roll-banner">
+            <div className="required-roll-text">
+              <span>Fate presses close. Resolve this roll.</span>
+              <strong>{pendingRequiredRoll.label}</strong>
+            </div>
+            <button
+              type="button"
+              className="roll-btn required"
+              onClick={handleRequiredRollClick}
+              disabled={isLoading || rollUiState.isRolling}
+            >
+              {rollUiState.isRolling ? 'Rolling...' : `Roll: ${pendingRequiredRoll.label}`}
+            </button>
+          </div>
+        )}
+
+        <form className="chat-input-container" onSubmit={handleSendMessage}>
+          <textarea
+            ref={inputRef}
+            className="chat-input"
+            rows={3}
+            placeholder="Describe your action..."
+            value={inputValue}
+            onChange={event => setInputValue(event.target.value)}
+            onKeyDown={handleInputKeyDown}
+            disabled={isLoading}
+          />
+          <div className="input-actions">
+            {pendingOptionalRoll && (
+              <button
+                type="button"
+                className="roll-btn optional"
+                onClick={handleOptionalRollClick}
+                disabled={isLoading || rollUiState.isRolling}
+              >
+                {rollUiState.isRolling ? 'Rolling...' : `Test your luck (${pendingOptionalRoll.label})`}
+              </button>
+            )}
+            <button
+              type="submit"
+              className="send-btn"
+              disabled={!inputValue.trim() || isLoading}
+              aria-label="Send action"
+            >
+              {isLoading ? <span className="loading-spinner" /> : <Send size={18} />}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <aside className="right-sidebar">
+        <div className="player-info">
+          <h3>Adventurer</h3>
+          <div className="player-card">
+            <div className="player-avatar">
+              <span>{characterProfile?.name?.charAt(0) || '?'}</span>
+            </div>
+            <div className="player-details">
+              <h4>{characterProfile?.name || 'Unnamed Hero'}</h4>
+              <p>{characterProfile?.class || 'Wanderer'}</p>
+            </div>
+            <div className="player-stats">
+              <div className="stat-bar">
+                <span className="stat-label">HP</span>
+                <div className="bar-container">
+                  <div className="bar hp-bar" style={{ width: '100%' }} />
+                </div>
+                <span className="stat-value">{resources.hp}</span>
+              </div>
+              <div className="stat-bar">
+                <span className="stat-label">MP</span>
+                <div className="bar-container">
+                  <div className="bar mp-bar" style={{ width: '100%' }} />
+                </div>
+                <span className="stat-value">{resources.mp}</span>
+              </div>
+              <div className="stat-bar">
+                <span className="stat-label">XP</span>
+                <div className="bar-container">
+                  <div className="bar xp-bar" style={{ width: `${xpProgress}%` }} />
+                </div>
+                <span className="stat-value">
+                  {xp} / {nextThreshold}
+                </span>
+              </div>
+            </div>
+            <div className="status-effects">
+              <span className="status-label">Unlocked Abilities</span>
+              <div className="effects-list">
+                {unlockedAbilities.length ? (
+                  unlockedAbilities.slice(0, 4).map(ability => (
+                    <span className="effect-tag" key={ability.id}>
+                      {ability.name}
+                    </span>
+                  ))
+                ) : (
+                  <span className="effect-tag">None yet</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  )
+}
+
+export default GameSession
+
+
+
+
+
+
+
+
+
+
+
+
+
+

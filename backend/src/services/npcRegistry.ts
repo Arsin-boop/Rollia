@@ -81,7 +81,13 @@ export function listNPCDialoguePalette(): NPCDialoguePaletteEntry[] {
 }
 
 export function listNPCProfiles(): NPCProfile[] {
-  return Array.from(npcStore.values())
+  const deduped = new Map<string, NPCProfile>()
+  for (const profile of npcStore.values()) {
+    const key = (profile.id || profile.name || '').trim().toLowerCase()
+    if (!key || deduped.has(key)) continue
+    deduped.set(key, profile)
+  }
+  return Array.from(deduped.values())
 }
 
 export function getNPCProfile(name: string): NPCProfile | undefined {
@@ -94,15 +100,29 @@ export function getNPCProfileById(id: string): NPCProfile | undefined {
 }
 
 export function registerNPCProfile(profile: Omit<NPCProfile, 'id'> & { id?: string }): NPCProfile {
-  const normalizedName = profile.name.trim()
+  const normalizedName = canonicalizeNpcName(profile.name.trim())
   const existing = npcStore.get(normalizedName)
   if (existing) {
     return existing
   }
 
-  const id = profile.id || slugify(normalizedName)
+  const incomingId = (profile.id || '').trim().toLowerCase()
+  const id = incomingId || slugify(normalizedName)
+  const existingById = getNPCProfileById(id)
+  if (existingById) {
+    // Preserve one canonical profile per id, but allow alias lookup by name.
+    npcStore.set(normalizedName, existingById)
+    return existingById
+  }
+
+  if (isCorinAlias(normalizedName) || id === corinProfile.id) {
+    npcStore.set(corinProfile.name, corinProfile)
+    npcStore.set(normalizedName, corinProfile)
+    return corinProfile
+  }
+
   const dialogueColorId = profile.dialogueColorId || assignDialogueColorId(id)
-  const stored: NPCProfile = { ...profile, id, dialogueColorId }
+  const stored: NPCProfile = { ...profile, name: normalizedName, id, dialogueColorId }
   npcStore.set(normalizedName, stored)
   return stored
 }
@@ -112,4 +132,157 @@ export function slugify(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '') || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+const RU_EXACT_NAME_MAP: Record<string, string> = {
+  'corin the barkeep': 'Корин, трактирщик',
+  corin: 'Корин'
+}
+
+const hasCyrillic = (value: string): boolean => /[А-Яа-яЁё]/.test(value)
+
+const transliterateLatinToCyrillic = (value: string): string => {
+  const source = value
+  const pairs: Array<[RegExp, string]> = [
+    [/shch/gi, 'щ'],
+    [/sch/gi, 'щ'],
+    [/yo/gi, 'ё'],
+    [/yu/gi, 'ю'],
+    [/ya/gi, 'я'],
+    [/zh/gi, 'ж'],
+    [/ch/gi, 'ч'],
+    [/sh/gi, 'ш'],
+    [/kh/gi, 'х'],
+    [/ts/gi, 'ц'],
+    [/th/gi, 'т'],
+    [/a/gi, 'а'],
+    [/b/gi, 'б'],
+    [/c/gi, 'к'],
+    [/d/gi, 'д'],
+    [/e/gi, 'е'],
+    [/f/gi, 'ф'],
+    [/g/gi, 'г'],
+    [/h/gi, 'х'],
+    [/i/gi, 'и'],
+    [/j/gi, 'й'],
+    [/k/gi, 'к'],
+    [/l/gi, 'л'],
+    [/m/gi, 'м'],
+    [/n/gi, 'н'],
+    [/o/gi, 'о'],
+    [/p/gi, 'п'],
+    [/q/gi, 'к'],
+    [/r/gi, 'р'],
+    [/s/gi, 'с'],
+    [/t/gi, 'т'],
+    [/u/gi, 'у'],
+    [/v/gi, 'в'],
+    [/w/gi, 'в'],
+    [/x/gi, 'кс'],
+    [/y/gi, 'и'],
+    [/z/gi, 'з']
+  ]
+
+  let out = source
+  for (const [pattern, replacement] of pairs) {
+    out = out.replace(pattern, replacement)
+  }
+  return out
+}
+
+const capitalizeCyrWord = (value: string): string => {
+  if (!value) return value
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+export function localizeNpcName(name: string, language: 'en' | 'ru' = 'en'): string {
+  const safeName = String(name || '').trim()
+  if (!safeName) return safeName
+  if (language !== 'ru') return safeName
+  if (hasCyrillic(safeName)) return safeName
+
+  const exact = RU_EXACT_NAME_MAP[safeName.toLowerCase()]
+  if (exact) return exact
+
+  const translated = safeName
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(token => {
+      const lower = token.toLowerCase()
+      if (lower === 'the') return ''
+      if (lower === 'barkeep') return 'трактирщик'
+      if (lower === 'guard') return 'стражник'
+      if (lower === 'merchant') return 'купец'
+      if (lower === 'innkeeper') return 'хозяин таверны'
+      return capitalizeCyrWord(transliterateLatinToCyrillic(token.toLowerCase()))
+    })
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return translated || safeName
+}
+
+const isCorinAlias = (value: string): boolean => {
+  const lowered = value.toLowerCase()
+  if (/\bcorin\b/.test(lowered)) return true
+  if (lowered.includes('корин')) return true
+  return false
+}
+
+const canonicalizeNpcName = (rawName: string): string => {
+  const trimmed = String(rawName || '').trim()
+  if (!trimmed) return trimmed
+  if (isCorinAlias(trimmed)) {
+    return corinProfile.name
+  }
+  return trimmed
+}
+
+const displayNameFromNpcId = (npcId: string): string => {
+  const stripped = npcId.replace(/^npc[-_]/i, '').replace(/[_-]+/g, ' ').trim()
+  if (!stripped) return 'Unknown'
+  return stripped
+    .split(' ')
+    .map(word => (word ? word[0].toUpperCase() + word.slice(1) : ''))
+    .join(' ')
+}
+
+export function ensureNPCProfileById(
+  npcId: string,
+  options?: { location?: string; contextSnippet?: string }
+): NPCProfile {
+  const normalizedId = String(npcId || '').trim().toLowerCase()
+  if (!normalizedId) {
+    return corinProfile
+  }
+  const existing = getNPCProfileById(normalizedId)
+  if (existing) {
+    return existing
+  }
+  if (normalizedId === corinProfile.id) {
+    npcStore.set(corinProfile.name, corinProfile)
+    return corinProfile
+  }
+
+  const fallbackName = displayNameFromNpcId(normalizedId)
+  return registerNPCProfile({
+    id: normalizedId,
+    name: fallbackName,
+    dialogueColorId: assignDialogueColorId(normalizedId),
+    age: 'unknown',
+    occupation: 'unknown',
+    firstImpression: '',
+    innerCharacter: '',
+    primaryMotivation: '',
+    secondaryMotivation: '',
+    secret: '',
+    voice: '',
+    behaviorQuirks: '',
+    relationshipToLocation: options?.location || 'unknown',
+    potentialHook: '',
+    location: options?.location,
+    contextSnippet: options?.contextSnippet
+  })
 }

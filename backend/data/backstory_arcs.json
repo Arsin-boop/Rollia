@@ -381,5 +381,3130 @@
       "revealedFacts": [],
       "status": "active"
     }
+  },
+  "1772028616169:ash": {
+    "profile": {
+      "characterKey": "1772028616169:ash",
+      "origin": "The scorched village of Brindlemark, where Ash grew up surrounded by the charred remains of a once-thriving community",
+      "keyEvent": "The night of the Red Hand raid, when Ash's family and neighbors were slaughtered by a band of ruthless raiders",
+      "unresolvedConflict": "Ash seeks revenge against the Red Hand and its ruthless leader, Kael Darkhaven",
+      "antagonisticForce": "The Red Hand, a marauding gang that has been terrorizing rural towns and villages",
+      "witnesses": [
+        "Thorne, a grizzled old survivor of the Brindlemark raid"
+      ],
+      "debts": [
+        "A debt of blood to Thorne, who saved Ash's life during the raid"
+      ],
+      "artifactsOrMarks": [
+        "The blackened wooden amulet bearing the symbol of the Red Hand, which Ash recovered from the ashes of her home"
+      ],
+      "emotionalCore": "Ash is driven by a burning need for vengeance and a deep-seated fear of being powerless",
+      "secrecyRules": [
+        "Ash keeps her past and her motivations hidden from those she doesn't trust"
+      ],
+      "hookTags": [
+        "vengeance",
+        "trauma",
+        "survival"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772028616169:ash",
+      "beats": [
+        {
+          "id": "1772028616169:beat1",
+          "type": "echo",
+          "goal": "Ash begins to hear whispers about the Red Hand's presence in a nearby town",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 0,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Red Hand"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772028616169:beat2",
+          "type": "trace",
+          "goal": "Ash discovers a cryptic message scrawled on a tavern wall, hinting at the Red Hand's plans",
+          "deliveryModes": [
+            "rumor",
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [
+              "symbol of the Red Hand"
+            ],
+            "phrases": [
+              "meet us at the old windmill"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772028616169:beat3",
+          "type": "pressure",
+          "goal": "Ash is confronted by a group of shady-looking characters who seem to be searching for her",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "You're Ash, aren't you?"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772028616169:beat4",
+          "type": "revelation",
+          "goal": "Ash learns that Kael Darkhaven has been spotted in a nearby city, and that he's planning to meet with a powerful ally",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "Kael Darkhaven"
+            ],
+            "symbols": [],
+            "phrases": [
+              "meet with Lord Ravenswood"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772028616169:beat5",
+          "type": "vector",
+          "goal": "Ash is offered a chance to join a group of mercenaries who are planning to infiltrate Lord Ravenswood's mansion",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {},
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 6,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772029381355:asd": {
+    "profile": {
+      "characterKey": "1772029381355:asd",
+      "origin": "The coastal town of Ravenshire, where the sea meets the darkest forest",
+      "keyEvent": "The night of the Blood Moon, when the town's musicians were mysteriously silenced",
+      "unresolvedConflict": "The townspeople are wary of outsiders, and the local guild of musicians seems to be hiding something",
+      "antagonisticForce": "The enigmatic leader of the Red Vipers, a group of ruthless entertainers",
+      "witnesses": [
+        "Lila, a young tavern singer",
+        "Kael, a reclusive instrument maker"
+      ],
+      "debts": [
+        "A favor to Lila's family for a provided shelter"
+      ],
+      "artifactsOrMarks": [
+        "A silver flute with an intricate, serpentine design"
+      ],
+      "emotionalCore": "The need to uncover the truth behind the Blood Moon's silence",
+      "secrecyRules": [
+        "Avoid mentioning the Red Vipers or the Blood Moon to the townspeople"
+      ],
+      "hookTags": [
+        "Music",
+        "Mystery",
+        "Small town secrets"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772029381355:asd",
+      "beats": [
+        {
+          "id": "Intro",
+          "type": "echo",
+          "goal": "Establish presence in Ravenshire",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 0,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "asd"
+            ],
+            "symbols": [],
+            "phrases": [
+              "Ravenshire's new bard"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "The Missing Musicians",
+          "type": "trace",
+          "goal": "Gather information about the silenced musicians",
+          "deliveryModes": [
+            "npc",
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "The night of the Blood Moon"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "The Red Vipers' Interest",
+          "type": "pressure",
+          "goal": "Sense the presence of the Red Vipers",
+          "deliveryModes": [
+            "coincidence",
+            "artifactReaction"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [
+              "serpentine design"
+            ],
+            "phrases": [],
+            "objects": [
+              "silver flute"
+            ],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "Lila's Warning",
+          "type": "revelation",
+          "goal": "Receive a warning from Lila about the Red Vipers",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "Lila"
+            ],
+            "symbols": [],
+            "phrases": [
+              "Be careful who you trust"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "The Invitation",
+          "type": "vector",
+          "goal": "Receive an invitation to perform for the Red Vipers",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "A performance for the Red Vipers"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "The Performance",
+          "type": "choice",
+          "goal": "Decide whether to perform for the Red Vipers",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 0,
+            "maxRevealLevel": "full"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 7,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772205102837:fads": {
+    "profile": {
+      "characterKey": "1772205102837:fads",
+      "origin": "Korga's Wastes",
+      "keyEvent": "Massacre of Korga's village",
+      "unresolvedConflict": "Seeking revenge against the cult responsible",
+      "antagonisticForce": "The Crimson Hand cult",
+      "witnesses": [
+        "Thrain Blackbeard"
+      ],
+      "debts": [
+        "Goldmine loan to Gorthok"
+      ],
+      "artifactsOrMarks": [
+        "Crimson scar on left cheek",
+        "Korga's totem"
+      ],
+      "emotionalCore": "Anger and a desire for vengeance",
+      "secrecyRules": [
+        "Avoid mentioning the Crimson Hand's involvement"
+      ],
+      "hookTags": [
+        "Cult",
+        "Revenge",
+        "Barbarian"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772205102837:fads",
+      "beats": [
+        {
+          "id": "1772205102837:beat1",
+          "type": "echo",
+          "goal": "Rumors of a cult in the area",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Dark rituals"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772205102837:beat2",
+          "type": "trace",
+          "goal": "Find signs of the cult's presence",
+          "deliveryModes": [
+            "patrol"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Bloodstains"
+            ],
+            "objects": [
+              "Broken cult symbol"
+            ],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772205102837:beat3",
+          "type": "pressure",
+          "goal": "Encounter cultists",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "low"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "Cultist 1"
+            ],
+            "symbols": [],
+            "phrases": [
+              "You will make a fine sacrifice"
+            ],
+            "objects": [],
+            "summary": "Hostile encounter"
+          },
+          "used": false
+        },
+        {
+          "id": "1772205102837:beat4",
+          "type": "revelation",
+          "goal": "Discover the cult's plan",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "medium"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "The Red Hand will bring darkness"
+            ],
+            "objects": [
+              "Cult's ritual book"
+            ],
+            "summary": "Cult plans to summon a dark entity"
+          },
+          "used": false
+        },
+        {
+          "id": "1772205102837:beat5",
+          "type": "vector",
+          "goal": "Track the cult's leader",
+          "deliveryModes": [
+            "wantedPoster"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "medium"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "The Crimson Hand's leader"
+            ],
+            "symbols": [],
+            "phrases": [
+              "Seek out the Black Oracle"
+            ],
+            "objects": [],
+            "summary": "Leader's whereabouts"
+          },
+          "used": false
+        },
+        {
+          "id": "1772205102837:beat6",
+          "type": "choice",
+          "goal": "Confront the cult's leader",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "high"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Will you show mercy or wrath?"
+            ],
+            "objects": [],
+            "summary": "Confrontation with the leader"
+          },
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 5,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772205400282:asd": {
+    "profile": {
+      "characterKey": "1772205400282:asd",
+      "origin": "Born in a remote village on the outskirts of a vast and troubled kingdom",
+      "keyEvent": "The brutal slaughter of his family and village by a band of marauding raiders",
+      "unresolvedConflict": "Seeks vengeance against the raiders and their leader",
+      "antagonisticForce": "The raider leader, a ruthless and cunning warlord named Grimgar Ironfist",
+      "witnesses": [
+        "A young survivor of the raid, a girl named Elara"
+      ],
+      "debts": [
+        "Owes a local blacksmith, Thorne, for a finely crafted battle-axe"
+      ],
+      "artifactsOrMarks": [
+        "A silver earring bearing the symbol of his family",
+        "A tattoo of a raven on his left bicep"
+      ],
+      "emotionalCore": "Fueled by rage and a desire for revenge",
+      "secrecyRules": [
+        "Avoids speaking of his past or his motivations to strangers"
+      ],
+      "hookTags": [
+        "vengeance",
+        "barbarian",
+        "raiders"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772205400282:asd",
+      "beats": [
+        {
+          "id": "1",
+          "type": "echo",
+          "goal": "Rumors of a raider gang in the area",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "raiders",
+              "violence"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "2",
+          "type": "trace",
+          "goal": "Discover a cryptic map leading to Grimgar's hideout",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [
+              "a crude map"
+            ],
+            "phrases": [],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "3",
+          "type": "pressure",
+          "goal": "Confront a local informant about Grimgar's whereabouts",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "informant"
+            ],
+            "symbols": [],
+            "phrases": [
+              "danger",
+              "warning"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "4",
+          "type": "revelation",
+          "goal": "Learn the true extent of Grimgar's brutality",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "atrocities",
+              "Grimgar"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "5",
+          "type": "vector",
+          "goal": "Track Grimgar's gang to their hideout",
+          "deliveryModes": [
+            "patrol"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "hideout",
+              "location"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "6",
+          "type": "choice",
+          "goal": "Decide whether to storm the hideout or gather allies",
+          "deliveryModes": [
+            "artifactReaction"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "allies",
+              "storm"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 6,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772281764263:ash": {
+    "profile": {
+      "characterKey": "1772281764263:ash",
+      "origin": "Emberhollow",
+      "keyEvent": "The night Emberhollow burned",
+      "unresolvedConflict": "Loss of mother, survivor's guilt",
+      "antagonisticForce": "The fire that destroyed Emberhollow",
+      "witnesses": [
+        "his father"
+      ],
+      "debts": [
+        "guilt to his mother"
+      ],
+      "artifactsOrMarks": [
+        "scar on his cheek"
+      ],
+      "emotionalCore": "pain and guilt",
+      "secrecyRules": [
+        "avoid discussing Emberhollow's destruction"
+      ],
+      "hookTags": [
+        "survivor's guilt",
+        "lost loved one"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772281764263:ash",
+      "beats": [
+        {
+          "id": "beat1",
+          "type": "echo",
+          "goal": "hint at Ash's past",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Emberhollow's flames"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "beat2",
+          "type": "trace",
+          "goal": "reveal Ash's connection to Emberhollow",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Ash's scar"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "beat3",
+          "type": "pressure",
+          "goal": "escalate Ash's emotional turmoil",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "lost loved one"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "beat4",
+          "type": "revelation",
+          "goal": "reveal Ash's past to a trusted NPC",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Emberhollow's destruction"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "beat5",
+          "type": "vector",
+          "goal": "point Ash towards a new goal",
+          "deliveryModes": [
+            "artifactReaction"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "place of warmth"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "beat6",
+          "type": "choice",
+          "goal": "force Ash to make a difficult decision",
+          "deliveryModes": [
+            "wantedPoster"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "confront the past"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "beat7",
+          "type": "consequence",
+          "goal": "resolve Ash's story arc",
+          "deliveryModes": [
+            "patrol"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "full"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "closure"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 4,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772318924706:asd": {
+    "profile": {
+      "characterKey": "1772318924706:asd",
+      "origin": "Born in a remote village on the outskirts of a vast and troubled kingdom",
+      "keyEvent": "The brutal slaughter of his family and village by a band of marauding raiders",
+      "unresolvedConflict": "Seeks vengeance against the raider lord who slaughtered his family",
+      "antagonisticForce": "The raider lord, a ruthless and cunning warlord named Grimgar Ironfist",
+      "witnesses": [
+        "A young survivor of the raid, a girl named Elara"
+      ],
+      "debts": [
+        "Owes a local blacksmith, Grimbold, for a finely crafted battle-axe"
+      ],
+      "artifactsOrMarks": [
+        "A silver earring bearing the symbol of his family",
+        "A tattoo of a raven on his left bicep"
+      ],
+      "emotionalCore": "Fueled by rage and a desire for revenge",
+      "secrecyRules": [
+        "Avoids discussing his past with strangers",
+        "Keeps his family's earring hidden"
+      ],
+      "hookTags": [
+        "vengeance",
+        "barbarian",
+        "raider"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772318924706:asd",
+      "beats": [
+        {
+          "id": "1",
+          "type": "echo",
+          "goal": "asd seeks information about Grimgar Ironfist",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Grimgar Ironfist"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "2",
+          "type": "trace",
+          "goal": "asd tracks Grimgar's raiders to a nearby town",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Ironfist's raiders"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "3",
+          "type": "pressure",
+          "goal": "asd confronts a local informant about Grimgar's whereabouts",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "You're looking for Grimgar"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "4",
+          "type": "revelation",
+          "goal": "asd learns Grimgar's true intentions",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Grimgar plans to raid the kingdom's capital"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "5",
+          "type": "vector",
+          "goal": "asd sets out to intercept Grimgar's raiders",
+          "deliveryModes": [
+            "patrol"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "The raiders are heading to the capital"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "6",
+          "type": "choice",
+          "goal": "asd must choose between attacking Grimgar's raiders or warning the capital's guards",
+          "deliveryModes": [
+            "artifactReaction"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {},
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 7,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772360512524:ash": {
+    "profile": {
+      "characterKey": "1772360512524:ash",
+      "origin": "Emberhollow",
+      "keyEvent": "The night Emberhollow burned",
+      "unresolvedConflict": "Loss of mother, guilt over survival",
+      "antagonisticForce": "The fire that consumed Emberhollow",
+      "witnesses": [
+        "his father"
+      ],
+      "debts": [
+        "to his mother"
+      ],
+      "artifactsOrMarks": [
+        "scar on his cheek"
+      ],
+      "emotionalCore": "Guilt and longing",
+      "secrecyRules": [
+        "avoid discussing Emberhollow's burning"
+      ],
+      "hookTags": [
+        "survivor's guilt",
+        "lost loved ones"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772360512524:ash",
+      "beats": [
+        {
+          "id": "echo",
+          "type": "echo",
+          "goal": "hint at Ash's past",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Emberhollow's burning"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "trace",
+          "type": "trace",
+          "goal": "reveal Ash's connection to fire",
+          "deliveryModes": [
+            "artifactReaction"
+          ],
+          "constraints": {
+            "minTurnsGap": 5,
+            "maxRevealLevel": "vague"
+          },
+          "triggerHints": {
+            "fire": "reaction"
+          },
+          "payload": {
+            "keyNames": [],
+            "symbols": [
+              "fire"
+            ],
+            "phrases": [],
+            "objects": [
+              "scar on his cheek"
+            ],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "pressure",
+          "type": "pressure",
+          "goal": "introduce a threat related to Ash's past",
+          "deliveryModes": [
+            "wantedPoster"
+          ],
+          "constraints": {
+            "minTurnsGap": 6,
+            "maxRevealLevel": "warning"
+          },
+          "triggerHints": {
+            "Emberhollow": "connection"
+          },
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Ash, son of Emberhollow"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "revelation",
+          "type": "revelation",
+          "goal": "reveal Ash's mother's fate",
+          "deliveryModes": [
+            "dream"
+          ],
+          "constraints": {
+            "minTurnsGap": 7,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {
+            "mother": "memory"
+          },
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "mother's voice"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "vector",
+          "type": "vector",
+          "goal": "point Ash towards a place of warmth",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 8,
+            "maxRevealLevel": "direction"
+          },
+          "triggerHints": {
+            "warmth": "hope"
+          },
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "a place where fire only gives warmth"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "choice",
+          "type": "choice",
+          "goal": "force Ash to confront his past",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 9,
+            "maxRevealLevel": "confrontation"
+          },
+          "triggerHints": {
+            "confront": "past"
+          },
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Ash, what happened in Emberhollow?"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "consequence",
+          "type": "consequence",
+          "goal": "resolve Ash's guilt",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 10,
+            "maxRevealLevel": "resolution"
+          },
+          "triggerHints": {
+            "resolution": "guilt"
+          },
+          "payload": {},
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 7,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772362570447:ash": {
+    "profile": {
+      "characterKey": "1772362570447:ash",
+      "origin": "Emberhollow",
+      "keyEvent": "The night Emberhollow burned",
+      "unresolvedConflict": "Loss of mother, guilt over survival",
+      "antagonisticForce": "The fire that destroyed Emberhollow",
+      "witnesses": [
+        "his father"
+      ],
+      "debts": [
+        "finding his mother",
+        "avenging his city's destruction"
+      ],
+      "artifactsOrMarks": [
+        "scar on his cheek"
+      ],
+      "emotionalCore": "guilt and longing",
+      "secrecyRules": [
+        "avoid discussing Emberhollow's destruction",
+        "hide his Umbramancer abilities"
+      ],
+      "hookTags": [
+        "survivor's guilt",
+        "lost loved ones",
+        "burned city"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772362570447:ash",
+      "beats": [
+        {
+          "id": "echo",
+          "type": "echo",
+          "goal": "hint at Ash's past",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Emberhollow's burning"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "trace",
+          "type": "trace",
+          "goal": "reveal Ash's connection to Emberhollow",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Ash's scar"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "pressure",
+          "type": "pressure",
+          "goal": "introduce a threat related to Ash's past",
+          "deliveryModes": [
+            "wantedPoster"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "reward for information on Ash"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "revelation",
+          "type": "revelation",
+          "goal": "reveal Ash's mother died in the fire",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Ash's mother's lullabies"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "vector",
+          "type": "vector",
+          "goal": "point Ash towards a potential solution",
+          "deliveryModes": [
+            "dream"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "a place where fire only gives warmth"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "choice",
+          "type": "choice",
+          "goal": "force Ash to choose between conflicting goals",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Ash's Umbramancer abilities"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "consequence",
+          "type": "consequence",
+          "goal": "resolve Ash's storyline",
+          "deliveryModes": [
+            "artifactReaction"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "full"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Ash's scars"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 5,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772362570447:jack": {
+    "profile": {
+      "characterKey": "1772362570447:jack",
+      "origin": "Ashwood Village",
+      "keyEvent": "The Night of the Burning Tower",
+      "unresolvedConflict": "The Mysterious Disappearance of his Family",
+      "antagonisticForce": "The Order of the Black Flame",
+      "witnesses": [
+        "Samantha the Tavern Keeper",
+        "Thorne a Fellow Village Guard"
+      ],
+      "debts": [
+        "A debt to the local blacksmith for a sword repair"
+      ],
+      "artifactsOrMarks": [
+        "The Ashwood Family Crest on his sword hilt",
+        "A scar above his left eyebrow"
+      ],
+      "emotionalCore": "Guilt and Vengeance",
+      "secrecyRules": [
+        "Avoid discussing his family's disappearance",
+        "Keep his affiliation with the Dark Knight order hidden"
+      ],
+      "hookTags": [
+        "Vengeance",
+        "Mystery",
+        "Dark Knight"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772362570447:jack",
+      "beats": [
+        {
+          "id": "B1",
+          "type": "echo",
+          "goal": "Create a sense of unease and foreboding",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "They're watching"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "B2",
+          "type": "trace",
+          "goal": "Provide a clue about the antagonist",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "Roderick"
+            ],
+            "symbols": [],
+            "phrases": [
+              "I saw Roderick arguing with your brother"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "B3",
+          "type": "pressure",
+          "goal": "Increase tension and danger",
+          "deliveryModes": [
+            "wantedPoster"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Wanted: Jack, the Dark Knight"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "B4",
+          "type": "revelation",
+          "goal": "Reveal a crucial piece of information",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "Samantha"
+            ],
+            "symbols": [],
+            "phrases": [
+              "Your family was taken by the Order"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "B5",
+          "type": "vector",
+          "goal": "Provide a direction for the character to follow",
+          "deliveryModes": [
+            "artifactReaction"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [
+              "The Black Flame Symbol"
+            ],
+            "phrases": [],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "B6",
+          "type": "choice",
+          "goal": "Offer a difficult decision",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "Thorne"
+            ],
+            "symbols": [],
+            "phrases": [
+              "Join us or face the consequences"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "B7",
+          "type": "consequence",
+          "goal": "Resolve the story arc",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "full"
+          },
+          "triggerHints": {},
+          "payload": {},
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 6,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772365621843:jack": {
+    "profile": {
+      "characterKey": "1772365621843:jack",
+      "origin": "Ashenhold Village",
+      "keyEvent": "The Night of the Burning Harvest",
+      "unresolvedConflict": "The slaughter of his family and neighbors",
+      "antagonisticForce": "The Order of the Red Hand",
+      "witnesses": [
+        "Sister Elara"
+      ],
+      "debts": [
+        "To Sister Elara for saving his life"
+      ],
+      "artifactsOrMarks": [
+        "The Blackened Sword",
+        "The Ashen Scar"
+      ],
+      "emotionalCore": "Vengeance and Guilt",
+      "secrecyRules": [
+        "Conceal affiliation with the Order of the Red Hand",
+        "Conceal true identity"
+      ],
+      "hookTags": [
+        "vengeance",
+        "darkness",
+        "betrayal"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772365621843:jack",
+      "beats": [
+        {
+          "id": "1772365621843:beat1",
+          "type": "echo",
+          "goal": "The player recalls a traumatic event",
+          "deliveryModes": [
+            "dream"
+          ],
+          "constraints": {
+            "minTurnsGap": 0,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Burning Harvest"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772365621843:beat2",
+          "type": "trace",
+          "goal": "The player discovers a cryptic message",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [
+              "The Red Hand"
+            ],
+            "phrases": [],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772365621843:beat3",
+          "type": "pressure",
+          "goal": "The player experiences a threatening situation",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [],
+            "objects": [
+              "The Blackened Sword"
+            ],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772365621843:beat4",
+          "type": "revelation",
+          "goal": "The player uncovers a crucial piece of information",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "Sister Elara"
+            ],
+            "symbols": [],
+            "phrases": [],
+            "objects": [],
+            "summary": "The Order of the Red Hand was involved in the massacre"
+          },
+          "used": false
+        },
+        {
+          "id": "1772365621843:beat5",
+          "type": "vector",
+          "goal": "The player is presented with a course of action",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Seek out the leader of the Order"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772365621843:beat6",
+          "type": "choice",
+          "goal": "The player must make a difficult decision",
+          "deliveryModes": [
+            "artifactReaction"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [],
+            "objects": [
+              "The Blackened Sword"
+            ],
+            "summary": "Spare or sacrifice Sister Elara"
+          },
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 6,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772367213405:asdf": {
+    "profile": {
+      "characterKey": "1772367213405:asdf",
+      "origin": "Abandoned on the streets of a large city, asdf grew up surviving by their wits and stealth.",
+      "keyEvent": "Discovered a hidden letter in a beggar's stash that hinted at a larger conspiracy involving the city's elite.",
+      "unresolvedConflict": "The beggar who gave asdf the letter was found dead, and asdf has been on the run ever since.",
+      "antagonisticForce": "The Red Vipers, a powerful thieves' guild believed to be behind the beggar's murder.",
+      "witnesses": [
+        "a street urchin who saw the beggar's murder"
+      ],
+      "debts": [
+        "owes a local blacksmith for a set of fine lockpicks"
+      ],
+      "artifactsOrMarks": [
+        "a silver earring with a small, intricate lock design"
+      ],
+      "emotionalCore": "Trusts no one, has a strong sense of self-preservation.",
+      "secrecyRules": [
+        "never reveals their true name",
+        "avoids discussing their past"
+      ],
+      "hookTags": [
+        "rogue",
+        "survivalist",
+        "on-the-run"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772367213405:asdf",
+      "beats": [
+        {
+          "id": "introduction",
+          "type": "echo",
+          "goal": "Establish asdf's skills as a rogue",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 0,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "beggar_murder",
+          "type": "trace",
+          "goal": "Reveal the beggar's murder and asdf's connection to it",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "beggar's murder"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "red_vipers",
+          "type": "pressure",
+          "goal": "Introduce the Red Vipers as a threat",
+          "deliveryModes": [
+            "wantedPoster"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "warning"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [
+              "Red Vipers"
+            ],
+            "phrases": [],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "lockpick_debt",
+          "type": "revelation",
+          "goal": "Reveal asdf's debt to the blacksmith",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "clear"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "lockpick debt"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "confrontation",
+          "type": "vector",
+          "goal": "Force asdf to confront the Red Vipers",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "clear"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "decision",
+          "type": "choice",
+          "goal": "Offer asdf a choice: join the Red Vipers or take them down",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "clear"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "join or take down"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 6,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772369324717:игорь": {
+    "profile": {
+      "characterKey": "1772369324717:игорь",
+      "origin": "Хэмлвэр",
+      "keyEvent": "Смерть родителей",
+      "unresolvedConflict": "Неизвестный убийца родителей",
+      "antagonisticForce": "Неизвестный убийца",
+      "witnesses": [],
+      "debts": [],
+      "artifactsOrMarks": [],
+      "emotionalCore": "Желание мести",
+      "secrecyRules": [
+        "Не раскрывать истинные мотивы"
+      ],
+      "hookTags": [
+        "месть",
+        "Хэмлвэр"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772369324717:игорь",
+      "beats": [
+        {
+          "id": "1",
+          "type": "echo",
+          "goal": "Начать поиски информации о смерти родителей",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Смерть родителей"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "2",
+          "type": "trace",
+          "goal": "Найти следы неизвестного убийцы",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 5,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Подозрительные люди"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "3",
+          "type": "pressure",
+          "goal": "Испытать давление со стороны властей",
+          "deliveryModes": [
+            "patrol"
+          ],
+          "constraints": {
+            "minTurnsGap": 3,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Власти ищут"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "4",
+          "type": "revelation",
+          "goal": "Узнать важную информацию о неизвестном убийце",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 6,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Убийца из города"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "5",
+          "type": "vector",
+          "goal": "Определить направление поиска",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "След leads to ..."
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "6",
+          "type": "choice",
+          "goal": "Сделать выбор между вариантами",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 5,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Выберите один из вариантов"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "7",
+          "type": "consequence",
+          "goal": "Испытать последствия выбора",
+          "deliveryModes": [
+            "consequence"
+          ],
+          "constraints": {
+            "minTurnsGap": 0,
+            "maxRevealLevel": "full"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Последствия выбора"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 6,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772399753790:игорь": {
+    "profile": {
+      "characterKey": "1772399753790:игорь",
+      "origin": "Село Подсобное, близ города Мертвый Вода",
+      "keyEvent": "Ритуал по очистке скверны в местной канализации пошел не так",
+      "unresolvedConflict": "Проклятие отхожего места",
+      "antagonisticForce": "Князь нечисти городской",
+      "witnesses": [
+        "Крестьяне села",
+        "Местный участковый"
+      ],
+      "debts": [
+        "Долг перед сельсоветом за устранение последствий ритуала"
+      ],
+      "artifactsOrMarks": [
+        "Татуировка символа магии говна на левой ягодице"
+      ],
+      "emotionalCore": "Чувство вины и ответственности за произошедшее",
+      "secrecyRules": [
+        "Не разглашать подробности ритуала и проклятия"
+      ],
+      "hookTags": [
+        "магия",
+        "говно",
+        "проклятие"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772399753790:игорь",
+      "beats": [
+        {
+          "id": "1772399753790:beat1",
+          "type": "echo",
+          "goal": "Намек на проблемы в канализации села",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 0,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "странные шумы в канализации"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772399753790:beat2",
+          "type": "trace",
+          "goal": "Следы ритуала на земле и на Игорье",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [
+              "татуировка"
+            ],
+            "phrases": [],
+            "objects": [
+              "странные символы на земле"
+            ],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772399753790:beat3",
+          "type": "pressure",
+          "goal": "Местные жители начинают подозревать Игоря",
+          "deliveryModes": [
+            "npc",
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Игорь что-то скрывает"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772399753790:beat4",
+          "type": "revelation",
+          "goal": "Игорь признается в проведении ритуала",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Я пытался очистить скверну"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772399753790:beat5",
+          "type": "vector",
+          "goal": "Князь нечисти городской проявляет интерес к Игорю",
+          "deliveryModes": [
+            "wantedPoster"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Розыск князя нечисти"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772399753790:beat6",
+          "type": "choice",
+          "goal": "Игорь должен выбрать: противостоять князю или скрываться",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {},
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 4,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772403048719:игорь": {
+    "profile": {
+      "characterKey": "1772403048719:игорь",
+      "origin": "Село под Москвой",
+      "keyEvent": "Убийство семьи",
+      "unresolvedConflict": "Месть за семью",
+      "antagonisticForce": "Братская мафия",
+      "witnesses": [
+        "Сельский кузнец",
+        "Пьяный крестьянин"
+      ],
+      "debts": [
+        "Долг кровью"
+      ],
+      "artifactsOrMarks": [
+        "Татуировка на левом плече"
+      ],
+      "emotionalCore": "Злоба и горе",
+      "secrecyRules": [
+        "Не раскрывать личность",
+        "Скрывать истинные намерения"
+      ],
+      "hookTags": [
+        "месть",
+        "темный мечник"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772403048719:игорь",
+      "beats": [
+        {
+          "id": "1772403048719:игорь:1",
+          "type": "echo",
+          "goal": "Напомнить о прошлом",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 0,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Что-то темное"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772403048719:игорь:2",
+          "type": "trace",
+          "goal": "Найти след",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "Иван"
+            ],
+            "symbols": [],
+            "phrases": [
+              "Говорили, что он был в селе"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772403048719:игорь:3",
+          "type": "pressure",
+          "goal": "Увеличить давление",
+          "deliveryModes": [
+            "wantedPoster"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "warning"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Разыскивается за убийство"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772403048719:игорь:4",
+          "type": "revelation",
+          "goal": "Открыть правду",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "full"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "Брат"
+            ],
+            "symbols": [],
+            "phrases": [
+              "Ты виновен"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772403048719:игорь:5",
+          "type": "vector",
+          "goal": "Направить действия",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "direction"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Ищи в Москве"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772403048719:игорь:6",
+          "type": "choice",
+          "goal": "Предложить выбор",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "option"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "Друг"
+            ],
+            "symbols": [],
+            "phrases": [
+              "Помогу, но нужно выбрать"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 6,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772405943153:игорь": {
+    "profile": {
+      "characterKey": "1772405943153:игорь",
+      "origin": "Киевская Русь",
+      "keyEvent": "Убийство семьи",
+      "unresolvedConflict": "Месть за семью",
+      "antagonisticForce": "Бояре",
+      "witnesses": [
+        "Соседи",
+        "Дружина"
+      ],
+      "debts": [
+        "Олег",
+        "Владимир"
+      ],
+      "artifactsOrMarks": [
+        "Кольцо с символом меча"
+      ],
+      "emotionalCore": "Гнев и жажда мести",
+      "secrecyRules": [
+        "Не раскрывать личность",
+        "Скрывать истинные намерения"
+      ],
+      "hookTags": [
+        "Месть",
+        "Темный мечник"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772405943153:игорь",
+      "beats": [
+        {
+          "id": "1772405943153:игорь:1",
+          "type": "echo",
+          "goal": "Напомнить о прошлом",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Убит князь"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772405943153:игорь:2",
+          "type": "trace",
+          "goal": "Найти след",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "Олег"
+            ],
+            "symbols": [],
+            "phrases": [
+              "Ищите в Киеве"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772405943153:игорь:3",
+          "type": "pressure",
+          "goal": "Оказать давление",
+          "deliveryModes": [
+            "wantedPoster"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Розыск"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772405943153:игорь:4",
+          "type": "revelation",
+          "goal": "Открыть правду",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "Владимир"
+            ],
+            "symbols": [],
+            "phrases": [
+              "Предательство"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772405943153:игорь:5",
+          "type": "vector",
+          "goal": "Направить действия",
+          "deliveryModes": [
+            "artifactReaction"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [
+              "Кольцо с символом меча"
+            ],
+            "phrases": [],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772405943153:игорь:6",
+          "type": "choice",
+          "goal": "Сделать выбор",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Простить или отомстить"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772405943153:игорь:7",
+          "type": "consequence",
+          "goal": "Последствия выбора",
+          "deliveryModes": [
+            "patrol"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "full"
+          },
+          "triggerHints": {},
+          "payload": {},
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 4,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772406429454:игорь": {
+    "profile": {
+      "characterKey": "1772406429454:игорь",
+      "origin": "Киевская Русь",
+      "keyEvent": "Убийство семьи",
+      "unresolvedConflict": "Месть боярину",
+      "antagonisticForce": "Боярин Михаил",
+      "witnesses": [
+        "Сельский житель"
+      ],
+      "debts": [
+        "Долг крестьянина"
+      ],
+      "artifactsOrMarks": [
+        "Кольцо с гербом"
+      ],
+      "emotionalCore": "Гнев и жажда мести",
+      "secrecyRules": [
+        "Не раскрывать личность"
+      ],
+      "hookTags": [
+        "Месть",
+        "Темный Мечник"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772406429454:игорь",
+      "beats": [
+        {
+          "id": "1772406429454:игорь:1",
+          "type": "echo",
+          "goal": "Напомнить о прошлом",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "Игорь"
+            ],
+            "symbols": [],
+            "phrases": [
+              "Темный Мечник"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772406429454:игорь:2",
+          "type": "trace",
+          "goal": "Отследить следы",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 5,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [
+              "Следы"
+            ],
+            "phrases": [],
+            "objects": [
+              "Карта"
+            ],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772406429454:игорь:3",
+          "type": "pressure",
+          "goal": "Увеличить давление",
+          "deliveryModes": [
+            "wantedPoster"
+          ],
+          "constraints": {
+            "minTurnsGap": 3,
+            "maxRevealLevel": "warning"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Награда за голову"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772406429454:игорь:4",
+          "type": "revelation",
+          "goal": "Открыть правду",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "full"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Письмо от крестьянина"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772406429454:игорь:5",
+          "type": "vector",
+          "goal": "Направить действия",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 2,
+            "maxRevealLevel": "direction"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Встреча с информатором"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772406429454:игорь:6",
+          "type": "choice",
+          "goal": "Сделать выбор",
+          "deliveryModes": [
+            "artifactReaction"
+          ],
+          "constraints": {
+            "minTurnsGap": 3,
+            "maxRevealLevel": "decision"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Реакция на артефакт"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772406429454:игорь:7",
+          "type": "consequence",
+          "goal": "Последствия выбора",
+          "deliveryModes": [
+            "patrol"
+          ],
+          "constraints": {
+            "minTurnsGap": 1,
+            "maxRevealLevel": "result"
+          },
+          "triggerHints": {},
+          "payload": {},
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 6,
+      "revealedFacts": [],
+      "status": "active"
+    }
+  },
+  "1772644638966:игорь": {
+    "profile": {
+      "characterKey": "1772644638966:игорь",
+      "origin": "Село на окраине княжества",
+      "keyEvent": "Убийство семьи",
+      "unresolvedConflict": "Месть за семью",
+      "antagonisticForce": "Братская мафия",
+      "witnesses": [
+        "Сельский кузнец",
+        "Пьяный крестьянин"
+      ],
+      "debts": [
+        "Долг князю за покровительство"
+      ],
+      "artifactsOrMarks": [
+        "Темный амулет мечника"
+      ],
+      "emotionalCore": "Злоба и горе",
+      "secrecyRules": [
+        "Не раскрывать личность заказчика"
+      ],
+      "hookTags": [
+        "месть",
+        "темный мечник"
+      ]
+    },
+    "plan": {
+      "characterKey": "1772644638966:игорь",
+      "beats": [
+        {
+          "id": "1772644638966:игорь:1",
+          "type": "echo",
+          "goal": "Напомнить о себе",
+          "deliveryModes": [
+            "rumor"
+          ],
+          "constraints": {
+            "minTurnsGap": 0,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Темный мечник"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772644638966:игорь:2",
+          "type": "trace",
+          "goal": "Отследить следы Братской мафии",
+          "deliveryModes": [
+            "npc"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [
+              "Сельский кузнец"
+            ],
+            "symbols": [],
+            "phrases": [
+              "Братская мафия"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772644638966:игорь:3",
+          "type": "pressure",
+          "goal": "Оказать давление на Братскую мафию",
+          "deliveryModes": [
+            "wantedPoster"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "hint"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Разыскивается"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772644638966:игорь:4",
+          "type": "revelation",
+          "goal": "Раскрыть правду о семье",
+          "deliveryModes": [
+            "letter"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Убийство семьи"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772644638966:игорь:5",
+          "type": "vector",
+          "goal": "Направить гнев на Братскую мафию",
+          "deliveryModes": [
+            "coincidence"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Отомстить"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        },
+        {
+          "id": "1772644638966:игорь:6",
+          "type": "choice",
+          "goal": "Сделать выбор между местью и долгом",
+          "deliveryModes": [
+            "artifactReaction"
+          ],
+          "constraints": {
+            "minTurnsGap": 4,
+            "maxRevealLevel": "partial"
+          },
+          "triggerHints": {},
+          "payload": {
+            "keyNames": [],
+            "symbols": [],
+            "phrases": [
+              "Долг или месть"
+            ],
+            "objects": [],
+            "summary": ""
+          },
+          "used": false
+        }
+      ],
+      "currentBeatIndex": 0,
+      "pressureLevel": 10,
+      "nextEligibleAfter": 4,
+      "revealedFacts": [],
+      "status": "active"
+    }
   }
 }

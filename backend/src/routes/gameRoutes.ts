@@ -1,12 +1,10 @@
 import express from 'express'
 import type { ChatCompletionMessage } from 'openai/resources/chat/completions'
 import {
-  generateDMResponse,
   generateQuestFromBackstory,
   generateSceneSummary,
   generateStatusUpdate,
   generateBackstorySummary,
-  generateCombatNarration,
   generateIntentDecision,
   generateBackstoryArcPlan
 } from '../services/aiService.js'
@@ -17,17 +15,116 @@ import {
   getEligibleBeat,
   markBeatUsed
 } from '../services/backstoryArcStore.js'
-import { listNPCProfiles, listNPCDialoguePalette } from '../services/npcRegistry.js'
+import { listNPCProfiles, listNPCDialoguePalette, localizeNpcName } from '../services/npcRegistry.js'
 import { getBattle, resolveAction, startBattle, type CombatEntity } from '../services/combatService.js'
+import {
+  processTurn,
+  type NPCState,
+  type WorldState
+} from '../services/directorService.js'
+import {
+  addEvent,
+  buildContextForAI,
+  generateTurnLog,
+  updateStorySummary,
+  type StoryMemory
+} from '../services/memoryService.js'
 import {
   annotateSegments,
   segmentMessage,
   type LastResolvedAction
 } from '../services/intentUtility.js'
+import { runNarrativeEngine } from '../services/narrativeEngine.js'
+import { interpretPlayerAction } from '../services/actionInterpreter.js'
 
 const router = express.Router()
 const pendingChecks = new Map<string, PendingCheck>()
 const gameStateByCampaign = new Map<string, { lastResolvedAction?: LastResolvedAction | null; turnIndex?: number }>()
+const worldStateByCampaign = new Map<string, WorldState>()
+const storyMemoryByCampaign = new Map<string, StoryMemory>()
+const normalizeLanguage = (value: unknown): 'en' | 'ru' => (value === 'ru' ? 'ru' : 'en')
+
+const DEFAULT_WORLD_STATE: WorldState = {
+  tension: 10,
+  guardsAlert: false,
+  npcMood: {
+    anger: 10,
+    suspicion: 10,
+    trust: 20
+  }
+}
+
+const DEFAULT_STORY_MEMORY: StoryMemory = {
+  recentEvents: [],
+  storySummary: []
+}
+
+const toFiniteNumber = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback
+
+const normalizeWorldState = (value: unknown): WorldState => {
+  if (!value || typeof value !== 'object') {
+    return { ...DEFAULT_WORLD_STATE, npcMood: { ...DEFAULT_WORLD_STATE.npcMood } }
+  }
+  const source = value as Partial<WorldState>
+  const sourceMood = (source.npcMood || {}) as Partial<WorldState['npcMood']>
+  return {
+    tension: toFiniteNumber(source.tension, DEFAULT_WORLD_STATE.tension),
+    guardsAlert: Boolean(source.guardsAlert),
+    npcMood: {
+      anger: toFiniteNumber(sourceMood.anger, DEFAULT_WORLD_STATE.npcMood.anger),
+      suspicion: toFiniteNumber(sourceMood.suspicion, DEFAULT_WORLD_STATE.npcMood.suspicion),
+      trust: toFiniteNumber(sourceMood.trust, DEFAULT_WORLD_STATE.npcMood.trust)
+    }
+  }
+}
+
+const normalizeNpcState = (value: unknown, fallbackWorldState: WorldState): NPCState => {
+  if (!value || typeof value !== 'object') {
+    return { ...fallbackWorldState.npcMood }
+  }
+  const source = value as Partial<NPCState>
+  return {
+    anger: toFiniteNumber(source.anger, fallbackWorldState.npcMood.anger),
+    suspicion: toFiniteNumber(source.suspicion, fallbackWorldState.npcMood.suspicion),
+    trust: toFiniteNumber(source.trust, fallbackWorldState.npcMood.trust)
+  }
+}
+
+const applyDirectorMemoryPipeline = (payload: {
+  campaignKey: string
+  playerInput: string
+  turnNumber: number
+  worldStateOverride?: unknown
+  npcStateOverride?: unknown
+}) => {
+  const storedWorldState = worldStateByCampaign.get(payload.campaignKey) || {
+    ...DEFAULT_WORLD_STATE,
+    npcMood: { ...DEFAULT_WORLD_STATE.npcMood }
+  }
+  const baseWorldState = payload.worldStateOverride
+    ? normalizeWorldState(payload.worldStateOverride)
+    : storedWorldState
+  const baseNpcState = normalizeNpcState(payload.npcStateOverride, baseWorldState)
+  const directorResult = processTurn(payload.playerInput, baseWorldState, baseNpcState)
+
+  let memory = storyMemoryByCampaign.get(payload.campaignKey) || {
+    recentEvents: [],
+    storySummary: []
+  }
+  const turnLog = generateTurnLog(payload.playerInput, directorResult.directorNotes)
+  memory = addEvent(memory, turnLog, directorResult.actionType, payload.turnNumber)
+  memory = updateStorySummary(memory)
+
+  worldStateByCampaign.set(payload.campaignKey, directorResult.updatedWorldState)
+  storyMemoryByCampaign.set(payload.campaignKey, memory)
+
+  return {
+    directorResult,
+    memoryContext: buildContextForAI(memory),
+    recentEvents: memory.recentEvents.map(entry => entry.description)
+  }
+}
 
 type ActionIntent = {
   action: 'attack' | 'attempt' | 'talk'
@@ -107,6 +204,20 @@ const extractLocationFromContext = (context?: string) => {
   return firstLine || 'Unknown location'
 }
 
+const extractTimeOfDayFromContext = (context?: string) => {
+  if (!context) return undefined
+  const match = context.match(/time\s*:\s*([^\n]+)/i)
+  const value = match?.[1]?.trim()
+  return value || undefined
+}
+
+const mapTensionLevel = (value: number | undefined): 'low' | 'medium' | 'high' => {
+  const tension = typeof value === 'number' ? value : 0
+  if (tension >= 70) return 'high'
+  if (tension >= 35) return 'medium'
+  return 'low'
+}
+
 const buildCharacterKey = (campaignKey: string, characterInfo?: any) => {
   if (characterInfo?.id) {
     return String(characterInfo.id)
@@ -171,13 +282,42 @@ const buildSceneState = (
   participants?: Array<{ id?: string; name?: string }>
 ) => {
   const roster = Array.isArray(participants)
-    ? Array.from(new Set(participants.map(entry => entry?.name).filter(Boolean)))
+    ? Array.from(
+        new Set(
+          participants
+            .map(entry => entry?.name)
+            .filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
+        )
+      )
     : []
   return {
     location: extractLocationFromContext(context),
     roster,
     lastTransition: null
   }
+}
+
+const extractLatestAssistantCue = (historyMessages: ChatCompletionMessage[]): string | undefined => {
+  for (let index = historyMessages.length - 1; index >= 0; index--) {
+    const entry = historyMessages[index]
+    if (!entry || entry.role !== 'assistant') continue
+    const rawContent: unknown = (entry as any).content
+    const content =
+      typeof rawContent === 'string'
+        ? rawContent
+        : Array.isArray(rawContent)
+        ? rawContent
+            .map((part: any) => (typeof part === 'string' ? part : part?.text || ''))
+            .join('')
+        : ''
+    const stripped = String(content || '')
+      .replace(/<npc\s+id="[^"]+"[^>]*>/gi, '')
+      .replace(/<\/npc>/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (stripped) return stripped.slice(0, 260)
+  }
+  return undefined
 }
 
 const updateLastResolvedAction = (campaignKey: string, next: LastResolvedAction) => {
@@ -797,8 +937,12 @@ router.post('/dm-response', async (req, res) => {
       pendingCheckId,
       selectedTarget,
       sceneParticipants,
-      playerSnapshot
+      playerSnapshot,
+      worldState,
+      npcState,
+      language
     } = req.body
+    const preferredLanguage = normalizeLanguage(language)
 
     if (!playerAction || typeof playerAction !== 'string') {
       return res.status(400).json({ error: 'Player action is required' })
@@ -828,13 +972,29 @@ router.post('/dm-response', async (req, res) => {
     const currentTurn = (gameState.turnIndex || 0) + 1
     gameStateByCampaign.set(campaignKey, { ...gameState, turnIndex: currentTurn })
     const sceneState = buildSceneState(gameContext || '', sceneParticipants)
+    const interpretedAction = interpretPlayerAction(playerAction, {
+      location: sceneState.location,
+      activeNPCs: (sceneState.roster || []).filter((name): name is string => typeof name === 'string' && Boolean(name.trim())),
+      lastNpcPrompt: extractLatestAssistantCue(historyMessages),
+      lastEvent: gameState.lastResolvedAction?.summary || undefined
+    })
+    const effectivePlayerAction = interpretedAction.interpretedInput
+    const interpreterNote = interpretedAction.transformed
+      ? `Action Interpreter: "${playerAction}" -> ${interpretedAction.intentType}. ${interpretedAction.reason}`
+      : ''
 
     if (rollResult && pendingCheckId) {
       const pending = pendingChecks.get(campaignKey)
       if (pending && pending.id === pendingCheckId) {
         pendingChecks.delete(campaignKey)
         console.log('Pending check cleared:', pending.id)
-
+        const { directorResult, memoryContext, recentEvents } = applyDirectorMemoryPipeline({
+          campaignKey,
+          playerInput: effectivePlayerAction,
+          turnNumber: currentTurn,
+          worldStateOverride: worldState,
+          npcStateOverride: npcState
+        })
         if (pending.type === 'attack') {
           let battleState = getBattle(campaignKey)
           if (!battleState) {
@@ -897,10 +1057,24 @@ router.post('/dm-response', async (req, res) => {
             }
           )
 
-          const narration = await generateCombatNarration(
-            resolved.state,
-            resolved.events,
-            `Player action: ${playerAction}`
+          const narrativeResult = await runNarrativeEngine(
+            {
+              playerAction: effectivePlayerAction,
+              directorNotes: `${directorResult.directorNotes}${interpreterNote ? ` ${interpreterNote}` : ''} Combat events: ${JSON.stringify(resolved.events)}`,
+              worldState: directorResult.updatedWorldState as unknown as Record<string, unknown>,
+              playerProfile: (characterInfo || {}) as Record<string, unknown>,
+              memoryContext,
+              location: sceneState.location || extractLocationFromContext(gameContext || ''),
+              recentEvents,
+              sceneState: {
+                location: sceneState.location || extractLocationFromContext(gameContext || ''),
+                timeOfDay: extractTimeOfDayFromContext(gameContext || ''),
+                activeNPCs: (sceneState.roster || []).filter((name): name is string => typeof name === 'string' && Boolean(name.trim())),
+                sceneGoal: pending.context || 'Resolve the immediate confrontation',
+                tensionLevel: mapTensionLevel(directorResult.updatedWorldState.tension)
+              }
+            },
+            preferredLanguage
           )
 
           if (pending.actionLabel || pending.context) {
@@ -916,44 +1090,39 @@ router.post('/dm-response', async (req, res) => {
           }
 
           return res.json({
-            response: narration,
+            scene: narrativeResult.scene,
+            narrative: narrativeResult.narration,
+            response: narrativeResult.narration,
+            choices: narrativeResult.choices,
             battle: resolved.state,
             events: resolved.events,
+            updatedWorldState: directorResult.updatedWorldState,
+            directorNotes: directorResult.directorNotes,
             ui: { showRoll: false },
             pending_check: null
           })
         }
 
-        const intentDetails = pending.intent
-          ? `Intent tags: ${pending.intent.tags.join(', ')}. Target: ${pending.intent.target || 'none'}.`
-          : ''
-        const rollTotal = rollResult.total ?? rollResult.result
-        const rollMath =
-          typeof rollResult.d20 === 'number'
-            ? `d20 ${rollResult.d20} + ${rollResult.bonus ?? 0} = ${rollTotal}`
-            : `${rollTotal}`
-        const dcText = typeof rollResult.dc === 'number' ? ` vs DC ${rollResult.dc}` : ''
-        const outcomeLabel = rollResult.label || pending.context
-        const followUp = `Player action: ${playerAction}. ${intentDetails}
-Outcome data: ${outcomeLabel} => ${rollMath}${dcText} (OUTCOME=${rollResult.success ? 'SUCCESS' : 'FAIL'}).
-Start from the outcome and world reaction. Describe ONLY the new consequences of this result. Do NOT restate the player's prior action or any preparation. Stay strictly diegetic. Do NOT mention rolls, numbers, or mechanics in narration.`
-
-        const characterKey = buildCharacterKey(campaignKey, characterInfo)
-        const backstoryArcContext = await buildBackstoryArcContext({
-          characterKey,
-          characterInfo,
-          backstory: characterInfo?.backstory,
-          currentTurn
-        })
-
-        console.log('Generating DM response for roll outcome:', pending.id)
-        const dmResponse = await generateDMResponse(
-          followUp,
-          characterInfo || {},
-          gameContext || '',
-          historyMessages,
-          sceneState,
-          backstoryArcContext || undefined
+        const outcomeNote = rollResult.success ? 'Outcome: success.' : 'Outcome: failure.'
+        console.log('Generating narrative engine response for roll outcome:', pending.id)
+        const narrativeResult = await runNarrativeEngine(
+          {
+            playerAction: effectivePlayerAction,
+            directorNotes: `${directorResult.directorNotes}${interpreterNote ? ` ${interpreterNote}` : ''} ${outcomeNote}`,
+            worldState: directorResult.updatedWorldState as unknown as Record<string, unknown>,
+            playerProfile: (characterInfo || {}) as Record<string, unknown>,
+            memoryContext,
+            location: sceneState.location || extractLocationFromContext(gameContext || ''),
+            recentEvents,
+            sceneState: {
+              location: sceneState.location || extractLocationFromContext(gameContext || ''),
+              timeOfDay: extractTimeOfDayFromContext(gameContext || ''),
+              activeNPCs: (sceneState.roster || []).filter((name): name is string => typeof name === 'string' && Boolean(name.trim())),
+              sceneGoal: pending.context || 'Resolve the immediate consequence',
+              tensionLevel: mapTensionLevel(directorResult.updatedWorldState.tension)
+            }
+          },
+          preferredLanguage
         )
 
         if (pending.actionLabel || pending.context) {
@@ -968,15 +1137,22 @@ Start from the outcome and world reaction. Describe ONLY the new consequences of
           })
         }
 
-        console.log('DM response generated successfully, length:', dmResponse.response.length)
+        console.log('Narrative engine response generated successfully, length:', narrativeResult.narration.length)
         const npcRegistry = listNPCProfiles().map(npc => ({
           id: npc.id,
-          name: npc.name,
+          name: localizeNpcName(npc.name, preferredLanguage),
           dialogueColorId: npc.dialogueColorId
         }))
         const npcPalette = listNPCDialoguePalette()
         return res.json({
-          ...dmResponse,
+          scene: narrativeResult.scene,
+          narrative: narrativeResult.narration,
+          response: narrativeResult.narration,
+          choices: narrativeResult.choices,
+          requiresRoll: false,
+          checkRequest: null,
+          updatedWorldState: directorResult.updatedWorldState,
+          directorNotes: directorResult.directorNotes,
           ui: { showRoll: false },
           pending_check: null,
           npcRegistry,
@@ -985,12 +1161,12 @@ Start from the outcome and world reaction. Describe ONLY the new consequences of
       }
     }
 
-    const segments = annotateSegments(segmentMessage(playerAction), gameState.lastResolvedAction || null)
+    const segments = annotateSegments(segmentMessage(effectivePlayerAction), gameState.lastResolvedAction || null)
 
     let decision: any = null
     try {
       decision = await generateIntentDecision({
-        rawText: playerAction,
+        rawText: effectivePlayerAction,
         segments,
         lastResolvedAction: gameState.lastResolvedAction || null,
         sceneContext: null
@@ -1005,7 +1181,7 @@ Start from the outcome and world reaction. Describe ONLY the new consequences of
       console.error('Intent decision failed, using fallback:', error?.message || error)
     }
 
-    const fallbackIntent = classifyIntent(playerAction, {
+    const fallbackIntent = classifyIntent(effectivePlayerAction, {
       selectedTarget,
       sceneParticipants,
       gameContext
@@ -1017,7 +1193,7 @@ Start from the outcome and world reaction. Describe ONLY the new consequences of
         segments.find(segment => segment.hint === 'ACTION_NOW') ||
         segments.find(segment => segment.hint !== 'PAST_REF') ||
         segments[0]
-      const resolvedCheck = resolveCheck(fallbackIntent, playerAction, gameContext)
+      const resolvedCheck = resolveCheck(fallbackIntent, effectivePlayerAction, gameContext)
       decision = {
         primarySegmentId: primarySegment?.id || 'seg-1',
         intentType: primarySegment?.hint || 'UNKNOWN',
@@ -1026,17 +1202,17 @@ Start from the outcome and world reaction. Describe ONLY the new consequences of
         stat: resolvedCheck?.stat || null,
         skill: null,
         dc: typeof resolvedCheck?.difficulty === 'number' ? resolvedCheck.difficulty : null,
-        actionLabel: summarizeActionText(primarySegment?.text || playerAction) || summarizeActionText(playerAction),
+        actionLabel: summarizeActionText(primarySegment?.text || effectivePlayerAction) || summarizeActionText(effectivePlayerAction),
         narration: ''
       }
     }
 
-    const target = selectedTarget || detectTarget(playerAction, sceneParticipants)
+    const target = selectedTarget || detectTarget(effectivePlayerAction, sceneParticipants)
     const pendingCheck = decision.shouldRoll
       ? buildDecisionCheck({
           decision,
           target,
-          rawText: playerAction,
+          rawText: effectivePlayerAction,
           sceneParticipants
         })
       : null
@@ -1087,9 +1263,16 @@ Start from the outcome and world reaction. Describe ONLY the new consequences of
 
     if (pendingCheck) {
       console.log('Skipping DM call until check/combat result is resolved.')
+      const currentWorldState = worldState
+        ? normalizeWorldState(worldState)
+        : worldStateByCampaign.get(campaignKey) || {
+            ...DEFAULT_WORLD_STATE,
+            npcMood: { ...DEFAULT_WORLD_STATE.npcMood }
+          }
       return res.json({
         response: '',
         requiresRoll: true,
+        updatedWorldState: currentWorldState,
         pending_check: pendingCheck,
         ui: { showRoll: true },
         checkRequest: {
@@ -1122,36 +1305,50 @@ Start from the outcome and world reaction. Describe ONLY the new consequences of
       }
     }
 
-    const characterKey = buildCharacterKey(campaignKey, characterInfo)
-    const backstoryArcContext = await buildBackstoryArcContext({
-      characterKey,
-      characterInfo,
-      backstory: characterInfo?.backstory,
-      currentTurn
+    const { directorResult, memoryContext, recentEvents } = applyDirectorMemoryPipeline({
+      campaignKey,
+      playerInput: effectivePlayerAction,
+      turnNumber: currentTurn,
+      worldStateOverride: worldState,
+      npcStateOverride: npcState
     })
-
-    console.log('Generating DM response for action:', playerAction.substring(0, 100))
-    const dmResponse = await generateDMResponse(
-      playerAction,
-      characterInfo || {},
-      gameContext || '',
-      historyMessages,
-      sceneState,
-      backstoryArcContext || undefined
+    console.log('Generating narrative engine response for action:', effectivePlayerAction.substring(0, 100))
+    const narrativeResult = await runNarrativeEngine(
+      {
+        playerAction: effectivePlayerAction,
+        directorNotes: `${directorResult.directorNotes}${interpreterNote ? ` ${interpreterNote}` : ''}`,
+        worldState: directorResult.updatedWorldState as unknown as Record<string, unknown>,
+        playerProfile: (characterInfo || {}) as Record<string, unknown>,
+        memoryContext,
+        location: sceneState.location || extractLocationFromContext(gameContext || ''),
+        recentEvents,
+        sceneState: {
+          location: sceneState.location || extractLocationFromContext(gameContext || ''),
+          timeOfDay: extractTimeOfDayFromContext(gameContext || ''),
+          activeNPCs: (sceneState.roster || []).filter((name): name is string => typeof name === 'string' && Boolean(name.trim())),
+          sceneGoal: 'Continue the current scene',
+          tensionLevel: mapTensionLevel(directorResult.updatedWorldState.tension)
+        }
+      },
+      preferredLanguage
     )
 
-    const responseText = dmResponse.response
+    const responseText = narrativeResult.narration
 
-    console.log('DM response generated successfully, length:', responseText.length)
+    console.log('Narrative engine response generated successfully, length:', responseText.length)
     const npcRegistry = listNPCProfiles().map(npc => ({
       id: npc.id,
-      name: npc.name,
+      name: localizeNpcName(npc.name, preferredLanguage),
       dialogueColorId: npc.dialogueColorId
     }))
     const npcPalette = listNPCDialoguePalette()
     res.json({
-      ...dmResponse,
+      narrative: responseText,
       response: responseText,
+      scene: narrativeResult.scene,
+      choices: narrativeResult.choices,
+      updatedWorldState: directorResult.updatedWorldState,
+      directorNotes: directorResult.directorNotes,
       requiresRoll: false,
       checkRequest: null,
       pending_check: null,
@@ -1173,7 +1370,8 @@ Start from the outcome and world reaction. Describe ONLY the new consequences of
 // Summarize scene context to reduce history
 router.post('/summarize-scene', async (req, res) => {
   try {
-    const { history } = req.body
+    const { history, language } = req.body
+    const preferredLanguage = normalizeLanguage(language)
 
     const historyMessages: ChatCompletionMessage[] = Array.isArray(history)
       ? history
@@ -1198,7 +1396,7 @@ router.post('/summarize-scene', async (req, res) => {
       return res.status(400).json({ error: 'History is required to summarize' })
     }
 
-    const summary = await generateSceneSummary(historyMessages)
+    const summary = await generateSceneSummary(historyMessages, preferredLanguage)
     res.json({ summary })
   } catch (error: any) {
     console.error('Error generating scene summary:', error)
@@ -1213,7 +1411,8 @@ router.post('/summarize-scene', async (req, res) => {
 // Generate status updates from recent scene context
 router.post('/status-update', async (req, res) => {
   try {
-    const { history, statusState } = req.body
+    const { history, statusState, language } = req.body
+    const preferredLanguage = normalizeLanguage(language)
 
     const historyMessages: ChatCompletionMessage[] = Array.isArray(history)
       ? history
@@ -1243,7 +1442,7 @@ router.post('/status-update', async (req, res) => {
         ? statusState
         : { active_statuses: [] }
 
-    const update = await generateStatusUpdate(historyMessages, normalizedStatusState)
+    const update = await generateStatusUpdate(historyMessages, normalizedStatusState, preferredLanguage)
     res.json(update)
   } catch (error: any) {
     console.error('Error generating status update:', error)
@@ -1258,7 +1457,8 @@ router.post('/status-update', async (req, res) => {
 // Generate a tailored quest from backstory
 router.post('/generate-quest', async (req, res) => {
   try {
-    const { backstory, characterName, characterClass } = req.body
+    const { backstory, characterName, characterClass, language } = req.body
+    const preferredLanguage = normalizeLanguage(language)
 
     if (!backstory || typeof backstory !== 'string') {
       return res.status(400).json({ error: 'Backstory is required to generate a quest' })
@@ -1267,7 +1467,7 @@ router.post('/generate-quest', async (req, res) => {
     const quest = await generateQuestFromBackstory(backstory, {
       name: characterName,
       className: characterClass
-    })
+    }, preferredLanguage)
 
     res.json(quest)
   } catch (error: any) {
@@ -1282,13 +1482,14 @@ router.post('/generate-quest', async (req, res) => {
 // Summarize character backstory into key moments
 router.post('/summarize-backstory', async (req, res) => {
   try {
-    const { backstory } = req.body
+    const { backstory, language } = req.body
+    const preferredLanguage = normalizeLanguage(language)
 
     if (!backstory || typeof backstory !== 'string') {
       return res.status(400).json({ error: 'Backstory is required' })
     }
 
-    const summary = await generateBackstorySummary(backstory)
+    const summary = await generateBackstorySummary(backstory, preferredLanguage)
     res.json({ summary })
   } catch (error: any) {
     console.error('Error generating backstory summary:', error)

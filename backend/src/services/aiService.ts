@@ -6,6 +6,7 @@ import {
   getNPCProfile,
   getNPCProfileById,
   registerNPCProfile,
+  localizeNpcName,
   slugify,
   type NPCProfile
 } from './npcRegistry.js'
@@ -168,6 +169,26 @@ export type TaskType =
   | 'CUSTOM_CLASS'
   | 'QUEST_JSON'
   | 'BACKSTORY_ARC_JSON'
+
+export type PreferredLanguage = 'en' | 'ru'
+
+const normalizeLanguage = (language?: string): PreferredLanguage =>
+  language === 'ru' ? 'ru' : 'en'
+
+const languageDirective = (language?: string): string => {
+  const resolved = normalizeLanguage(language)
+  if (resolved === 'ru') {
+    return 'LANGUAGE RULE: Write all user-facing content in Russian. Keep JSON keys/schema in English when required.'
+  }
+  return 'LANGUAGE RULE: Write all user-facing content in English.'
+}
+
+const isMostlyCyrillic = (text: string): boolean => {
+  const letters = (text.match(/[A-Za-zА-Яа-яЁё]/g) || []).length
+  if (!letters) return false
+  const cyr = (text.match(/[А-Яа-яЁё]/g) || []).length
+  return cyr / letters >= 0.6
+}
 
 interface CallAIOptions {
   temperature?: number
@@ -357,6 +378,19 @@ export async function generateCustomClass(description: string): Promise<{
   proficiencies: string[]
   features: string[]
   description: string
+  startingWeapon: {
+    name: string
+    type: string
+    damage: string
+    description: string
+    tags: string[]
+  }
+  startingArmor: {
+    name: string
+    armorClass: number
+    description: string
+    tags: string[]
+  }
 }> {
   const systemPrompt = `You are an expert D&D 5e game designer. Generate a balanced custom class based on the user's description.
 Return ONLY a valid JSON object with this exact structure:
@@ -373,9 +407,23 @@ Return ONLY a valid JSON object with this exact structure:
   "hitDie": "d6" | "d8" | "d10" | "d12",
   "proficiencies": ["array", "of", "strings"],
   "features": ["array", "of", "feature", "descriptions"],
-  "description": "At least 3 paragraphs describing the class's origin, philosophy, combat style, and ideal party role. Use \\n\\n for paragraph breaks."
+  "description": "At least 3 paragraphs describing the class's origin, philosophy, combat style, and ideal party role. Use \\n\\n for paragraph breaks.",
+  "startingWeapon": {
+    "name": "string",
+    "type": "melee" | "ranged" | "magic",
+    "damage": "string (for example: 1d8 slashing)",
+    "description": "string",
+    "tags": ["equipment", "weapon"]
+  },
+  "startingArmor": {
+    "name": "string",
+    "armorClass": number (10-22),
+    "description": "string",
+    "tags": ["equipment", "armor"]
+  }
 }
-Make sure the stats total between 72-78 (standard point buy range). The class should be balanced and follow D&D 5e design principles.`
+Make sure the stats total between 72-78 (standard point buy range). The class should be balanced and follow D&D 5e design principles.
+Always include both startingWeapon and startingArmor.`
 
   const userPrompt = `Create a D&D 5e custom class based on this description: ${description}
 Return only JSON. Do not wrap the response in markdown or add any commentary.`
@@ -419,8 +467,8 @@ Return only JSON. Do not wrap the response in markdown or add any commentary.`
 
     const classData = JSON.parse(sanitizeJsonForParse(jsonString))
 
-    const stats = classData.stats
-    const statTotal = Object.values(stats).reduce((sum: number, val: number) => sum + val, 0)
+    const stats = (classData.stats || {}) as Record<string, number>
+    const statTotal = Object.values(stats).reduce((sum, val) => sum + Number(val || 0), 0)
 
     if (statTotal < 72 || statTotal > 78) {
       const targetTotal = 75
@@ -445,7 +493,28 @@ Return only JSON. Do not wrap the response in markdown or add any commentary.`
       hitDie: classData.hitDie || 'd8',
       proficiencies: Array.isArray(classData.proficiencies) ? classData.proficiencies : [],
       features: Array.isArray(classData.features) ? classData.features : [],
-      description: classData.description || description
+      description: classData.description || description,
+      startingWeapon: {
+        name: classData.startingWeapon?.name || 'Adventurer Blade',
+        type: classData.startingWeapon?.type || 'melee',
+        damage: classData.startingWeapon?.damage || '1d8 slashing',
+        description:
+          classData.startingWeapon?.description ||
+          'A practical weapon chosen to match this class training.',
+        tags: Array.isArray(classData.startingWeapon?.tags)
+          ? classData.startingWeapon.tags
+          : ['equipment', 'weapon']
+      },
+      startingArmor: {
+        name: classData.startingArmor?.name || 'Traveler Armor',
+        armorClass: Math.max(10, Math.min(22, Number(classData.startingArmor?.armorClass) || 12)),
+        description:
+          classData.startingArmor?.description ||
+          'Protective armor suited to this class combat style.',
+        tags: Array.isArray(classData.startingArmor?.tags)
+          ? classData.startingArmor.tags
+          : ['equipment', 'armor']
+      }
     }
   } catch (error) {
     console.error('Error generating custom class:', error)
@@ -466,14 +535,28 @@ Return only JSON. Do not wrap the response in markdown or add any commentary.`
 
 Their tale is whispered through campfires and taverns alike, describing the ideals that shaped them and the oaths they swore. Paint a vivid origin story for this class when you play them.
 
-Detail how this class approaches adventuring: the cadence of their combat rhythm, their relationship with magic or steel, and the sorts of quests that ignite their passion.`
+Detail how this class approaches adventuring: the cadence of their combat rhythm, their relationship with magic or steel, and the sorts of quests that ignite their passion.`,
+      startingWeapon: {
+        name: 'Adventurer Blade',
+        type: 'melee',
+        damage: '1d8 slashing',
+        description: 'A reliable blade carried by seasoned travelers.',
+        tags: ['equipment', 'weapon']
+      },
+      startingArmor: {
+        name: 'Traveler Armor',
+        armorClass: 12,
+        description: 'Layered leather and cloth armor fit for the road.',
+        tags: ['equipment', 'armor']
+      }
     }
   }
 }
 
 export async function generateStatusUpdate(
   history: ChatCompletionMessage[],
-  statusState: StatusStateInput
+  statusState: StatusStateInput,
+  language: PreferredLanguage = 'en'
 ): Promise<StatusUpdatePayload> {
   const transcript = history
     .filter(entry => entry && entry.role !== 'system' && typeof entry.content === 'string')
@@ -562,7 +645,9 @@ ${transcript}
 Current status state:
 ${JSON.stringify(statusState)}
 
-Output JSON only.`
+${languageDirective(language)}
+
+Output JSON only.` 
 
   const summaryState = {
     active_statuses: (statusState.active_statuses || []).map(status => ({
@@ -637,7 +722,8 @@ Output JSON only.`
 }
 
 export async function generateSceneSummary(
-  history: ChatCompletionMessage[]
+  history: ChatCompletionMessage[],
+  language: PreferredLanguage = 'en'
 ): Promise<string> {
   const filteredHistory = history.filter(
     entry => entry && entry.role !== 'system' && typeof entry.content === 'string' && entry.content.trim()
@@ -655,6 +741,8 @@ Rules:
 - Do NOT include dice, rolls, or system messages.
 - Use 3-5 short bullet points.
 - This summary will replace the full scene context.
+
+${languageDirective(language)}
 
 Output only the summary.`
 
@@ -674,14 +762,19 @@ Output only the summary.`
   return normalizeSummary(response)
 }
 
-export async function generateBackstorySummary(backstory: string): Promise<string> {
+export async function generateBackstorySummary(
+  backstory: string,
+  language: PreferredLanguage = 'en'
+): Promise<string> {
   const systemPrompt = `Summarize the character backstory into key moments for future DM use.
 
 Rules:
 - 3-5 bullet points.
 - Focus on concrete events, motivations, unresolved hooks.
 - No prose, no mechanics, no meta.
-- Output only the bullet list.`
+- Output only the bullet list.
+
+${languageDirective(language)}`
 
   const userPrompt = `Backstory:
 ${backstory}
@@ -1005,7 +1098,8 @@ Class description: ${classDescription || 'None'}`
 export async function generateCombatNarration(
   battleState: CombatState,
   events: CombatEvent[],
-  context: string
+  context: string,
+  language: PreferredLanguage = 'en'
 ): Promise<string> {
   const systemPrompt = `You are the combat narrator for a grounded dark-fantasy RPG.
 Narrate ONLY the provided combat events. Start from the outcome and world reaction.
@@ -1013,17 +1107,29 @@ Do not add mechanics, rolls, DCs, or new effects. Do NOT ask the player to roll.
 
 OUTPUT TEMPLATE (MANDATORY)
 Dungeon Master
-<Location · Sub-location · Time>
-Physical space & actors (who is where, what they do)
-World reaction (movement, sound, tension, attention)
-Consequence or pressure (something is about to happen)
+<Location \u00B7 Sub-location \u00B7 Time>
+
+Immediate action (1-2 sentences)
+
+Atmospheric detail (1-2 sentences)
+
+Tension hook or shift (exactly 1 sentence)
 
 STYLE RULES
 - Factual first, atmospheric second.
 - Concrete, physical description. No prophetic or poetic vagueness.
-- Each paragraph is 2-4 full sentences.
+- Keep one blank line between blocks.
 - End on a situation, not a question.
-- No meta/system filler. No roll mentions.`
+- No meta/system filler. No roll mentions.
+- Subject clarity is mandatory: every action must have a clearly identifiable actor.
+- Avoid ambiguous pronouns when multiple actors are present; name the actor directly.
+- Spatial continuity is mandatory: no unexplained room/floor/location shifts mid-beat.
+- Keep statements logically grounded in visible context; do not drop abrupt lore reveals without anchor.
+- Avoid contradictory descriptors unless the contrast is explicitly explained.
+- Keep dialogue direct and referential; avoid cryptic lines with missing referents.
+- Grammar must be clean and professional: agreement, syntax, tense consistency, no mixed alphabets.
+
+${languageDirective(language)}`
 
   const userPrompt = `Context:
 ${context || 'None'}
@@ -1058,12 +1164,12 @@ Narrate only these events in-world.`
 
   let raw = await generateNarration()
   let cleaned = stripMetaGuidance(raw)
-  const lengthOutOfBounds = cleaned.length < 1200 || cleaned.length > 2200
+  const lengthOutOfBounds = cleaned.length < 550 || cleaned.length > 1200
   if (lengthOutOfBounds) {
     const lengthInstruction =
-      cleaned.length < 1200
-        ? 'Expand to 1200-2200 characters while keeping the exact template and concrete detail.'
-        : 'Trim to 1200-2200 characters while keeping the exact template and concrete detail.'
+      cleaned.length < 550
+        ? 'Expand to 550-1200 characters while keeping the exact template and concrete detail.'
+        : 'Trim to 550-1200 characters while keeping the exact template and concrete detail.'
     raw = await generateNarration(lengthInstruction)
     cleaned = stripMetaGuidance(raw)
   }
@@ -1075,7 +1181,7 @@ Narrate only these events in-world.`
     cleaned = stripMetaGuidance(raw)
   }
 
-  return cleaned || pickFallbackNarration(context, 'combat')
+  return cleaned || pickFallbackNarration(context, 'combat', language)
 }
 
 export type IntentDecision = {
@@ -1159,7 +1265,8 @@ ${JSON.stringify(payload.sceneContext || null)}`
 
 export async function generateQuestFromBackstory(
   backstory: string,
-  characterInfo: { name?: string; className?: string }
+  characterInfo: { name?: string; className?: string },
+  language: PreferredLanguage = 'en'
 ): Promise<GeneratedQuest> {
   const systemPrompt = `You are a D&D quest architect. Given a character's backstory, propose a single compelling quest that feels handcrafted for them.
 Before writing the quest, extract Narrative Hooks from the backstory into:
@@ -1175,10 +1282,11 @@ Return ONLY a JSON object with this exact structure:
   "xp": number between 150 and 500,
   "recommendedLevel": number between 1 and 5,
   "objectives": ["list of clear objectives in order"]
-}`
+}
+${languageDirective(language)}`
 
-  const userPrompt = `Character Name: ${characterInfo.name || 'Unknown'}
-Class: ${characterInfo.className || 'Adventurer'}
+  const userPrompt = `Character Name: ${characterInfo.name || (language === 'ru' ? 'Неизвестно' : 'Unknown')}
+Class: ${characterInfo.className || (language === 'ru' ? 'Искатель приключений' : 'Adventurer')}
 Backstory:
 ${backstory}
 
@@ -1203,29 +1311,44 @@ Design one quest tailored to this hero.`
     const quest = JSON.parse(sanitizeJsonForParse(jsonString))
     return {
       id: quest.id || `quest-${Date.now()}`,
-      title: quest.title || 'Heroic Opportunity',
-      summary: quest.summary || 'A mysterious rumor promises glory.',
-      hook: quest.hook || 'A hooded figure beckons you toward destiny.',
+      title: quest.title || (language === 'ru' ? 'Героический шанс' : 'Heroic Opportunity'),
+      summary: quest.summary || (language === 'ru' ? 'Таинственный слух сулит славу.' : 'A mysterious rumor promises glory.'),
+      hook: quest.hook || (language === 'ru' ? 'Фигура в капюшоне манит вас к судьбе.' : 'A hooded figure beckons you toward destiny.'),
       xp: Math.max(50, Math.min(800, quest.xp || 200)),
       recommendedLevel: quest.recommendedLevel || 1,
       objectives: Array.isArray(quest.objectives) && quest.objectives.length
         ? quest.objectives
+        : language === 'ru'
+        ? ['Расследуйте тревожный след', 'Столкнитесь с угрозой', 'Заберите награду']
         : ['Investigate the disturbance', 'Confront the threat', 'Claim your reward']
     }
   } catch (error) {
     console.error('Error generating quest:', error)
     return {
       id: `quest-${Date.now()}`,
-      title: 'Echoes of the Past',
-      summary: 'A rumor suggests the past deeds of your family are returning to haunt you.',
-      hook: 'A courier delivers a scorched letter bearing a sigil you thought lost to time.',
+      title: language === 'ru' ? 'Эхо прошлого' : 'Echoes of the Past',
+      summary:
+        language === 'ru'
+          ? 'Слух намекает, что поступки вашей семьи из прошлого возвращаются за расплатой.'
+          : 'A rumor suggests the past deeds of your family are returning to haunt you.',
+      hook:
+        language === 'ru'
+          ? 'Курьер приносит обожженное письмо с печатью, которую вы считали утраченной.'
+          : 'A courier delivers a scorched letter bearing a sigil you thought lost to time.',
       xp: 200,
       recommendedLevel: 1,
-      objectives: [
-        'Journey to the site mentioned in the letter',
-        'Uncover the source of the haunting echoes',
-        'Lay the past to rest or seize its power'
-      ]
+      objectives:
+        language === 'ru'
+          ? [
+              'Отправьтесь к месту, указанному в письме',
+              'Раскройте источник тревожных отголосков',
+              'Упокойте прошлое или подчините его силу'
+            ]
+          : [
+              'Journey to the site mentioned in the letter',
+              'Uncover the source of the haunting echoes',
+              'Lay the past to rest or seize its power'
+            ]
     }
   }
 }
@@ -1241,7 +1364,8 @@ export async function generateDMResponse(
     plan?: BackstoryArcPlan | null
     eligibleBeat?: BackstoryBeat | null
     currentTurn?: number
-  }
+  },
+  language: PreferredLanguage = 'en'
 ): Promise<{
   response: string
   diceRolls?: Array<{
@@ -1254,13 +1378,16 @@ export async function generateDMResponse(
   optionalRollType?: string
 }> {
   const knownNPCs = listNPCProfiles()
+  const npcDisplayName = (name: string) => localizeNpcName(name, normalizeLanguage(language))
   const npcRegistrySummary = knownNPCs.length
     ? knownNPCs
         .map(
           npc =>
-            `${npc.id} (${npc.name}): dialogueColorId=${npc.dialogueColorId}, role=${npc.occupation || 'unknown'}, personality=${npc.innerCharacter}, voice=${npc.voice}, quirks=${npc.behaviorQuirks}`
+            `${npc.id} (${npcDisplayName(npc.name)}): dialogueColorId=${npc.dialogueColorId}, role=${npc.occupation || 'unknown'}, personality=${npc.innerCharacter}, voice=${npc.voice}, quirks=${npc.behaviorQuirks}`
         )
         .join('\n')
+    : normalizeLanguage(language) === 'ru'
+    ? 'Пока нет записей. Сцену удерживает Корин.'
     : 'None yet. Corin anchors the scene.'
 
   const sceneLocation = sceneState.location?.trim() || 'Unknown location'
@@ -1271,11 +1398,11 @@ export async function generateDMResponse(
       [
         sceneLocation,
         ...(sceneState.roster || []),
-        ...knownNPCs.map(npc => npc.name).filter(Boolean),
+        ...knownNPCs.map(npc => npcDisplayName(npc.name)).filter(Boolean),
         characterInfo?.name,
-        'The Gilded Griffin',
+        normalizeLanguage(language) === 'ru' ? 'Позолоченный Грифон' : 'The Gilded Griffin',
         'Everlume',
-        'Corin'
+        normalizeLanguage(language) === 'ru' ? 'Корин' : 'Corin'
       ]
         .filter(Boolean)
         .map(value => String(value).trim())
@@ -1583,7 +1710,9 @@ ${characterInfo.appearance ? `- Appearance: ${characterInfo.appearance}` : ''}
 ${characterInfo.backstorySummary ? `- Backstory summary: ${characterInfo.backstorySummary}` : ''}
 ${characterInfo.backstory ? `- Backstory: ${characterInfo.backstory}` : ''}
 
-${gameContext ? `Game Context: ${gameContext}` : ''}`
+${gameContext ? `Game Context: ${gameContext}` : ''}
+
+${languageDirective(language)}`
 */
 
   /* const systemPrompt = `You are the Dungeon Master for a grounded dark-fantasy RPG with a Rollia House voice.
@@ -1640,7 +1769,7 @@ DESIGN PHILOSOPHY
 
 OUTPUT TEMPLATE (MANDATORY)
 Dungeon Master
-<Location · Sub-location · Time>
+<Location \u00B7 Sub-location \u00B7 Time>
 [1] Physical space & actors (who is where, what they do)
 [2] World reaction (movement, sound, tension, attention)
 [3] Consequence or pressure (something is about to happen)
@@ -1694,21 +1823,75 @@ ${gameContext ? `Game Context: ${gameContext}` : ''}`
 */
 
   const backstoryArcBlock = buildBackstoryArcPrompt(backstoryArcContext)
+  const isRussian = normalizeLanguage(language) === 'ru'
+  const responseLanguageRule = isRussian
+    ? 'CRITICAL LANGUAGE REQUIREMENT: Output narration entirely in Russian (Cyrillic). Do not answer in English.'
+    : 'CRITICAL LANGUAGE REQUIREMENT: Output narration entirely in English.'
+  const russianPrecisionRules = isRussian
+    ? `RUSSIAN PRECISION RULES (MANDATORY)
+- Every sentence must have a clearly identifiable acting subject.
+- If multiple male actors are present, avoid ambiguous pronouns (on/ego/tot/kto-to); use explicit role/name.
+- Preserve spatial logic: no unexplained jumps between rooms/positions/floors.
+- Do not introduce upper floors unless previously established by scene context.
+- Keep physical descriptions plausible and visually coherent.
+- Grammar must be professionally edited Russian prose: agreement, tense consistency, clean syntax.
+- No mixed alphabets in headers or labels; never mix Cyrillic/Latin in "Dungeon Master".
+- Anchor lore mentions (tattoo, missing brother, faction, past event) to current context before revelation.
+- Faction naming consistency: prefer natural Russian naming for Snow Wolves and keep one variant.
+- Dialogue must be direct and referential; no cryptic lines without a clear referent.
+- Do not stack multiple metaphors in one paragraph; preserve semantic clarity.`
+    : ''
+  const russianPlainSpeechRules = isRussian
+    ? `RUSSIAN STYLE CALIBRATION
+- Prefer normal, natural speech over ornamental prose.
+- Keep metaphor usage minimal: at most one light metaphor in the entire response.
+- Default to concrete verbs and observable actions.
+- Keep NPC dialogue practical and conversational, not literary or prophetic.
+- Avoid rhetorical flourish if a direct sentence can express the same meaning.`
+    : ''
 
   const systemPrompt = `You are the Dungeon Master for a grounded dark-fantasy RPG with a Rollia House voice.
 
-STYLE RULES
+${responseLanguageRule}
+${russianPrecisionRules ? `\n\n${russianPrecisionRules}` : ''}
+${russianPlainSpeechRules ? `\n\n${russianPlainSpeechRules}` : ''}
+
+FORMAT RULES (MANDATORY)
+- Use this exact layout and order:
+Dungeon Master
+<Location \u00B7 Sub-location \u00B7 Time>
+
+<Block 1: immediate action, 1-2 sentences>
+
+<Block 2: atmospheric detail, 1-2 sentences>
+
+<Block 3: tension hook or narrative shift, exactly 1 sentence>
+- Keep one blank line between header and narrative, and between each block.
+- "Dungeon Master" must stay in English exactly; do not replace it with localized variants.
+- Put location only on the dedicated header line, never inside paragraph openings.
+- No bullets, numbering, or meta labels in final output.
+- If using Russian language output, only narrative text is Russian; header format stays exactly as shown.
+
+SCENE TRANSITION CONSISTENCY
+- Never switch location abruptly.
+- If location changes, include a short transition cause in Block 1 before settling into the new place.
+- If the shift is non-physical, explicitly mark it at sentence start:
+  Vision:
+  Memory:
+  Hallucination:
+  Magical Shift:
+- Transition must explain why the scene context changed.
+
+NARRATIVE STYLE
 - Dark fantasy, grounded, BG3 / Dragon Age tone.
 - Factual first, atmospheric second.
-- No prophetic or poetic vagueness. No abstract mysticism. No philosophical abstractions.
-- NPCs speak like cautious, experienced people, not oracles.
-- Mystery comes from past events, political pressure, fear, observed anomalies, and concrete consequences.
-- Metaphor density: max 1 metaphorical or symbolic sentence per paragraph. After one, keep remaining sentences literal.
-- Concrete perception priority: describe physical actions and observable reactions before mood or interpretation.
-- Sentence complexity: target 10-18 words, hard cap 25. Split long sentences and remove extra descriptors first.
-- Dialogue simplification: NPC speech must be direct and concrete unless explicitly labeled poetic.
-- Each paragraph must include a physical action, spoken line, position change, new information, or threat shift.
-- Game text register: cinematic RPG narration, not novel prose or lyrical introspection.
+- Use concrete physical detail before interpretation.
+- Avoid metaphor stacking: use at most one strong metaphor in the whole response.
+- Alternate concrete detail with imagery; do not chain emotional + atmospheric + existential metaphors.
+- Keep pacing tight and readable. Avoid long uninterrupted paragraphs.
+- Subject clarity is mandatory: every action sentence must identify who acts.
+- If two or more male characters are present, avoid ambiguous pronouns ("он", "его", "тот", "кто-то"); use names/roles.
+- Dialogue must clarify facts and referents, not obscure them.
 
 WORLD ACTS
 - The world moves without waiting for the player.
@@ -1725,34 +1908,29 @@ OPENING SCENE
 - Backstory pressure must show through observable world reaction (recognition, suspicion, a targeted patrol/rumor, or a mark reacting).
 - Treat the first message as the introduction to the world and the player's place in it: establish where they are, who is present, and what immediate pressure is forming.
 
-OUTPUT TEMPLATE (MANDATORY)
-Dungeon Master
-<Location \u00B7 Sub-location \u00B7 Time>
-Physical space & actors (who is where, what they do)
-World reaction (movement, sound, tension, attention)
-Consequence or pressure (something is about to happen)
-
 OUTPUT RULES
 - The scene header must be the first content line in the DM message.
 - Always follow the template in that exact order.
-- Each paragraph must be 2-4 full sentences, dense and concrete.
-- Information before atmosphere within each paragraph.
-- No numbered labels, no bullets, no meta labels.
 - No meta/system filler. No roll mentions. No mechanics. Only <npc> tags for dialogue.
 - No "you might/you could" suggestions or options.
 - No abstract phrases like "fate whispers", "the world remembers".
 - One response = one complete scene beat. No micro-messages.
+- Spatial consistency is mandatory: no unexplained moves between rooms/floors/locations in one beat.
+- Logical continuity is mandatory: anchor tattoos, relatives, secrets, and past events to prior context.
+- Remove contradictory descriptors unless the reason for contrast is stated in the same sentence.
+- Reduce abstract ambiguity: do not stack "что-то/будто/словно/казалось" style vagueness.
+- Grammar enforcement: clean agreement, syntax, tense consistency; no mixed-script headers (never "Дungeon Master").
+- NPC voice differentiation is required:
+  - recurring NPCs must keep recognizable phrasing/rhythm.
+  - avoid generic "dark wisdom" tone for every NPC.
+  - dialogue should feel personal and role-specific, not poetic by default.
 - Dialogue density: add about one extra short spoken line per scene beat on average.
 - Background chatter is allowed when it advances tension (patron whispers, guards, servants).
 - Keep dialogue short (3-12 words). No monologues.
-- Split long, clause-heavy sentences into two for clarity.
-- Sensory details must trigger a concrete reaction (a look, a pause, a hand to a weapon).
-- Keep tension grounded in observable facts; avoid vague metaphysical phrasing unless tied to a specific anomaly.
-- SIMPLE_TONE: assume true. Reduce metaphor and abstraction, increase clarity, cause-effect, and direct phrasing.
 - Readability check: make it clear who is here, what happened, who is a threat, and what changed.
 
 LENGTH
-- 1200-2200 characters per response.
+- 550-1200 characters per response.
 
 SCENE STATE
 - Location: ${sceneLocation}
@@ -1773,9 +1951,12 @@ Character Info:
 ${characterInfo.stats ? `- Stats: ${JSON.stringify(characterInfo.stats)}` : ''}
 ${characterInfo.appearance ? `- Appearance: ${characterInfo.appearance}` : ''}
 
-${gameContext ? `Game Context: ${gameContext}` : ''}`
+${gameContext ? `Game Context: ${gameContext}` : ''}
+${languageDirective(language)}`
 
-  const userPromptBase = `Player Action: ${playerAction}
+  const userPromptBase = `${responseLanguageRule}
+
+Player Action: ${playerAction}
 
 Respond as the DM, narrating what happens in-world only. Follow the template exactly. No roll or mechanics references.`
 
@@ -1826,12 +2007,12 @@ Respond as the DM, narrating what happens in-world only. Follow the template exa
   let rawResponse = await generateNarration()
   let cleanedResult = cleanNarration(rawResponse)
   const lengthOutOfBounds =
-    cleanedResult.response.length < 1200 || cleanedResult.response.length > 2200
+    cleanedResult.response.length < 550 || cleanedResult.response.length > 1200
   if (lengthOutOfBounds) {
     const lengthInstruction =
-      cleanedResult.response.length < 1200
-        ? 'Expand to 1200-2200 characters while keeping the exact template and concrete detail.'
-        : 'Trim to 1200-2200 characters while keeping the exact template and concrete detail.'
+      cleanedResult.response.length < 550
+        ? 'Expand to 550-1200 characters while keeping the exact template and concrete detail.'
+        : 'Trim to 550-1200 characters while keeping the exact template and concrete detail.'
     rawResponse = await generateNarration(lengthInstruction)
     cleanedResult = cleanNarration(rawResponse)
   }
@@ -1859,10 +2040,17 @@ Respond as the DM, narrating what happens in-world only. Follow the template exa
     cleanedResult = cleanNarration(rawResponse)
   }
 
+  if (isRussian && cleanedResult.response && !isMostlyCyrillic(cleanedResult.response)) {
+    rawResponse = await generateNarration(
+      'Rewrite the same scene fully in Russian (Cyrillic). Preserve all events and structure, change language only.'
+    )
+    cleanedResult = cleanNarration(rawResponse)
+  }
+
   let cleanedResponse = cleanedResult.response
   const shouldFallback = !cleanedResponse || !cleanedResponse.trim()
   if (shouldFallback) {
-    const fallback = pickFallbackNarration(gameContext, playerAction)
+    const fallback = pickFallbackNarration(gameContext, playerAction, language)
     console.warn('DM output empty after filtering.', {
       reason: cleanedResult.stateChangeResult.removed
         ? 'STATE_CHANGE_WITHOUT_EVENT'
@@ -2754,28 +2942,56 @@ function stripStateChangeWithoutEvent(
   return { cleaned: kept.join(' ').trim(), removed }
 }
 
-function pickFallbackNarration(gameContext: string, playerAction: string): string {
+function pickFallbackNarration(
+  gameContext: string,
+  playerAction: string,
+  language: PreferredLanguage = 'en'
+): string {
   const context = `${gameContext} ${playerAction}`.toLowerCase()
   const combatHints = /battle|fight|attack|blade|blood|strike|ambush|enemy|wound/
   const socialHints = /tavern|talk|ask|reply|barkeep|crowd|rumor|deal/
-  const combatFallbacks = [
-    'Steel rings as a blade glances off a chair leg.',
-    'Boots scrape the floor as someone shifts closer.',
-    'A weapon thuds against wood, then skitters to a stop.',
-    'Breath hisses through teeth as a stance tightens.'
-  ]
-  const socialFallbacks = [
-    'A mug clinks on the counter. A head turns toward you.',
-    'Corin wipes the bar and looks up. "Go on."',
-    'Chairs creak as a few patrons lean in to listen.',
-    'A door sighs shut behind someone. The room stills.'
-  ]
-  const neutralFallbacks = [
-    'A lantern flickers and throws a hard shadow across the floor.',
-    'Dust lifts as a draft slips under the door.',
-    'A boot scuffs the boards. Someone shifts their weight.',
-    'A distant bell rings once, then fades.'
-  ]
+  const combatFallbacks =
+    language === 'ru'
+      ? [
+          'Сталь звенит, клинок скользит по ножке стула.',
+          'Сапоги скребут пол, кто-то подается ближе.',
+          'Оружие глухо бьет о дерево и отлетает в сторону.',
+          'Кто-то резко выдыхает и крепче встает в стойку.'
+        ]
+      : [
+          'Steel rings as a blade glances off a chair leg.',
+          'Boots scrape the floor as someone shifts closer.',
+          'A weapon thuds against wood, then skitters to a stop.',
+          'Breath hisses through teeth as a stance tightens.'
+        ]
+  const socialFallbacks =
+    language === 'ru'
+      ? [
+          'Кружка звякает о стойку. Несколько голов поворачиваются к вам.',
+          'Корин вытирает бар и поднимает взгляд. "Говори."',
+          'Стулья скрипят, пара посетителей подается вперед.',
+          'Дверь с тяжелым вздохом закрывается за чьей-то спиной.'
+        ]
+      : [
+          'A mug clinks on the counter. A head turns toward you.',
+          'Corin wipes the bar and looks up. "Go on."',
+          'Chairs creak as a few patrons lean in to listen.',
+          'A door sighs shut behind someone. The room stills.'
+        ]
+  const neutralFallbacks =
+    language === 'ru'
+      ? [
+          'Фонарь мерцает и бросает резкую тень на пол.',
+          'Пыль поднимается, когда сквозняк тянет из-под двери.',
+          'Сапог шаркает по доскам. Кто-то меняет стойку.',
+          'Вдалеке один раз звонит колокол и затихает.'
+        ]
+      : [
+          'A lantern flickers and throws a hard shadow across the floor.',
+          'Dust lifts as a draft slips under the door.',
+          'A boot scuffs the boards. Someone shifts their weight.',
+          'A distant bell rings once, then fades.'
+        ]
 
   const pool = combatHints.test(context)
     ? combatFallbacks
@@ -2783,7 +2999,32 @@ function pickFallbackNarration(gameContext: string, playerAction: string): strin
     ? socialFallbacks
     : neutralFallbacks
 
-  return pool[Math.floor(Math.random() * pool.length)]
+  const narrativeLine = pool[Math.floor(Math.random() * pool.length)]
+  const locationLine = inferFallbackSceneHeader(gameContext)
+  const immediateAction = narrativeLine
+  const atmosphere =
+    language === 'ru'
+      ? 'Запах дыма и мокрой шерсти держится в воздухе, а взгляды снова сходятся на движении.'
+      : 'Smoke and wet wool linger in the air as nearby eyes track the movement.'
+  const hook =
+    language === 'ru'
+      ? 'Напряжение сдвигается: следующий шаг уже меняет расклад.'
+      : 'Tension shifts: the next move is already changing the room.'
+
+  return `Dungeon Master
+${locationLine}
+
+${immediateAction}
+
+${atmosphere}
+
+${hook}`
+}
+
+function inferFallbackSceneHeader(gameContext: string): string {
+  const match = gameContext.match(/location\s*:\s*([^\n]+)/i)
+  const location = (match?.[1] || 'The Gilded Griffin').trim()
+  return `${location} \u00B7 Main Floor \u00B7 Present`
 }
 
 async function syncNPCProfilesFromResponse(response: string, location: string): Promise<void> {
@@ -2943,3 +3184,4 @@ Hidden context: ${context.contextSnippet}`
     return null
   }
 }
+

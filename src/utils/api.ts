@@ -1,6 +1,9 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 export const API_ORIGIN = API_BASE_URL.replace(/\/api$/, '')
 
+export type ApiLanguage = 'en' | 'ru'
+const normalizeLanguage = (language?: string): ApiLanguage => (language === 'ru' ? 'ru' : 'en')
+
 // Test backend connection
 export async function testBackendConnection(): Promise<boolean> {
   try {
@@ -26,10 +29,29 @@ export interface CustomClassResponse {
   proficiencies: string[]
   features: string[]
   description: string
+  startingWeapon?: {
+    name: string
+    type: string
+    damage: string
+    description: string
+    tags?: string[]
+  }
+  startingArmor?: {
+    name: string
+    armorClass: number
+    description: string
+    tags?: string[]
+  }
 }
 
 export interface DMResponse {
   response: string
+  narrative?: string
+  scene?: {
+    location: string
+    time: string
+  }
+  choices?: string[]
   diceRolls?: Array<{
     type: string
     result: number
@@ -257,6 +279,7 @@ export async function getDMResponse(
     }
     pendingCheckId?: string
     playerSnapshot?: { hp?: number; mp?: number }
+    language?: ApiLanguage
   }
 ): Promise<DMResponse> {
   try {
@@ -273,7 +296,8 @@ export async function getDMResponse(
         campaignId: options?.campaignId,
         rollResult: options?.rollResult,
         pendingCheckId: options?.pendingCheckId,
-        playerSnapshot: options?.playerSnapshot
+        playerSnapshot: options?.playerSnapshot,
+        language: normalizeLanguage(options?.language)
       }),
     })
 
@@ -293,14 +317,17 @@ export async function getDMResponse(
   }
 }
 
-export async function summarizeScene(history: ChatMessage[]): Promise<string> {
+export async function summarizeScene(
+  history: ChatMessage[],
+  language: ApiLanguage = 'en'
+): Promise<string> {
   try {
     const response = await fetch(`${API_BASE_URL}/game/summarize-scene`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ history }),
+      body: JSON.stringify({ history, language: normalizeLanguage(language) }),
     })
 
     if (!response.ok) {
@@ -322,7 +349,8 @@ export async function summarizeScene(history: ChatMessage[]): Promise<string> {
 
 export async function getStatusUpdate(
   history: ChatMessage[],
-  statusState: StatusStateInput
+  statusState: StatusStateInput,
+  language: ApiLanguage = 'en'
 ): Promise<StatusUpdatePayload> {
   try {
     const response = await fetch(`${API_BASE_URL}/game/status-update`, {
@@ -330,7 +358,7 @@ export async function getStatusUpdate(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ history, statusState }),
+      body: JSON.stringify({ history, statusState, language: normalizeLanguage(language) }),
     })
 
     if (!response.ok) {
@@ -380,11 +408,15 @@ export async function actBattle(payload: {
   intent: ActionIntent
   context?: string
   playerSnapshot?: { hp?: number; mp?: number }
+  language?: ApiLanguage
 }): Promise<{ battle: CombatState; events: CombatEvent[]; narration: string }> {
   const response = await fetch(`${API_BASE_URL}/battle/action`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      ...payload,
+      language: normalizeLanguage(payload.language)
+    })
   })
 
   if (!response.ok) {
@@ -407,14 +439,15 @@ export async function getBattleState(campaignId: string): Promise<{ battle: Comb
 export async function generateQuestFromBackstory(
   backstory: string,
   characterName: string,
-  characterClass: string
+  characterClass: string,
+  language: ApiLanguage = 'en'
 ): Promise<GeneratedQuest> {
   const response = await fetch(`${API_BASE_URL}/game/generate-quest`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ backstory, characterName, characterClass })
+    body: JSON.stringify({ backstory, characterName, characterClass, language: normalizeLanguage(language) })
   })
 
   if (!response.ok) {
@@ -461,13 +494,16 @@ export async function getCharacter(characterId: string): Promise<CharacterRecord
   return response.json()
 }
 
-export async function summarizeBackstory(backstory: string): Promise<string> {
+export async function summarizeBackstory(
+  backstory: string,
+  language: ApiLanguage = 'en'
+): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/game/summarize-backstory`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ backstory })
+    body: JSON.stringify({ backstory, language: normalizeLanguage(language) })
   })
 
   if (!response.ok) {

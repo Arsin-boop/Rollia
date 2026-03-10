@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:wght@400;500;600;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg-primary: #0e1016;
+  --bg-secondary: #131826;
+  --bg-tertiary: #1b2230;
+  --accent-primary: #e3b15a;
+  --accent-secondary: #8c2f2f;
+  --text-primary: #e6e2d6;
+  --text-secondary: #b9b2a5;
+  --border-color: #2a2f3d;
+  --success: #6bcb77;
+  --warning: #fbbf24;
+  --error: #8c2f2f;
+}
+
+body {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 1.15rem;
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+html {
+  font-size: 1.15rem;
+}
+
+#root {
+  font-size: 1.15rem;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Cinzel', 'Cormorant Garamond', serif;
+  letter-spacing: 0.02em;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+input, textarea, select {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+

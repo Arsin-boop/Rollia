@@ -3,6 +3,7 @@ import { generateCombatNarration } from '../services/aiService.js'
 import { getBattle, resolveAction, startBattle, type CombatEntity } from '../services/combatService.js'
 
 const router = express.Router()
+const normalizeLanguage = (value: unknown): 'en' | 'ru' => (value === 'ru' ? 'ru' : 'en')
 
 router.post('/start', async (req, res) => {
   try {
@@ -42,13 +43,18 @@ router.post('/start', async (req, res) => {
 
 router.post('/action', async (req, res) => {
   try {
-    const { campaignId, intent, context, playerSnapshot } = req.body
+    const { campaignId, intent, context, playerSnapshot, language } = req.body
     if (!campaignId || !intent) {
       return res.status(400).json({ error: 'campaignId and intent are required' })
     }
 
     const resolved = resolveAction(String(campaignId), intent, playerSnapshot)
-    const narration = await generateCombatNarration(resolved.state, resolved.events, context || '')
+    const narration = await generateCombatNarration(
+      resolved.state,
+      resolved.events,
+      context || '',
+      normalizeLanguage(language)
+    )
     res.json({ battle: resolved.state, events: resolved.events, narration })
   } catch (error: any) {
     console.error('Error resolving battle action:', error)
