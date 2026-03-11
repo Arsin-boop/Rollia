@@ -107,52 +107,52 @@ The built files will be in the `dist` directory.
 ## Project Structure
 
 ```
-РІвЂќСљРІвЂќР‚РІвЂќР‚ package.json                 # Frontend dependencies
-РІвЂќСљРІвЂќР‚РІвЂќР‚ tsconfig.json
-РІвЂќСљРІвЂќР‚РІвЂќР‚ vite.config.ts
-РІвЂќСљРІвЂќР‚РІвЂќР‚ index.html
-РІвЂќСљРІвЂќР‚РІвЂќР‚ .env                        # Frontend environment variables
-РІвЂќСљРІвЂќР‚РІвЂќР‚ .gitignore
-РІвЂќСљРІвЂќР‚РІвЂќР‚ README.md
-РІвЂќСљРІвЂќР‚РІвЂќР‚ src/                        # Frontend source code
-РІвЂќвЂљ   РІвЂќСљРІвЂќР‚РІвЂќР‚ main.tsx
-РІвЂќвЂљ   РІвЂќСљРІвЂќР‚РІвЂќР‚ App.tsx
-РІвЂќвЂљ   РІвЂќСљРІвЂќР‚РІвЂќР‚ App.css
-РІвЂќвЂљ   РІвЂќСљРІвЂќР‚РІвЂќР‚ index.css
-РІвЂќвЂљ   РІвЂќСљРІвЂќР‚РІвЂќР‚ utils/
-РІвЂќвЂљ   РІвЂќвЂљ   РІвЂќвЂќРІвЂќР‚РІвЂќР‚ api.ts             # API client functions
-РІвЂќвЂљ   РІвЂќвЂќРІвЂќР‚РІвЂќР‚ pages/
-РІвЂќвЂљ       РІвЂќСљРІвЂќР‚РІвЂќР‚ LandingPage.tsx
-РІвЂќвЂљ       РІвЂќСљРІвЂќР‚РІвЂќР‚ LandingPage.css
-РІвЂќвЂљ       РІвЂќСљРІвЂќР‚РІвЂќР‚ CharacterCreation.tsx
-РІвЂќвЂљ       РІвЂќСљРІвЂќР‚РІвЂќР‚ CharacterCreation.css
-РІвЂќвЂљ       РІвЂќСљРІвЂќР‚РІвЂќР‚ CampaignHub.tsx
-РІвЂќвЂљ       РІвЂќСљРІвЂќР‚РІвЂќР‚ CampaignHub.css
-РІвЂќвЂљ       РІвЂќСљРІвЂќР‚РІвЂќР‚ GameSession.tsx
-РІвЂќвЂљ       РІвЂќвЂќРІвЂќР‚РІвЂќР‚ GameSession.css
-РІвЂќвЂќРІвЂќР‚РІвЂќР‚ backend/                    # Backend server
-    РІвЂќСљРІвЂќР‚РІвЂќР‚ package.json           # Backend dependencies
-    РІвЂќСљРІвЂќР‚РІвЂќР‚ tsconfig.json
-    РІвЂќСљРІвЂќР‚РІвЂќР‚ .env                   # Backend environment variables (API key)
-    РІвЂќСљРІвЂќР‚РІвЂќР‚ src/
-    РІвЂќвЂљ   РІвЂќСљРІвЂќР‚РІвЂќР‚ server.ts          # Express server setup
-    РІвЂќвЂљ   РІвЂќСљРІвЂќР‚РІвЂќР‚ services/
-    РІвЂќвЂљ   РІвЂќвЂљ   РІвЂќСљРІвЂќР‚РІвЂќР‚ aiService.ts   # OpenAI integration
-    РІвЂќвЂљ   РІвЂќвЂљ   РІвЂќвЂќРІвЂќР‚РІвЂќР‚ diceService.ts # D&D 5e dice mechanics
-    РІвЂќвЂљ   РІвЂќвЂќРІвЂќР‚РІвЂќР‚ routes/
-    РІвЂќвЂљ       РІвЂќСљРІвЂќР‚РІвЂќР‚ characterRoutes.ts
-    РІвЂќвЂљ       РІвЂќСљРІвЂќР‚РІвЂќР‚ gameRoutes.ts
-    РІвЂќвЂљ       РІвЂќвЂќРІвЂќР‚РІвЂќР‚ diceRoutes.ts
-    РІвЂќвЂќРІвЂќР‚РІвЂќР‚ dist/                  # Compiled backend code
+├── package.json                 # Frontend dependencies
+├── tsconfig.json
+├── vite.config.ts
+├── index.html
+├── .env                        # Frontend environment variables
+├── .gitignore
+├── README.md
+├── src/                        # Frontend source code
+│   ├── main.tsx
+│   ├── App.tsx
+│   ├── App.css
+│   ├── index.css
+│   ├── utils/
+│   │   └── api.ts             # API client functions
+│   └── pages/
+│       ├── LandingPage.tsx
+│       ├── LandingPage.css
+│       ├── CharacterCreation.tsx
+│       ├── CharacterCreation.css
+│       ├── CampaignHub.tsx
+│       ├── CampaignHub.css
+│       ├── GameSession.tsx
+│       └── GameSession.css
+└── backend/                    # Backend server
+    ├── package.json           # Backend dependencies
+    ├── tsconfig.json
+    ├── .env                   # Backend environment variables (API key)
+    ├── src/
+    │   ├── server.ts          # Express server setup
+    │   ├── services/
+    │   │   ├── aiService.ts   # OpenAI integration
+    │   │   └── diceService.ts # D&D 5e dice mechanics
+    │   └── routes/
+    │       ├── characterRoutes.ts
+    │       ├── gameRoutes.ts
+    │       └── diceRoutes.ts
+    └── dist/                  # Compiled backend code
 ```
 
 ## Features Implemented
 
-РІСљвЂ¦ **AI-Powered DM**: Integrated with OpenAI API (openai/gpt-oss-120b) for dynamic storytelling
-РІСљвЂ¦ **Custom Class Generation**: AI creates balanced D&D 5e classes based on descriptions
-РІСљвЂ¦ **Dice Rolling System**: Full D&D 5e dice mechanics (d20, skill checks, saving throws)
-РІСљвЂ¦ **Real-time Gameplay**: Chat-based interaction with AI DM
-РІСљвЂ¦ **Character Creation**: Multi-stage character creation with AI-assisted class generation
+✦ **AI-Powered DM**: Integrated with OpenAI API (openai/gpt-oss-120b) for dynamic storytelling
+✦ **Custom Class Generation**: AI creates balanced D&D 5e classes based on descriptions
+✦ **Dice Rolling System**: Full D&D 5e dice mechanics (d20, skill checks, saving throws)
+✦ **Real-time Gameplay**: Chat-based interaction with AI DM
+✦ **Character Creation**: Multi-stage character creation with AI-assisted class generation
 
 ## API Endpoints
 
