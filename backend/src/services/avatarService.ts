@@ -3,7 +3,6 @@ import fs from 'fs'
 import path from 'path'
 
 const STYLE_VERSION = 'v3'
-const MODELSLAB_ENDPOINT = 'https://modelslab.com/api/v6/images/text2img'
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'avatars')
 
 const ensureUploadDir = () => {
@@ -206,7 +205,6 @@ const computeSeedFromHash = (hash?: string) => {
   return seed % 2147483647
 }
 
-// --- HuggingFace provider ---
 const generateAvatarPngHuggingFace = async (
   prompt: string,
   negativePrompt: string,
@@ -273,112 +271,16 @@ const generateAvatarPngHuggingFace = async (
   throw new Error(`HuggingFace response did not include image data. content-type=${contentType}`)
 }
 
-// --- ModelsLab provider ---
-const generateAvatarPngModelsLab = async (
-  prompt: string,
-  negativePrompt: string,
-  hash?: string
-): Promise<Buffer> => {
-  const token = process.env.MODELSLAB_KEY
-  if (!token) throw new Error('MODELSLAB_KEY is not configured')
-
-  const { model, steps, guidance, size } = getAvatarConfig()
-  const seed = computeSeedFromHash(hash)
-  const negativePromptApplied = Boolean(negativePrompt && negativePrompt.trim())
-  console.log('ModelsLab avatar generation config:', { model, steps, size, guidance, seed: typeof seed === 'number' ? seed : 'none' })
-
-  const payload = {
-    key: token,
-    model_id: model,
-    prompt,
-    ...(negativePromptApplied ? { negative_prompt: negativePrompt } : {}),
-    width: String(size),
-    height: String(size),
-    samples: '1',
-    num_inference_steps: String(steps),
-    guidance_scale: guidance,
-    enhance_prompt: 'no',
-    safety_checker: 'no',
-    ...(typeof seed === 'number' ? { seed } : {})
-  }
-
-  const response = await fetch(MODELSLAB_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '')
-    throw new Error(`ModelsLab request failed: ${response.status} ${errorText}`)
-  }
-
-  const data = await response.json()
-  const base64Image =
-    data?.output?.[0]?.base64 ||
-    data?.output?.[0]?.image ||
-    data?.output?.[0] ||
-    data?.images?.[0]?.base64 ||
-    data?.images?.[0] ||
-    data?.image ||
-    data?.base64 ||
-    data?.data?.[0]
-
-  if (base64Image && typeof base64Image === 'string') {
-    const cleaned = base64Image.includes(',') ? base64Image.split(',').pop()! : base64Image
-    return Buffer.from(cleaned, 'base64')
-  }
-
-  const imageUrl =
-    data?.output?.[0]?.url ||
-    data?.output?.[0] ||
-    data?.images?.[0]?.url ||
-    data?.images?.[0] ||
-    data?.image_url ||
-    data?.data?.[0]
-
-  if (imageUrl && typeof imageUrl === 'string') {
-    const imageResponse = await fetch(imageUrl)
-    if (!imageResponse.ok) throw new Error(`ModelsLab image download failed: ${imageResponse.status}`)
-    const ab = await imageResponse.arrayBuffer()
-    return Buffer.from(ab)
-  }
-
-  const responseKeys = data && typeof data === 'object' ? Object.keys(data) : []
-  const status = typeof data?.status === 'string' ? data.status : ''
-  const message = typeof data?.message === 'string' ? data.message : ''
-  const detail = [status, message].filter(Boolean).join(' ')
-  throw new Error(`ModelsLab response did not include image data. keys=${responseKeys.join(',')}${detail ? ` message=${detail}` : ''}`)
-}
-
-// --- Public entry point: picks provider based on env ---
 export const generateAvatarPng = async (
   prompt: string,
   negativePrompt: string,
   hash?: string
 ): Promise<Buffer> => {
-  const provider = (process.env.AVATAR_PROVIDER || '').trim().toLowerCase()
-
-  if (provider === 'huggingface' || (!provider && process.env.HF_TOKEN && !process.env.MODELSLAB_KEY)) {
-    return generateAvatarPngHuggingFace(prompt, negativePrompt, hash)
+  if (!process.env.HF_TOKEN?.trim()) {
+    throw new Error('HF_TOKEN is not configured. Add it to backend/.env')
   }
-  if (provider === 'modelslab' && !process.env.MODELSLAB_KEY && process.env.HF_TOKEN) {
-    console.warn('AVATAR_PROVIDER=modelslab but MODELSLAB_KEY is missing. Falling back to HuggingFace.')
-    return generateAvatarPngHuggingFace(prompt, negativePrompt, hash)
-  }
-  if (provider === 'modelslab' || (!provider && process.env.MODELSLAB_KEY)) {
-    return generateAvatarPngModelsLab(prompt, negativePrompt, hash)
-  }
-
-  throw new Error(
-    'No avatar provider configured. Set AVATAR_PROVIDER=huggingface and HF_TOKEN, or AVATAR_PROVIDER=modelslab and MODELSLAB_KEY in backend/.env'
-  )
+  return generateAvatarPngHuggingFace(prompt, negativePrompt, hash)
 }
-
-const bufferToArrayBuffer = (buffer: Buffer) => {
-  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
-}
-
 export const validateAvatarGender = async (
   pngBuffer: Buffer,
   sex: 'male' | 'female' | 'unknown',

@@ -130,6 +130,7 @@ type CharacterAbility = {
 }
 
 type StoredCharacterProfile = {
+  id?: string
   name: string
   class: string
   classDescription?: string
@@ -257,6 +258,7 @@ const SUMMARY_KEEP_LATEST = 2
 const MIN_BACKSTORY_LENGTH = 200
 const MIN_MESSAGES_FOR_BACKSTORY = 6
 const DM_DISPLAY_NAME = 'Dungeon Master'
+const TYPING_DOT_FRAMES = ['', '.', '..', '...', '..', '.'] as const
 /* const INITIAL_DM_OPENING = `Dungeon Master
 
 The Gilded Griffin · Taproom · Morning
@@ -792,6 +794,7 @@ const GameSession = () => {
   const [activeSidebar, setActiveSidebar] = useState<SidebarSection>('stats')
   const [activeLoadoutTab, setActiveLoadoutTab] = useState<LoadoutTab>('inventory')
   const [isLoading, setIsLoading] = useState(false)
+  const [typingFrame, setTypingFrame] = useState(0)
   const [characterColors, setCharacterColors] = useState<Record<string, string>>({})
   const [npcRegistryById, setNpcRegistryById] = useState<Record<string, NPCRegistryEntry>>({})
   const [npcPaletteById, setNpcPaletteById] = useState<Record<string, NPCPaletteEntry>>(() => {
@@ -818,6 +821,8 @@ const GameSession = () => {
   const [activeSpellId, setActiveSpellId] = useState<string | null>(null)
   const [campaignStateLoaded, setCampaignStateLoaded] = useState(false)
   const [currentLocation, setCurrentLocation] = useState('')
+  const [currentTime, setCurrentTime] = useState('')
+  const [openingSeed, setOpeningSeed] = useState(0)
   const battleUiEnabled = false
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -963,38 +968,24 @@ const GameSession = () => {
     const storageKey = `${CAMPAIGN_STATE_KEY_PREFIX}${campaignId}`
     const stored = parseCampaignState(localStorage.getItem(storageKey))
 
+    // If session has a characterId, make sure the loaded profile matches.
+    // This catches the case where the user navigates directly via URL
+    // and localStorage still holds a different character.
     const sessionMeta = (() => {
-      try {
-        return JSON.parse(localStorage.getItem(`session_${campaignId}`) || 'null')
-      } catch {
-        return null
-      }
-    })() as { characterId?: string } | null
-
-    const sessionCharacterId = sessionMeta?.characterId
+      try { return JSON.parse(localStorage.getItem(`session_${campaignId}`) || 'null') } catch { return null }
+    })()
+    const sessionCharacterId: string | undefined = sessionMeta?.characterId
     if (sessionCharacterId) {
       const collectionRaw = localStorage.getItem('rollia_characters_v1')
-      const collection = (() => {
-        try {
-          return JSON.parse(collectionRaw || '[]') as Array<Record<string, unknown>>
-        } catch {
-          return []
-        }
-      })()
-      const linked = collection.find(entry => String(entry?.id || '') === sessionCharacterId)
+      const collection: any[] = (() => { try { return JSON.parse(collectionRaw || '[]') } catch { return [] } })()
+      const linked = collection.find((c: any) => c.id === sessionCharacterId)
       if (linked) {
-        const currentId = (() => {
-          try {
-            const parsed = JSON.parse(localStorage.getItem('character') || 'null')
-            return String(parsed?.id || '')
-          } catch {
-            return ''
-          }
-        })()
+        const currentId = (() => { try { return JSON.parse(localStorage.getItem('character') || 'null')?.id } catch { return null } })()
         if (currentId !== sessionCharacterId) {
+          // Swap to the correct character for this session
           localStorage.setItem('character', JSON.stringify(linked))
           localStorage.setItem('dnd-ai-character', JSON.stringify(linked))
-          setCharacterProfile(linked as unknown as StoredCharacterProfile)
+          setCharacterProfile(linked)
         }
       }
     }
@@ -1027,6 +1018,7 @@ const GameSession = () => {
     lastSceneHeaderRef.current = lastHeader || ''
     if (lastHeader) {
       setCurrentLocation(lastHeader.split('·')[0].trim())
+      setCurrentTime((lastHeader.split('·')[1] || '').trim())
     }
     if (restoredMessages.length || restoredHistory.length) {
       openingGeneratedRef.current = true
@@ -1285,7 +1277,18 @@ const GameSession = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, isLoading])
+
+  useEffect(() => {
+    if (!isLoading) {
+      setTypingFrame(0)
+      return
+    }
+    const intervalId = window.setInterval(() => {
+      setTypingFrame(prev => (prev + 1) % TYPING_DOT_FRAMES.length)
+    }, 260)
+    return () => window.clearInterval(intervalId)
+  }, [isLoading])
 
   useEffect(() => {
     const lastDM = [...messages].reverse().find(message => message.type === 'dm')
@@ -1471,6 +1474,42 @@ const GameSession = () => {
     ])
   }, [])
 
+  const handleResetCampaignText = useCallback(async () => {
+    if (isLoading) return
+    const confirmMessage =
+      language === 'ru'
+        ? 'Сбросить историю этой сессии и начать заново?'
+        : 'Reset this session history and start from the beginning?'
+    if (!window.confirm(confirmMessage)) {
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const characterId = characterProfile?.id
+      if (campaignId) {
+        await resetSession(campaignId, characterId)
+        localStorage.removeItem(`${CAMPAIGN_STATE_KEY_PREFIX}${campaignId}`)
+      }
+      setMessages([])
+      setChatHistory([])
+      setSceneSummary('')
+      setInputValue('')
+      setCurrentLocation('')
+      setCurrentTime('')
+      lastSceneHeaderRef.current = ''
+      openingGeneratedRef.current = false
+      setOpeningSeed(prev => prev + 1)
+    } catch (error: any) {
+      console.error('Failed to reset campaign:', error)
+      pushSystemMessage(
+        error?.message || (language === 'ru' ? 'Не удалось сбросить сессию.' : 'Failed to reset session.')
+      )
+    } finally {
+      setIsLoading(false)
+    }
+  }, [campaignId, characterProfile, isLoading, language, pushSystemMessage])
+
   const updateMessageRoll = useCallback(
     (messageId: string, roll: Message['roll']) => {
       setMessages(prev =>
@@ -1517,45 +1556,6 @@ const GameSession = () => {
       return { ...prev, systemNotices: [] }
     })
   }, [updateStoredProfile])
-
-  const handleResetChat = useCallback(async () => {
-    const confirmed = window.confirm(
-      language === 'ru'
-        ? 'Очистить весь чат и начать заново?'
-        : 'Clear the entire chat and start again?'
-    )
-    if (!confirmed) return
-
-    try {
-      if (campaignId) {
-        await resetSession(campaignId)
-      }
-    } catch (error) {
-      console.error('Failed to reset backend session:', error)
-    }
-
-    setMessages([])
-    setChatHistory([])
-    setSceneSummary('')
-    setInputValue('')
-    setBattleState(null)
-    setCombatEvents([])
-    setCombatAction({ action: null })
-    setAttemptText('')
-    clearSystemNotices()
-    pendingCheckByMessageRef.current.clear()
-    rollStartedRef.current.clear()
-    lastPlayerActionRef.current = ''
-    lastPlayerMessageIdRef.current = null
-    lastSceneHeaderRef.current = ''
-    openingGeneratedRef.current = false
-
-    if (campaignId) {
-      localStorage.removeItem(`${CAMPAIGN_STATE_KEY_PREFIX}${campaignId}`)
-    }
-
-    setCharacterProfile(prev => (prev ? { ...prev } : prev))
-  }, [campaignId, clearSystemNotices, language])
 
   const tickCooldowns = useCallback(() => {
     updateStoredProfile(prev => {
@@ -1700,6 +1700,9 @@ const GameSession = () => {
       if (currentLocation) {
         segments.push(`Location: ${currentLocation}`)
       }
+      if (currentTime) {
+        segments.push(`Time: ${currentTime}`)
+      }
       if (campaignId) {
         segments.push(`Campaign: ${campaignId}`)
       }
@@ -1721,7 +1724,7 @@ const GameSession = () => {
       }
       return segments.join('\n')
     },
-    [campaignId, currentLocation, sceneSummary, statusEffects, systemNotices, characterProfile?.backstorySummary]
+    [campaignId, currentLocation, currentTime, sceneSummary, statusEffects, systemNotices, characterProfile?.backstorySummary]
   )
 
   const sendCombatIntent = useCallback(
@@ -2217,6 +2220,7 @@ const GameSession = () => {
       if (finalHeader) {
         lastSceneHeaderRef.current = finalHeader
         setCurrentLocation(finalHeader.split('·')[0].trim())
+        setCurrentTime((finalHeader.split('·')[1] || '').trim())
       }
 
       if (body) {
@@ -2367,7 +2371,8 @@ const GameSession = () => {
     resources.hp,
     resources.mp,
     stats,
-    language
+    language,
+    openingSeed
   ])
 
   const continueStoryAfterRoll = useCallback(
@@ -3586,9 +3591,7 @@ const GameSession = () => {
             <button
               type="button"
               className="log-export-btn"
-              onClick={() => {
-                void handleResetChat()
-              }}
+              onClick={() => void handleResetCampaignText()}
               disabled={isLoading}
             >
               {language === 'ru' ? 'Сбросить чат' : 'Reset Chat'}
@@ -3772,6 +3775,22 @@ const GameSession = () => {
                 </div>
               </div>
             ))}
+            {isLoading && (
+              <div className="message dm message-typing" aria-live="polite">
+                <div className="message-header">
+                  <span className="message-type">{DM_DISPLAY_NAME}</span>
+                  <span className="message-time">
+                    {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <div className="message-content dm-bubble dmBubble">
+                  <span className="typing-indicator">
+                    <span className="typing-label">{language === 'ru' ? 'Печатаем' : 'Typing'}</span>
+                    <span className="typing-dots">{TYPING_DOT_FRAMES[typingFrame]}</span>
+                  </span>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
         </div>

@@ -528,6 +528,15 @@ export async function getCharacter(characterId: string): Promise<CharacterRecord
   return response.json()
 }
 
+export async function getCharactersFromDB(): Promise<CharacterRecord[]> {
+  const response = await fetch(`${API_BASE_URL}/character`)
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(errorData.error || `Failed to fetch characters (${response.status})`)
+  }
+  return response.json()
+}
+
 export async function summarizeBackstory(
   backstory: string,
   language: ApiLanguage = 'en'

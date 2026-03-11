@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 import { StarryBackground } from '../components/StarryBackground'
-import { deleteCharacterFromDB } from '../utils/api'
+import { deleteCharacterFromDB, getCharactersFromDB, type CharacterRecord } from '../utils/api'
 
 const CHARACTER_KEY = 'character'
 const LEGACY_CHARACTER_KEY = 'dnd-ai-character'
@@ -10,8 +10,8 @@ const CHARACTER_COLLECTION_KEY = 'rollia_characters_v1'
 
 type StoredCharacter = {
   id: string
-  name: string
-  class: string
+  name?: string
+  class?: string
   updatedAt?: string
   activeCampaignId?: string | null
   [key: string]: unknown
@@ -50,14 +50,32 @@ export default function CharactersMenuPage() {
   const navigate = useNavigate()
   const [characters, setCharacters] = useState<StoredCharacter[]>([])
 
-  const refresh = useCallback(() => {
-    setCharacters(readCharacters())
+  const normalizeFromDb = (items: CharacterRecord[]): StoredCharacter[] => {
+    return items.map(item => ({
+      ...item,
+      name: item.name || 'Unnamed Hero',
+      class: item.class || 'Adventurer'
+    }))
+  }
+
+  const refresh = useCallback(async () => {
+    try {
+      const fromDb = normalizeFromDb(await getCharactersFromDB())
+      setCharacters(fromDb)
+      localStorage.setItem(CHARACTER_COLLECTION_KEY, JSON.stringify(fromDb))
+    } catch (error) {
+      console.warn('Failed to load characters from DB, using local storage fallback:', error)
+      setCharacters(readCharacters())
+    }
   }, [])
 
   useEffect(() => {
-    refresh()
-    window.addEventListener('storage', refresh)
-    return () => window.removeEventListener('storage', refresh)
+    void refresh()
+    const handleStorage = () => {
+      void refresh()
+    }
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
   }, [refresh])
 
   const activeCharacterId = useMemo(() => {

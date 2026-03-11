@@ -68,6 +68,18 @@ export const getCharacter = (id: string): CharacterRecord | null => {
   return decodeRow(rows[0] as any)
 }
 
+export const listCharacters = (): CharacterRecord[] => {
+  const rows = db.select().from(characters).all()
+  return rows
+    .map(row => decodeRow(row as any))
+    .filter((entry): entry is CharacterRecord => Boolean(entry))
+    .sort((a, b) => {
+      const aTime = Date.parse(a.updatedAt || '')
+      const bTime = Date.parse(b.updatedAt || '')
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+    })
+}
+
 export const saveCharacter = (record: CharacterRecord): CharacterRecord => {
   const createdAtMs = toMs(record.createdAt)
   const updatedAtMs = toMs(record.updatedAt)

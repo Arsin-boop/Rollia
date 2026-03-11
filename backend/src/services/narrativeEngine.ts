@@ -110,10 +110,11 @@ Required JSON schema (exactly these fields):
 }
 
 Field rules:
-- "scene.location" must contain the scene location.
-- "scene.time" must contain the scene time.
+- "scene.location" MUST equal the Location provided in Context. Do NOT invent or change it.
+- "scene.time" MUST equal the Time provided in Context. If Time is "Unspecified", derive it from the narrative but keep it consistent with previous turns. Do NOT output "Unspecified", "Unknown", "Не указано", "Неопределено" or any equivalent — use a concrete time of day instead.
 - "narration" must contain only narrative events and character actions.
 - Do NOT include location or time inside "narration".
+- Do NOT use game terms like "NPC", "Tension", "tension level", "boss", "mob", "HP", "XP" inside "narration" — use character names, roles, or descriptive prose instead.
 - "choices" must be an array with exactly 3 elements.
 - Each choice must be a short actionable sentence.
 
@@ -151,11 +152,13 @@ Rules:
 - Keep narration outside <npc> tags.
 - Do not output markdown bullets inside "narration".
 - Scene continuity rules (strict):
-  1) Do NOT change location unless explicitly instructed by the Director.
-  2) Do NOT introduce new NPCs unless they are already listed in the scene context.
-  3) Focus on immediate consequences of the latest player action.
-  4) Quest hooks in the Player Profile are future story seeds. Do NOT stage them as immediate events unless triggered by player action or Director notes.
-  5) Continue the existing scene; do not start an unrelated scene.
+  1) The location in "scene.location" MUST be copied verbatim from Context → Location. Never invent a new location mid-scene.
+  2) The time in "scene.time" MUST be consistent with Context → Time. Never reset or vague-ify the time.
+  3) Do NOT introduce new NPCs unless they are already listed in the scene context.
+  4) Focus on immediate consequences of the latest player action.
+  5) Quest hooks in the Player Profile are hints for future story seeds — do NOT stage them as immediate events.
+  6) Do NOT use meta game terms (NPC, Tension, HP, XP, boss) in narration — describe through fiction.
+  7) Director Instructions are authoritative — follow them but do not quote or paraphrase them in narration.
 ${russianGrammarRules}
 
 Context:

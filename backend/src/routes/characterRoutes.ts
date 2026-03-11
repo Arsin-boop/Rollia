@@ -9,7 +9,14 @@ import {
   validateAvatarGender
 } from '../services/avatarService.js'
 import { generateAppearanceSpec, generateClassVisualTags, generateCustomClass } from '../services/aiService.js'
-import { createCharacterId, deleteCharacter, getCharacter, upsertCharacter, updateCharacter } from '../services/characterStore.js'
+import {
+  createCharacterId,
+  deleteCharacter,
+  getCharacter,
+  listCharacters,
+  upsertCharacter,
+  updateCharacter
+} from '../services/characterStore.js'
 
 const router = express.Router()
 const MAX_APPEARANCE_LENGTH = 4000
@@ -210,11 +217,6 @@ router.post('/appearance', async (req, res) => {
       return res.status(429).json({ error: 'Too many avatar generation requests' })
     }
 
-    if (!process.env.MODELSLAB_KEY) {
-      updateCharacter(id, { avatarStatus: 'failed', avatarError: 'MODELSLAB_KEY is not configured' })
-      return res.status(500).json({ error: 'MODELSLAB_KEY is not configured' })
-    }
-
     updateCharacter(id, {
       avatarStatus: 'pending',
       avatarError: null,
@@ -229,6 +231,16 @@ router.post('/appearance', async (req, res) => {
   } catch (error: any) {
     console.error('Error saving appearance:', error)
     res.status(500).json({ error: error?.message || 'Failed to save appearance' })
+  }
+})
+
+router.get('/', async (_req, res) => {
+  try {
+    const items = listCharacters()
+    return res.json(items)
+  } catch (error: any) {
+    console.error('Error listing characters:', error)
+    return res.status(500).json({ error: error?.message || 'Failed to list characters' })
   }
 })
 
