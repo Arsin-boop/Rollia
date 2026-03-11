@@ -1333,19 +1333,19 @@ Design one quest tailored to this hero.`
           : 'A rumor suggests the past deeds of your family are returning to haunt you.',
       hook:
         language === 'ru'
-          ? 'Курьер приносит обожженное письмо с печатью, которую вы считали утраченной.'
-          : 'A courier delivers a scorched letter bearing a sigil you thought lost to time.',
+          ? 'Тёмные дела прошлого тянутся в настоящее — и кто-то явно знает, где вас найти.'
+          : 'The past has a way of finding those who would rather forget it.',
       xp: 200,
       recommendedLevel: 1,
       objectives:
         language === 'ru'
           ? [
-              'Отправьтесь к месту, указанному в письме',
+              'Выясните, кто стоит за происходящим',
               'Раскройте источник тревожных отголосков',
               'Упокойте прошлое или подчините его силу'
             ]
           : [
-              'Journey to the site mentioned in the letter',
+              'Uncover who is behind what is happening',
               'Uncover the source of the haunting echoes',
               'Lay the past to rest or seize its power'
             ]

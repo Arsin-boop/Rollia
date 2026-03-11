@@ -125,6 +125,13 @@ export const updateCharacter = (id: string, updates: Partial<CharacterRecord>): 
   return upsertCharacter(id, updates)
 }
 
+export const deleteCharacter = (id: string): boolean => {
+  const existing = getCharacter(id)
+  if (!existing) return false
+  db.delete(characters).where(eq(characters.id, id)).run()
+  return true
+}
+
 const migrateLegacyCharacterJson = () => {
   try {
     const legacyPath = path.join(process.cwd(), 'data', 'characters.json')
@@ -149,4 +156,6 @@ const migrateLegacyCharacterJson = () => {
   }
 }
 
-migrateLegacyCharacterJson()
+if (process.env.MIGRATE_LEGACY_JSON === 'true') {
+  migrateLegacyCharacterJson()
+}

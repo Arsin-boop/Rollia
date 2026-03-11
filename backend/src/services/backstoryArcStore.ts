@@ -269,5 +269,7 @@ export const markBeatUsed = (
   }
 }
 
-migrateLegacyBackstoryArcs()
+if (process.env.MIGRATE_LEGACY_JSON === 'true') {
+  migrateLegacyBackstoryArcs()
+}
 loadStore()

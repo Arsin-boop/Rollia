@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 import { StarryBackground } from '../components/StarryBackground'
+import { deleteCharacterFromDB } from '../utils/api'
 
 const CHARACTER_KEY = 'character'
 const LEGACY_CHARACTER_KEY = 'dnd-ai-character'
@@ -86,6 +87,9 @@ export default function CharactersMenuPage() {
       }
     }
     refresh()
+    deleteCharacterFromDB(characterId).catch(error => {
+      console.warn('Failed to delete character from DB:', error)
+    })
   }
 
   return (
@@ -143,4 +147,3 @@ export default function CharactersMenuPage() {
     </div>
   )
 }
-

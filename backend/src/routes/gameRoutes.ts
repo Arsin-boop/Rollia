@@ -38,7 +38,7 @@ import {
 } from '../services/intentUtility.js'
 import { runNarrativeEngine } from '../services/narrativeEngine.js'
 import { interpretPlayerAction } from '../services/actionInterpreter.js'
-import { getSession, upsertSession, type SessionHistoryMessage } from '../services/sessionStore.js'
+import { deleteSession, getSession, upsertSession, type SessionHistoryMessage } from '../services/sessionStore.js'
 
 const router = express.Router()
 const pendingChecks = new Map<string, PendingCheck>()
@@ -92,6 +92,21 @@ const normalizeNpcState = (value: unknown, fallbackWorldState: WorldState): NPCS
     suspicion: toFiniteNumber(source.suspicion, fallbackWorldState.npcMood.suspicion),
     trust: toFiniteNumber(source.trust, fallbackWorldState.npcMood.trust)
   }
+}
+
+const sanitizeCharacterForNarrative = (characterInfo: any): Record<string, unknown> => {
+  if (!characterInfo || typeof characterInfo !== 'object') return {}
+  const { quests, ...rest } = characterInfo
+  const sanitizedQuests = Array.isArray(quests)
+    ? quests.map(({ id, title, description, status, objectives }: any) => ({
+        id,
+        title,
+        description,
+        status,
+        objectives
+      }))
+    : undefined
+  return sanitizedQuests ? { ...rest, quests: sanitizedQuests } : rest
 }
 
 const normalizeStoryMemory = (value: unknown): StoryMemory => {
@@ -180,6 +195,30 @@ router.post('/reset-session', (req, res) => {
   } catch (error: any) {
     console.error('Failed to reset session:', error)
     return res.status(500).json({ error: error?.message || 'Failed to reset session' })
+  }
+})
+
+router.delete('/session/:id', (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim()
+    if (!id) {
+      return res.status(400).json({ error: 'Session ID is required' })
+    }
+
+    pendingChecks.delete(id)
+    gameStateByCampaign.delete(id)
+    worldStateByCampaign.delete(id)
+    storyMemoryByCampaign.delete(id)
+    clearBattle(id)
+
+    const deleted = deleteSession(id)
+    if (!deleted) {
+      return res.status(404).json({ error: 'Session not found' })
+    }
+    return res.json({ success: true, id })
+  } catch (error: any) {
+    console.error('Failed to delete session:', error)
+    return res.status(500).json({ error: error?.message || 'Failed to delete session' })
   }
 })
 
@@ -1098,8 +1137,9 @@ router.post('/dm-response', async (req, res) => {
       return res.status(400).json({ error: 'Player action is required' })
     }
 
-    const campaignKey = campaignId || 'default'
-    const persistedSession = ensureCampaignStateFromSession(campaignKey)
+    const hasCampaignId = typeof campaignId === 'string' && campaignId.trim().length > 0
+    const campaignKey = hasCampaignId ? campaignId.trim() : 'default'
+    const persistedSession = hasCampaignId ? ensureCampaignStateFromSession(campaignKey) : null
 
     const requestHistoryMessages: ChatCompletionMessage[] = Array.isArray(history)
       ? history
@@ -1141,11 +1181,13 @@ router.post('/dm-response', async (req, res) => {
     const interpreterNote = interpretedAction.transformed
       ? `Action Interpreter: "${playerAction}" -> ${interpretedAction.intentType}. ${interpretedAction.reason}`
       : ''
+    const narrativeCharacterProfile = sanitizeCharacterForNarrative(characterInfo)
 
     const saveSessionSnapshot = (payload: {
       history: SessionHistoryMessage[]
       worldState: WorldState
     }) => {
+      if (!hasCampaignId) return
       const currentMemory = storyMemoryByCampaign.get(campaignKey) || { ...DEFAULT_STORY_MEMORY }
       const currentGameState = gameStateByCampaign.get(campaignKey) || { lastResolvedAction: null, turnIndex: currentTurn }
       upsertSession({
@@ -1258,7 +1300,7 @@ router.post('/dm-response', async (req, res) => {
               playerAction: effectivePlayerAction,
               directorNotes: `${directorResult.directorNotes}${interpreterNote ? ` ${interpreterNote}` : ''} Combat events: ${JSON.stringify(resolved.events)}`,
               worldState: directorResult.updatedWorldState as unknown as Record<string, unknown>,
-              playerProfile: (characterInfo || {}) as Record<string, unknown>,
+              playerProfile: narrativeCharacterProfile,
               memoryContext,
               location: sceneState.location || extractLocationFromContext(gameContext || ''),
               recentEvents,
@@ -1309,7 +1351,7 @@ router.post('/dm-response', async (req, res) => {
             playerAction: effectivePlayerAction,
             directorNotes: `${directorResult.directorNotes}${interpreterNote ? ` ${interpreterNote}` : ''} ${outcomeNote}`,
             worldState: directorResult.updatedWorldState as unknown as Record<string, unknown>,
-            playerProfile: (characterInfo || {}) as Record<string, unknown>,
+            playerProfile: narrativeCharacterProfile,
             memoryContext,
             location: sceneState.location || extractLocationFromContext(gameContext || ''),
             recentEvents,
@@ -1527,7 +1569,7 @@ router.post('/dm-response', async (req, res) => {
         playerAction: effectivePlayerAction,
         directorNotes: `${directorResult.directorNotes}${interpreterNote ? ` ${interpreterNote}` : ''}`,
         worldState: directorResult.updatedWorldState as unknown as Record<string, unknown>,
-        playerProfile: (characterInfo || {}) as Record<string, unknown>,
+        playerProfile: narrativeCharacterProfile,
         memoryContext,
         location: sceneState.location || extractLocationFromContext(gameContext || ''),
         recentEvents,

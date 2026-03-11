@@ -9,7 +9,7 @@ import {
   validateAvatarGender
 } from '../services/avatarService.js'
 import { generateAppearanceSpec, generateClassVisualTags, generateCustomClass } from '../services/aiService.js'
-import { createCharacterId, getCharacter, upsertCharacter, updateCharacter } from '../services/characterStore.js'
+import { createCharacterId, deleteCharacter, getCharacter, upsertCharacter, updateCharacter } from '../services/characterStore.js'
 
 const router = express.Router()
 const MAX_APPEARANCE_LENGTH = 4000
@@ -243,6 +243,18 @@ router.get('/:id', async (req, res) => {
     console.error('Error fetching character:', error)
     res.status(500).json({ error: error?.message || 'Failed to load character' })
   }
+})
+
+router.delete('/:id', (req, res) => {
+  const { id } = req.params
+  if (!id) {
+    return res.status(400).json({ error: 'Character ID is required' })
+  }
+  const deleted = deleteCharacter(id)
+  if (!deleted) {
+    return res.status(404).json({ error: 'Character not found' })
+  }
+  return res.json({ success: true, id })
 })
 
 export default router

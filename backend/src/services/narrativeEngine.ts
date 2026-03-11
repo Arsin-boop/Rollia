@@ -117,17 +117,17 @@ Field rules:
 - "choices" must be an array with exactly 3 elements.
 - Each choice must be a short actionable sentence.
 
-Valid response example:
+Valid response example (structure only — do NOT copy this content):
 {
   "scene": {
-    "location": "Black Fox Tavern",
-    "time": "Evening"
+    "location": "<current scene location>",
+    "time": "<time of day>"
   },
-  "narration": "The courier places the burned letter on the table. The seal of your family is barely visible beneath the scorch marks.",
+  "narration": "<2-3 paragraphs of narrative prose based on the current scene>",
   "choices": [
-    "Read the letter carefully",
-    "Ask the courier where it came from",
-    "Watch the swordsman in the corner"
+    "<first actionable option>",
+    "<second actionable option>",
+    "<third actionable option>"
   ]
 }
 
@@ -154,7 +154,8 @@ Rules:
   1) Do NOT change location unless explicitly instructed by the Director.
   2) Do NOT introduce new NPCs unless they are already listed in the scene context.
   3) Focus on immediate consequences of the latest player action.
-  4) Continue the existing scene; do not start an unrelated scene.
+  4) Quest hooks in the Player Profile are future story seeds. Do NOT stage them as immediate events unless triggered by player action or Director notes.
+  5) Continue the existing scene; do not start an unrelated scene.
 ${russianGrammarRules}
 
 Context:

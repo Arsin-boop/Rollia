@@ -962,6 +962,43 @@ const GameSession = () => {
     setCampaignStateLoaded(false)
     const storageKey = `${CAMPAIGN_STATE_KEY_PREFIX}${campaignId}`
     const stored = parseCampaignState(localStorage.getItem(storageKey))
+
+    const sessionMeta = (() => {
+      try {
+        return JSON.parse(localStorage.getItem(`session_${campaignId}`) || 'null')
+      } catch {
+        return null
+      }
+    })() as { characterId?: string } | null
+
+    const sessionCharacterId = sessionMeta?.characterId
+    if (sessionCharacterId) {
+      const collectionRaw = localStorage.getItem('rollia_characters_v1')
+      const collection = (() => {
+        try {
+          return JSON.parse(collectionRaw || '[]') as Array<Record<string, unknown>>
+        } catch {
+          return []
+        }
+      })()
+      const linked = collection.find(entry => String(entry?.id || '') === sessionCharacterId)
+      if (linked) {
+        const currentId = (() => {
+          try {
+            const parsed = JSON.parse(localStorage.getItem('character') || 'null')
+            return String(parsed?.id || '')
+          } catch {
+            return ''
+          }
+        })()
+        if (currentId !== sessionCharacterId) {
+          localStorage.setItem('character', JSON.stringify(linked))
+          localStorage.setItem('dnd-ai-character', JSON.stringify(linked))
+          setCharacterProfile(linked as unknown as StoredCharacterProfile)
+        }
+      }
+    }
+
     if (!stored) {
       setMessages([])
       setChatHistory([])

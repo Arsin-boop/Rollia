@@ -80,3 +80,10 @@ export const upsertSession = (input: {
     updatedAt: now
   }
 }
+
+export const deleteSession = (id: string): boolean => {
+  const existing = getSession(id)
+  if (!existing) return false
+  db.delete(sessions).where(eq(sessions.id, id)).run()
+  return true
+}

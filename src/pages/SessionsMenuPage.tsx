@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trash2, UserRound } from 'lucide-react'
 import { StarryBackground } from '../components/StarryBackground'
+import { deleteSessionFromDB } from '../utils/api'
 
 const ACTIVE_CAMPAIGN_KEY = 'activeCampaignId'
 const CHARACTER_KEY = 'character'
@@ -99,6 +100,9 @@ export default function SessionsMenuPage() {
       localStorage.removeItem(ACTIVE_CAMPAIGN_KEY)
     }
     refresh()
+    deleteSessionFromDB(sessionId).catch(error => {
+      console.warn('Failed to delete session from DB:', error)
+    })
   }
 
   return (
@@ -161,4 +165,3 @@ export default function SessionsMenuPage() {
     </div>
   )
 }
-

@@ -340,6 +340,17 @@ export async function resetSession(
   return response.json()
 }
 
+export async function deleteSessionFromDB(sessionId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/game/session/${sessionId}`, {
+    method: 'DELETE'
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(errorData.error || `Failed to delete session (${response.status})`)
+  }
+}
+
 export async function summarizeScene(
   history: ChatMessage[],
   language: ApiLanguage = 'en'
@@ -631,5 +642,15 @@ export async function performSavingThrow(
   }
 
   return response.json()
+}
+
+export async function deleteCharacterFromDB(characterId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/character/${characterId}`, {
+    method: 'DELETE'
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(err.error || `Failed to delete character (${response.status})`)
+  }
 }
 
