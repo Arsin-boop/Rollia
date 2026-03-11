@@ -17,7 +17,19 @@ export interface NPCProfile {
   contextSnippet?: string
 }
 
-const npcStore = new Map<string, NPCProfile>()
+// Per-campaign NPC store — key is campaignKey, value is name->profile map
+const campaignNpcStores = new Map<string, Map<string, NPCProfile>>()
+
+const getStore = (campaignKey: string): Map<string, NPCProfile> => {
+  if (!campaignNpcStores.has(campaignKey)) {
+    campaignNpcStores.set(campaignKey, new Map())
+  }
+  return campaignNpcStores.get(campaignKey)!
+}
+
+export function clearNPCRegistry(campaignKey: string): void {
+  campaignNpcStores.delete(campaignKey)
+}
 
 export type NPCDialoguePaletteEntry = {
   id: string
@@ -74,15 +86,15 @@ const corinProfile: NPCProfile = {
   contextSnippet: 'Default barkeep NPC anchoring the campaign opener'
 }
 
-npcStore.set(corinProfile.name, corinProfile)
 
 export function listNPCDialoguePalette(): NPCDialoguePaletteEntry[] {
   return NPC_DIALOGUE_PALETTE.slice()
 }
 
-export function listNPCProfiles(): NPCProfile[] {
+export function listNPCProfiles(campaignKey = 'default'): NPCProfile[] {
+  const store = getStore(campaignKey)
   const deduped = new Map<string, NPCProfile>()
-  for (const profile of npcStore.values()) {
+  for (const profile of store.values()) {
     const key = (profile.id || profile.name || '').trim().toLowerCase()
     if (!key || deduped.has(key)) continue
     deduped.set(key, profile)
@@ -90,40 +102,41 @@ export function listNPCProfiles(): NPCProfile[] {
   return Array.from(deduped.values())
 }
 
-export function getNPCProfile(name: string): NPCProfile | undefined {
-  return npcStore.get(name.trim())
+export function getNPCProfile(name: string, campaignKey = 'default'): NPCProfile | undefined {
+  return getStore(campaignKey).get(name.trim())
 }
 
-export function getNPCProfileById(id: string): NPCProfile | undefined {
+export function getNPCProfileById(id: string, campaignKey = 'default'): NPCProfile | undefined {
   const normalizedId = id.trim().toLowerCase()
-  return Array.from(npcStore.values()).find(profile => profile.id === normalizedId)
+  return Array.from(getStore(campaignKey).values()).find(profile => profile.id === normalizedId)
 }
 
-export function registerNPCProfile(profile: Omit<NPCProfile, 'id'> & { id?: string }): NPCProfile {
+export function registerNPCProfile(profile: Omit<NPCProfile, 'id'> & { id?: string }, campaignKey = 'default'): NPCProfile {
+  const store = getStore(campaignKey)
   const normalizedName = canonicalizeNpcName(profile.name.trim())
-  const existing = npcStore.get(normalizedName)
+  const existing = store.get(normalizedName)
   if (existing) {
     return existing
   }
 
   const incomingId = (profile.id || '').trim().toLowerCase()
   const id = incomingId || slugify(normalizedName)
-  const existingById = getNPCProfileById(id)
+  const existingById = getNPCProfileById(id, campaignKey)
   if (existingById) {
-    // Preserve one canonical profile per id, but allow alias lookup by name.
-    npcStore.set(normalizedName, existingById)
+    store.set(normalizedName, existingById)
     return existingById
   }
 
+  // Corin is no longer a global default — only register if explicitly created
   if (isCorinAlias(normalizedName) || id === corinProfile.id) {
-    npcStore.set(corinProfile.name, corinProfile)
-    npcStore.set(normalizedName, corinProfile)
+    store.set(corinProfile.name, corinProfile)
+    store.set(normalizedName, corinProfile)
     return corinProfile
   }
 
   const dialogueColorId = profile.dialogueColorId || assignDialogueColorId(id)
   const stored: NPCProfile = { ...profile, name: normalizedName, id, dialogueColorId }
-  npcStore.set(normalizedName, stored)
+  store.set(normalizedName, stored)
   return stored
 }
 
@@ -251,18 +264,28 @@ const displayNameFromNpcId = (npcId: string): string => {
 
 export function ensureNPCProfileById(
   npcId: string,
+  campaignKey = 'default',
   options?: { location?: string; contextSnippet?: string }
 ): NPCProfile {
+  const store = getStore(campaignKey)
   const normalizedId = String(npcId || '').trim().toLowerCase()
   if (!normalizedId) {
-    return corinProfile
+    // No longer fall back to Corin — create a generic unknown NPC
+    return registerNPCProfile({
+      id: `unknown-${Date.now()}`,
+      name: 'Unknown',
+      age: 'unknown', occupation: 'unknown', firstImpression: '',
+      innerCharacter: '', primaryMotivation: '', secondaryMotivation: '',
+      secret: '', voice: '', behaviorQuirks: '', relationshipToLocation: 'unknown',
+      potentialHook: '', location: options?.location, contextSnippet: options?.contextSnippet
+    }, campaignKey)
   }
-  const existing = getNPCProfileById(normalizedId)
+  const existing = getNPCProfileById(normalizedId, campaignKey)
   if (existing) {
     return existing
   }
   if (normalizedId === corinProfile.id) {
-    npcStore.set(corinProfile.name, corinProfile)
+    store.set(corinProfile.name, corinProfile)
     return corinProfile
   }
 
@@ -271,18 +294,9 @@ export function ensureNPCProfileById(
     id: normalizedId,
     name: fallbackName,
     dialogueColorId: assignDialogueColorId(normalizedId),
-    age: 'unknown',
-    occupation: 'unknown',
-    firstImpression: '',
-    innerCharacter: '',
-    primaryMotivation: '',
-    secondaryMotivation: '',
-    secret: '',
-    voice: '',
-    behaviorQuirks: '',
-    relationshipToLocation: options?.location || 'unknown',
-    potentialHook: '',
-    location: options?.location,
-    contextSnippet: options?.contextSnippet
-  })
+    age: 'unknown', occupation: 'unknown', firstImpression: '',
+    innerCharacter: '', primaryMotivation: '', secondaryMotivation: '',
+    secret: '', voice: '', behaviorQuirks: '', relationshipToLocation: options?.location || 'unknown',
+    potentialHook: '', location: options?.location, contextSnippet: options?.contextSnippet
+  }, campaignKey)
 }

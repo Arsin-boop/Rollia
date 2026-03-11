@@ -18,6 +18,7 @@ export interface NarrativeContext {
   location: string
   recentEvents: string[]
   sceneState?: SceneState
+  campaignKey?: string
 }
 
 export interface NarrativeSceneMeta {
@@ -226,7 +227,7 @@ export async function runNarrativeEngine(
     while ((match = regex.exec(narration)) !== null) {
       const npcId = (match[1] || '').trim()
       if (!npcId) continue
-      ensureNPCProfileById(npcId, {
+      ensureNPCProfileById(npcId, context.campaignKey || 'default', {
         location: result.scene.location || context.sceneState?.location || context.location,
         contextSnippet: narration.slice(0, 500)
       })
