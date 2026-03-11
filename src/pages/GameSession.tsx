@@ -36,7 +36,6 @@ import {
 import './GameSession.css'
 import { useI18n } from '../i18n'
 import type { CharacterStats, InventoryItem } from '../types/character'
-import { calculateHp, calculateMp } from '../utils/resourceFormulas'
 
 type Message = {
   id: string
@@ -513,17 +512,19 @@ const mergeUniqueEquipment = (baseEquipment: string[], items: InventoryItem[]): 
 
 const computeResourcesFromProfile = (profile: StoredCharacterProfile | null) => {
   if (!profile) {
-    return { hp: calculateHp(1, 10), mp: calculateMp(1, 10) }
+    return { hp: 24, mp: 16 }
   }
   if (profile.resources) {
     return profile.resources
   }
   const stats = profile.customClassData?.stats || DEFAULT_STATS
-  const level = profile.level ?? 1
-  return {
-    hp: calculateHp(level, stats.constitution || DEFAULT_STATS.constitution),
-    mp: calculateMp(level, stats.intelligence || DEFAULT_STATS.intelligence)
-  }
+  const hitDie = Number(profile.customClassData?.hitDie?.replace('d', '')) || 8
+  const hp = Math.max(1, hitDie + (stats.constitution || DEFAULT_STATS.constitution))
+  const mp = Math.max(
+    8,
+    Math.round(((stats.intelligence || 10) + (stats.wisdom || 10) + (stats.charisma || 10)) / 3)
+  )
+  return { hp, mp }
 }
 
 const AFFINITY_TIERS = ['Hostile', 'Wary', 'Neutral', 'Friendly', 'Allied'] as const
@@ -816,6 +817,7 @@ const GameSession = () => {
   const [expandedEquipmentItem, setExpandedEquipmentItem] = useState<string | null>(null)
   const [activeSpellId, setActiveSpellId] = useState<string | null>(null)
   const [campaignStateLoaded, setCampaignStateLoaded] = useState(false)
+  const [currentLocation, setCurrentLocation] = useState('')
   const battleUiEnabled = false
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -986,6 +988,9 @@ const GameSession = () => {
       .reverse()
       .find(message => message.type === 'dm' && message.sceneHeader)?.sceneHeader
     lastSceneHeaderRef.current = lastHeader || ''
+    if (lastHeader) {
+      setCurrentLocation(lastHeader.split('·')[0].trim())
+    }
     if (restoredMessages.length || restoredHistory.length) {
       openingGeneratedRef.current = true
     }
@@ -1476,6 +1481,45 @@ const GameSession = () => {
     })
   }, [updateStoredProfile])
 
+  const handleResetChat = useCallback(async () => {
+    const confirmed = window.confirm(
+      language === 'ru'
+        ? 'Очистить весь чат и начать заново?'
+        : 'Clear the entire chat and start again?'
+    )
+    if (!confirmed) return
+
+    try {
+      if (campaignId) {
+        await resetSession(campaignId)
+      }
+    } catch (error) {
+      console.error('Failed to reset backend session:', error)
+    }
+
+    setMessages([])
+    setChatHistory([])
+    setSceneSummary('')
+    setInputValue('')
+    setBattleState(null)
+    setCombatEvents([])
+    setCombatAction({ action: null })
+    setAttemptText('')
+    clearSystemNotices()
+    pendingCheckByMessageRef.current.clear()
+    rollStartedRef.current.clear()
+    lastPlayerActionRef.current = ''
+    lastPlayerMessageIdRef.current = null
+    lastSceneHeaderRef.current = ''
+    openingGeneratedRef.current = false
+
+    if (campaignId) {
+      localStorage.removeItem(`${CAMPAIGN_STATE_KEY_PREFIX}${campaignId}`)
+    }
+
+    setCharacterProfile(prev => (prev ? { ...prev } : prev))
+  }, [campaignId, clearSystemNotices, language])
+
   const tickCooldowns = useCallback(() => {
     updateStoredProfile(prev => {
       if (!prev) return prev
@@ -1615,6 +1659,10 @@ const GameSession = () => {
   const buildGameContext = useCallback(
     () => {
       const segments: string[] = []
+      // Location MUST be first so extractLocationFromContext() on the backend reads it correctly
+      if (currentLocation) {
+        segments.push(`Location: ${currentLocation}`)
+      }
       if (campaignId) {
         segments.push(`Campaign: ${campaignId}`)
       }
@@ -1636,7 +1684,7 @@ const GameSession = () => {
       }
       return segments.join('\n')
     },
-    [campaignId, sceneSummary, statusEffects, systemNotices, characterProfile?.backstorySummary]
+    [campaignId, currentLocation, sceneSummary, statusEffects, systemNotices, characterProfile?.backstorySummary]
   )
 
   const sendCombatIntent = useCallback(
@@ -2131,6 +2179,7 @@ const GameSession = () => {
       const finalHeader = sceneHeaderFromMeta || extractedHeader
       if (finalHeader) {
         lastSceneHeaderRef.current = finalHeader
+        setCurrentLocation(finalHeader.split('·')[0].trim())
       }
 
       if (body) {
@@ -2225,8 +2274,10 @@ const GameSession = () => {
     [applyStatusUpdate, buildStatusStateInput, language]
   )
 
-  const requestOpeningScene = useCallback(async () => {
-    if (!campaignId || !characterProfile) return
+  useEffect(() => {
+    if (!campaignId || !characterProfile || openingGeneratedRef.current) {
+      return
+    }
     openingGeneratedRef.current = true
     setIsLoading(true)
 
@@ -2236,36 +2287,37 @@ const GameSession = () => {
       'Follow the DM output format exactly: Dungeon Master line, scene header line, then three unnumbered paragraphs. ' +
       'No bullets, no questions, no meta.'
 
-    try {
-      const dmResponse = await getDMResponse(
-        openingPrompt,
-        {
-          name: characterProfile?.name,
-          class: characterProfile?.class,
-          level,
-          appearance: characterProfile?.appearance,
-          backstory: characterProfile?.backstory,
-          backstorySummary: characterProfile?.backstorySummary,
-          stats,
-          quests
-        },
-        buildGameContext(),
-        [],
-        { campaignId, playerSnapshot: { hp: resources.hp, mp: resources.mp }, language }
-      )
-      const updatedHistory: ChatMessage[] = [{ role: 'assistant', content: dmResponse.response }]
-      setChatHistory(updatedHistory)
-      void maybeSummarizeHistory(updatedHistory)
-      void maybeUpdateStatusEffects(updatedHistory)
-      clearSystemNotices()
-      handleDMResponseOutput(dmResponse)
-    } catch (error: any) {
-      openingGeneratedRef.current = false
-      console.error('Failed to generate opening scene:', error)
-      pushSystemMessage(error?.message || t('gameSession.error.openingScene'))
-    } finally {
-      setIsLoading(false)
-    }
+    getDMResponse(
+      openingPrompt,
+      {
+        name: characterProfile?.name,
+        class: characterProfile?.class,
+        appearance: characterProfile?.appearance,
+        backstory: characterProfile?.backstory,
+        backstorySummary: characterProfile?.backstorySummary,
+        stats,
+        quests
+      },
+      buildGameContext(),
+      [],
+      { campaignId, playerSnapshot: { hp: resources.hp, mp: resources.mp }, language }
+    )
+      .then(dmResponse => {
+        const updatedHistory: ChatMessage[] = [{ role: 'assistant', content: dmResponse.response }]
+        setChatHistory(updatedHistory)
+        void maybeSummarizeHistory(updatedHistory)
+        void maybeUpdateStatusEffects(updatedHistory)
+        clearSystemNotices()
+        handleDMResponseOutput(dmResponse)
+      })
+      .catch(error => {
+        openingGeneratedRef.current = false
+        console.error('Failed to generate opening scene:', error)
+        pushSystemMessage(error?.message || t('gameSession.error.openingScene'))
+      })
+      .finally(() => {
+        setIsLoading(false)
+      })
   }, [
     buildGameContext,
     campaignId,
@@ -2280,13 +2332,6 @@ const GameSession = () => {
     stats,
     language
   ])
-
-  useEffect(() => {
-    if (!campaignId || !characterProfile || openingGeneratedRef.current) {
-      return
-    }
-    void requestOpeningScene()
-  }, [campaignId, characterProfile, requestOpeningScene])
 
   const continueStoryAfterRoll = useCallback(
     async (payload: {
@@ -2321,7 +2366,6 @@ const GameSession = () => {
           {
             name: characterProfile?.name,
             class: characterProfile?.class,
-            level,
             appearance: characterProfile?.appearance,
             backstory: characterProfile?.backstory,
             backstorySummary: characterProfile?.backstorySummary,
@@ -2764,52 +2808,6 @@ const GameSession = () => {
     [renderPlainTextSegment, renderCharacterSegment, renderNpcDialogueSegment]
   )
 
-  const handleResetChat = useCallback(async () => {
-    if (!campaignId || isLoading) return
-
-    const confirmed = window.confirm(
-      language === 'ru'
-        ? 'Очистить весь чат и начать кампанию заново?'
-        : 'Clear the entire chat and start the campaign from the beginning?'
-    )
-    if (!confirmed) return
-
-    setMessages([])
-    setChatHistory([])
-    setSceneSummary('')
-    setInputValue('')
-    setBattleState(null)
-    setCombatEvents([])
-    setCombatAction({ action: null })
-    setAttemptText('')
-    clearSystemNotices()
-
-    lastSceneHeaderRef.current = ''
-    openingGeneratedRef.current = false
-    pendingCheckByMessageRef.current.clear()
-    rollStartedRef.current.clear()
-    lastPlayerActionRef.current = ''
-    lastPlayerMessageIdRef.current = null
-
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(`${CAMPAIGN_STATE_KEY_PREFIX}${campaignId}`)
-    }
-
-    try {
-      await resetSession(campaignId)
-    } catch (error) {
-      console.error('Failed to reset backend session:', error)
-    }
-
-    await requestOpeningScene()
-  }, [
-    campaignId,
-    isLoading,
-    language,
-    clearSystemNotices,
-    requestOpeningScene
-  ])
-
   const handleSendMessage = useCallback(
     async (event?: React.FormEvent) => {
       event?.preventDefault()
@@ -2846,7 +2844,6 @@ const GameSession = () => {
           {
             name: characterProfile?.name,
             class: characterProfile?.class,
-            level,
             appearance: characterProfile?.appearance,
             backstory: characterProfile?.backstory,
             backstorySummary: characterProfile?.backstorySummary,

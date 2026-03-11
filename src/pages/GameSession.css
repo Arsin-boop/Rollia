@@ -493,6 +493,28 @@
   text-shadow: 0 0 6px rgba(255, 216, 138, 0.18);
 }
 
+.message-typing {
+  opacity: 0.92;
+}
+
+.typing-indicator {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  min-width: 8.5rem;
+}
+
+.typing-label {
+  color: #f8faff;
+}
+
+.typing-dots {
+  color: var(--accent-primary);
+  display: inline-block;
+  min-width: 1.2rem;
+  text-align: left;
+}
+
 .roll-inline {
   display: flex;
   flex-direction: column;
