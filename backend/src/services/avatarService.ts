@@ -357,9 +357,13 @@ export const generateAvatarPng = async (
   negativePrompt: string,
   hash?: string
 ): Promise<Buffer> => {
-  const provider = (process.env.AVATAR_PROVIDER || '').toLowerCase()
+  const provider = (process.env.AVATAR_PROVIDER || '').trim().toLowerCase()
 
   if (provider === 'huggingface' || (!provider && process.env.HF_TOKEN && !process.env.MODELSLAB_KEY)) {
+    return generateAvatarPngHuggingFace(prompt, negativePrompt, hash)
+  }
+  if (provider === 'modelslab' && !process.env.MODELSLAB_KEY && process.env.HF_TOKEN) {
+    console.warn('AVATAR_PROVIDER=modelslab but MODELSLAB_KEY is missing. Falling back to HuggingFace.')
     return generateAvatarPngHuggingFace(prompt, negativePrompt, hash)
   }
   if (provider === 'modelslab' || (!provider && process.env.MODELSLAB_KEY)) {

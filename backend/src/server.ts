@@ -1,4 +1,5 @@
 import express from 'express'
+import fs from 'fs'
 import path from 'path'
 import cors from 'cors'
 import dotenv from 'dotenv'
@@ -8,13 +9,19 @@ import diceRoutes from './routes/diceRoutes.js'
 import battleRoutes from './routes/battleRoutes.js'
 import { generateAIResponse } from './services/aiService.js'
 
-dotenv.config()
+const cwd = process.cwd()
+const inferredBackendRoot = fs.existsSync(path.join(cwd, 'src', 'server.ts'))
+  ? cwd
+  : path.join(cwd, 'backend')
+const backendRoot = fs.existsSync(inferredBackendRoot) ? inferredBackendRoot : cwd
+const envPath = path.join(backendRoot, '.env')
+dotenv.config({ path: envPath })
 
 const requiredEnvVars = ['GROQ_API_KEY_PRIMARY', 'GROQ_API_KEY_UTILITY', 'GROQ_BASE_URL']
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
     console.error(`Missing required environment variable: ${envVar}`)
-    console.error('Check backend/.env — see backend/.env.example for reference')
+    console.error(`Check ${envPath} - see backend/.env.example for reference`)
     process.exit(1)
   }
 }
@@ -30,7 +37,7 @@ app.use(
   })
 )
 app.use(express.json())
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
+app.use('/uploads', express.static(path.join(backendRoot, 'uploads')))
 
 // Routes
 app.use('/api/character', characterRoutes)
