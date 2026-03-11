@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "db:generate": "drizzle-kit generate --config drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
+    "db:studio": "drizzle-kit studio --config drizzle.config.ts"
   },
   "dependencies": {
     "@huggingface/inference": "^2.8.1",

@@ -38,6 +38,7 @@ import {
 } from '../services/intentUtility.js'
 import { runNarrativeEngine } from '../services/narrativeEngine.js'
 import { interpretPlayerAction } from '../services/actionInterpreter.js'
+import { getSession, upsertSession, type SessionHistoryMessage } from '../services/sessionStore.js'
 
 const router = express.Router()
 const pendingChecks = new Map<string, PendingCheck>()
@@ -91,6 +92,66 @@ const normalizeNpcState = (value: unknown, fallbackWorldState: WorldState): NPCS
     suspicion: toFiniteNumber(source.suspicion, fallbackWorldState.npcMood.suspicion),
     trust: toFiniteNumber(source.trust, fallbackWorldState.npcMood.trust)
   }
+}
+
+const normalizeStoryMemory = (value: unknown): StoryMemory => {
+  if (!value || typeof value !== 'object') {
+    return { recentEvents: [], storySummary: [] }
+  }
+  const source = value as Partial<StoryMemory>
+  return {
+    recentEvents: Array.isArray(source.recentEvents) ? source.recentEvents : [],
+    storySummary: Array.isArray(source.storySummary) ? source.storySummary : []
+  }
+}
+
+const normalizeSessionHistory = (value: unknown): SessionHistoryMessage[] => {
+  if (!Array.isArray(value)) return []
+  return value
+    .map(entry => {
+      if (!entry || typeof entry !== 'object') return null
+      const role = (entry as { role?: unknown }).role
+      const content = (entry as { content?: unknown }).content
+      if ((role !== 'system' && role !== 'user' && role !== 'assistant') || typeof content !== 'string') {
+        return null
+      }
+      const text = content.trim()
+      if (!text) return null
+      return { role, content: text } as SessionHistoryMessage
+    })
+    .filter((entry): entry is SessionHistoryMessage => Boolean(entry))
+}
+
+const ensureCampaignStateFromSession = (campaignKey: string) => {
+  const session = getSession(campaignKey)
+  if (!session) return null
+
+  if (!worldStateByCampaign.has(campaignKey) && session.payload.worldState) {
+    worldStateByCampaign.set(campaignKey, normalizeWorldState(session.payload.worldState))
+  }
+  if (!storyMemoryByCampaign.has(campaignKey) && session.payload.storyMemory) {
+    storyMemoryByCampaign.set(campaignKey, normalizeStoryMemory(session.payload.storyMemory))
+  }
+  if (!gameStateByCampaign.has(campaignKey) && session.payload.gameState && typeof session.payload.gameState === 'object') {
+    const source = session.payload.gameState as Partial<{ lastResolvedAction: LastResolvedAction | null; turnIndex: number }>
+    gameStateByCampaign.set(campaignKey, {
+      lastResolvedAction: source.lastResolvedAction || null,
+      turnIndex: typeof source.turnIndex === 'number' ? source.turnIndex : 0
+    })
+  }
+
+  return session
+}
+
+const appendHistoryMessage = (
+  history: SessionHistoryMessage[],
+  nextMessage: SessionHistoryMessage
+): SessionHistoryMessage[] => {
+  const last = history[history.length - 1]
+  if (last && last.role === nextMessage.role && last.content.trim() === nextMessage.content.trim()) {
+    return history
+  }
+  return [...history, nextMessage]
 }
 
 const resolveDirectorActionType = async (playerInput: string): Promise<ActionType> => {
@@ -974,7 +1035,10 @@ router.post('/dm-response', async (req, res) => {
       return res.status(400).json({ error: 'Player action is required' })
     }
 
-    const historyMessages: ChatCompletionMessage[] = Array.isArray(history)
+    const campaignKey = campaignId || 'default'
+    const persistedSession = ensureCampaignStateFromSession(campaignKey)
+
+    const requestHistoryMessages: ChatCompletionMessage[] = Array.isArray(history)
       ? history
           .map((entry: any) => {
             if (
@@ -993,7 +1057,13 @@ router.post('/dm-response', async (req, res) => {
           .filter((entry): entry is ChatCompletionMessage => Boolean(entry))
       : []
 
-    const campaignKey = campaignId || 'default'
+    const persistedHistoryMessages: ChatCompletionMessage[] = normalizeSessionHistory(persistedSession?.history || []).map(entry => ({
+      role: entry.role,
+      content: entry.content
+    })) as ChatCompletionMessage[]
+
+    const historyMessages = requestHistoryMessages.length ? requestHistoryMessages : persistedHistoryMessages
+
     const gameState = gameStateByCampaign.get(campaignKey) || { lastResolvedAction: null, turnIndex: 0 }
     const currentTurn = (gameState.turnIndex || 0) + 1
     gameStateByCampaign.set(campaignKey, { ...gameState, turnIndex: currentTurn })
@@ -1008,6 +1078,40 @@ router.post('/dm-response', async (req, res) => {
     const interpreterNote = interpretedAction.transformed
       ? `Action Interpreter: "${playerAction}" -> ${interpretedAction.intentType}. ${interpretedAction.reason}`
       : ''
+
+    const saveSessionSnapshot = (payload: {
+      history: SessionHistoryMessage[]
+      worldState: WorldState
+    }) => {
+      const currentMemory = storyMemoryByCampaign.get(campaignKey) || { ...DEFAULT_STORY_MEMORY }
+      const currentGameState = gameStateByCampaign.get(campaignKey) || { lastResolvedAction: null, turnIndex: currentTurn }
+      upsertSession({
+        id: campaignKey,
+        characterId: characterInfo?.id ? String(characterInfo.id) : null,
+        history: payload.history,
+        payload: {
+          worldState: payload.worldState,
+          storyMemory: currentMemory,
+          gameState: currentGameState
+        }
+      })
+    }
+
+    const sendWithSession = (payload: Record<string, unknown>, options?: { narration?: string; worldState?: WorldState }) => {
+      let sessionHistory = normalizeSessionHistory(historyMessages as unknown as SessionHistoryMessage[])
+      sessionHistory = appendHistoryMessage(sessionHistory, { role: 'user', content: effectivePlayerAction })
+      if (options?.narration && options.narration.trim()) {
+        sessionHistory = appendHistoryMessage(sessionHistory, { role: 'assistant', content: options.narration.trim() })
+      }
+      const worldForSave =
+        options?.worldState ||
+        worldStateByCampaign.get(campaignKey) || {
+          ...DEFAULT_WORLD_STATE,
+          npcMood: { ...DEFAULT_WORLD_STATE.npcMood }
+        }
+      saveSessionSnapshot({ history: sessionHistory, worldState: worldForSave })
+      return res.json(payload)
+    }
 
     if (rollResult && pendingCheckId) {
       const pending = pendingChecks.get(campaignKey)
@@ -1117,7 +1221,7 @@ router.post('/dm-response', async (req, res) => {
             })
           }
 
-          return res.json({
+          return sendWithSession({
             scene: narrativeResult.scene,
             narrative: narrativeResult.narration,
             response: narrativeResult.narration,
@@ -1128,6 +1232,9 @@ router.post('/dm-response', async (req, res) => {
             directorNotes: directorResult.directorNotes,
             ui: { showRoll: false },
             pending_check: null
+          }, {
+            narration: narrativeResult.narration,
+            worldState: directorResult.updatedWorldState
           })
         }
 
@@ -1172,7 +1279,7 @@ router.post('/dm-response', async (req, res) => {
           dialogueColorId: npc.dialogueColorId
         }))
         const npcPalette = listNPCDialoguePalette()
-        return res.json({
+        return sendWithSession({
           scene: narrativeResult.scene,
           narrative: narrativeResult.narration,
           response: narrativeResult.narration,
@@ -1185,6 +1292,9 @@ router.post('/dm-response', async (req, res) => {
           pending_check: null,
           npcRegistry,
           npcPalette
+        }, {
+          narration: narrativeResult.narration,
+          worldState: directorResult.updatedWorldState
         })
       }
     }
@@ -1247,14 +1357,16 @@ router.post('/dm-response', async (req, res) => {
 
     const activeBattle = getBattle(campaignKey)
     if (pendingCheck?.type === 'attack' && !activeBattle) {
+      const baseHp = typeof playerSnapshot?.hp === 'number' ? playerSnapshot.hp : 20
+      const baseMp = typeof playerSnapshot?.mp === 'number' ? playerSnapshot.mp : 0
       const playerEntity: CombatEntity = {
         id: 'player',
         type: 'player',
         name: characterInfo?.name || 'Player',
-        hp: 20,
-        hp_max: 20,
-        mp: 0,
-        mp_max: 0,
+        hp: baseHp,
+        hp_max: baseHp,
+        mp: baseMp,
+        mp_max: baseMp,
         statuses: [],
         statusEffects: []
       }
@@ -1299,7 +1411,7 @@ router.post('/dm-response', async (req, res) => {
             ...DEFAULT_WORLD_STATE,
             npcMood: { ...DEFAULT_WORLD_STATE.npcMood }
           }
-      return res.json({
+      return sendWithSession({
         response: '',
         requiresRoll: true,
         updatedWorldState: currentWorldState,
@@ -1318,6 +1430,8 @@ router.post('/dm-response', async (req, res) => {
           on_success: 'resolve',
           on_failure: 'resolve'
         }
+      }, {
+        worldState: currentWorldState
       })
     }
 
@@ -1372,7 +1486,7 @@ router.post('/dm-response', async (req, res) => {
       dialogueColorId: npc.dialogueColorId
     }))
     const npcPalette = listNPCDialoguePalette()
-    res.json({
+    return sendWithSession({
       narrative: responseText,
       response: responseText,
       scene: narrativeResult.scene,
@@ -1385,6 +1499,9 @@ router.post('/dm-response', async (req, res) => {
       ui: { showRoll: false },
       npcRegistry,
       npcPalette
+    }, {
+      narration: responseText,
+      worldState: directorResult.updatedWorldState
     })
   } catch (error: any) {
     console.error('Error generating DM response:', error)
