@@ -154,6 +154,40 @@ const appendHistoryMessage = (
   return [...history, nextMessage]
 }
 
+const toResourceStat = (value: unknown, fallback: number): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return fallback
+}
+
+const resolveBaseResources = (
+  playerSnapshot: { hp?: number; mp?: number } | undefined,
+  characterInfo: any
+) => {
+  if (typeof playerSnapshot?.hp === 'number' && typeof playerSnapshot?.mp === 'number') {
+    return {
+      hp: Math.max(1, Math.floor(playerSnapshot.hp)),
+      mp: Math.max(0, Math.floor(playerSnapshot.mp))
+    }
+  }
+
+  const statsSource = characterInfo?.stats || characterInfo?.customClassData?.stats || {}
+  const level = Math.max(1, Math.floor(toResourceStat(characterInfo?.level, 1)))
+  const constitution = toResourceStat(statsSource?.constitution, 10)
+  const intelligence = toResourceStat(statsSource?.intelligence, 10)
+
+  const hp = 8 * level + 2 * constitution
+  const mp = 5 * level + 3 * intelligence
+
+  return {
+    hp: Math.max(1, Math.floor(hp)),
+    mp: Math.max(0, Math.floor(mp))
+  }
+}
+
 const resolveDirectorActionType = async (playerInput: string): Promise<ActionType> => {
   const text = String(playerInput || '').trim()
   const fallback = classifyAction(text)
@@ -1128,8 +1162,9 @@ router.post('/dm-response', async (req, res) => {
         if (pending.type === 'attack') {
           let battleState = getBattle(campaignKey)
           if (!battleState) {
-            const baseHp = typeof playerSnapshot?.hp === 'number' ? playerSnapshot.hp : 20
-            const baseMp = typeof playerSnapshot?.mp === 'number' ? playerSnapshot.mp : 0
+            const baseResources = resolveBaseResources(playerSnapshot, characterInfo)
+            const baseHp = baseResources.hp
+            const baseMp = baseResources.mp
             const playerEntity: CombatEntity = {
               id: 'player',
               type: 'player',
@@ -1357,8 +1392,9 @@ router.post('/dm-response', async (req, res) => {
 
     const activeBattle = getBattle(campaignKey)
     if (pendingCheck?.type === 'attack' && !activeBattle) {
-      const baseHp = typeof playerSnapshot?.hp === 'number' ? playerSnapshot.hp : 20
-      const baseMp = typeof playerSnapshot?.mp === 'number' ? playerSnapshot.mp : 0
+      const baseResources = resolveBaseResources(playerSnapshot, characterInfo)
+      const baseHp = baseResources.hp
+      const baseMp = baseResources.mp
       const playerEntity: CombatEntity = {
         id: 'player',
         type: 'player',

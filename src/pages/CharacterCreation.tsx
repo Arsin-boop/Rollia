@@ -9,6 +9,7 @@ import {
 } from '../utils/api'
 import './CharacterCreation.css'
 import type { InventoryItem } from '../types/character'
+import { calculateHp, calculateMp } from '../utils/resourceFormulas'
 
 type CharacterData = {
   name: string
@@ -219,21 +220,13 @@ const buildAbilityDeck = (classData: CustomClassResponse): CharacterAbility[] =>
 
 const computeResources = (classData?: CustomClassResponse) => {
   if (!classData) {
-    return { hp: 24, mp: 16 }
+    return { hp: calculateHp(1, 10), mp: calculateMp(1, 10) }
   }
-
-  const hitDieValue = Number(classData.hitDie?.replace('d', '')) || 8
-  const hp = Math.max(1, hitDieValue + (classData.stats.constitution || 10))
-  const mp = Math.max(
-    8,
-    Math.round(
-      ((classData.stats.intelligence || 10) +
-        (classData.stats.wisdom || 10) +
-        (classData.stats.charisma || 10)) / 3
-    )
-  )
-
-  return { hp, mp }
+  const level = 1
+  return {
+    hp: calculateHp(level, classData.stats.constitution),
+    mp: calculateMp(level, classData.stats.intelligence)
+  }
 }
 
 const toSlug = (value: string) =>

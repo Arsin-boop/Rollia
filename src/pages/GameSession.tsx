@@ -35,6 +35,7 @@ import {
 import './GameSession.css'
 import { useI18n } from '../i18n'
 import type { CharacterStats, InventoryItem } from '../types/character'
+import { calculateHp, calculateMp } from '../utils/resourceFormulas'
 
 type Message = {
   id: string
@@ -511,19 +512,17 @@ const mergeUniqueEquipment = (baseEquipment: string[], items: InventoryItem[]): 
 
 const computeResourcesFromProfile = (profile: StoredCharacterProfile | null) => {
   if (!profile) {
-    return { hp: 24, mp: 16 }
+    return { hp: calculateHp(1, 10), mp: calculateMp(1, 10) }
   }
   if (profile.resources) {
     return profile.resources
   }
   const stats = profile.customClassData?.stats || DEFAULT_STATS
-  const hitDie = Number(profile.customClassData?.hitDie?.replace('d', '')) || 8
-  const hp = Math.max(1, hitDie + (stats.constitution || DEFAULT_STATS.constitution))
-  const mp = Math.max(
-    8,
-    Math.round(((stats.intelligence || 10) + (stats.wisdom || 10) + (stats.charisma || 10)) / 3)
-  )
-  return { hp, mp }
+  const level = profile.level ?? 1
+  return {
+    hp: calculateHp(level, stats.constitution || DEFAULT_STATS.constitution),
+    mp: calculateMp(level, stats.intelligence || DEFAULT_STATS.intelligence)
+  }
 }
 
 const AFFINITY_TIERS = ['Hostile', 'Wary', 'Neutral', 'Friendly', 'Allied'] as const
@@ -2243,6 +2242,7 @@ const GameSession = () => {
       {
         name: characterProfile?.name,
         class: characterProfile?.class,
+        level,
         appearance: characterProfile?.appearance,
         backstory: characterProfile?.backstory,
         backstorySummary: characterProfile?.backstorySummary,
@@ -2317,6 +2317,7 @@ const GameSession = () => {
           {
             name: characterProfile?.name,
             class: characterProfile?.class,
+            level,
             appearance: characterProfile?.appearance,
             backstory: characterProfile?.backstory,
             backstorySummary: characterProfile?.backstorySummary,
@@ -2795,6 +2796,7 @@ const GameSession = () => {
           {
             name: characterProfile?.name,
             class: characterProfile?.class,
+            level,
             appearance: characterProfile?.appearance,
             backstory: characterProfile?.backstory,
             backstorySummary: characterProfile?.backstorySummary,
