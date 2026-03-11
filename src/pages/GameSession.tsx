@@ -14,6 +14,7 @@ import {
 import {
   API_ORIGIN,
   getDMResponse,
+  resetSession,
   generateQuestFromBackstory,
   summarizeScene,
   summarizeBackstory,
@@ -2224,10 +2225,8 @@ const GameSession = () => {
     [applyStatusUpdate, buildStatusStateInput, language]
   )
 
-  useEffect(() => {
-    if (!campaignId || !characterProfile || openingGeneratedRef.current) {
-      return
-    }
+  const requestOpeningScene = useCallback(async () => {
+    if (!campaignId || !characterProfile) return
     openingGeneratedRef.current = true
     setIsLoading(true)
 
@@ -2237,38 +2236,36 @@ const GameSession = () => {
       'Follow the DM output format exactly: Dungeon Master line, scene header line, then three unnumbered paragraphs. ' +
       'No bullets, no questions, no meta.'
 
-    getDMResponse(
-      openingPrompt,
-      {
-        name: characterProfile?.name,
-        class: characterProfile?.class,
-        level,
-        appearance: characterProfile?.appearance,
-        backstory: characterProfile?.backstory,
-        backstorySummary: characterProfile?.backstorySummary,
-        stats,
-        quests
-      },
-      buildGameContext(),
-      [],
-      { campaignId, playerSnapshot: { hp: resources.hp, mp: resources.mp }, language }
-    )
-      .then(dmResponse => {
-        const updatedHistory: ChatMessage[] = [{ role: 'assistant', content: dmResponse.response }]
-        setChatHistory(updatedHistory)
-        void maybeSummarizeHistory(updatedHistory)
-        void maybeUpdateStatusEffects(updatedHistory)
-        clearSystemNotices()
-        handleDMResponseOutput(dmResponse)
-      })
-      .catch(error => {
-        openingGeneratedRef.current = false
-        console.error('Failed to generate opening scene:', error)
-        pushSystemMessage(error?.message || t('gameSession.error.openingScene'))
-      })
-      .finally(() => {
-        setIsLoading(false)
-      })
+    try {
+      const dmResponse = await getDMResponse(
+        openingPrompt,
+        {
+          name: characterProfile?.name,
+          class: characterProfile?.class,
+          level,
+          appearance: characterProfile?.appearance,
+          backstory: characterProfile?.backstory,
+          backstorySummary: characterProfile?.backstorySummary,
+          stats,
+          quests
+        },
+        buildGameContext(),
+        [],
+        { campaignId, playerSnapshot: { hp: resources.hp, mp: resources.mp }, language }
+      )
+      const updatedHistory: ChatMessage[] = [{ role: 'assistant', content: dmResponse.response }]
+      setChatHistory(updatedHistory)
+      void maybeSummarizeHistory(updatedHistory)
+      void maybeUpdateStatusEffects(updatedHistory)
+      clearSystemNotices()
+      handleDMResponseOutput(dmResponse)
+    } catch (error: any) {
+      openingGeneratedRef.current = false
+      console.error('Failed to generate opening scene:', error)
+      pushSystemMessage(error?.message || t('gameSession.error.openingScene'))
+    } finally {
+      setIsLoading(false)
+    }
   }, [
     buildGameContext,
     campaignId,
@@ -2283,6 +2280,13 @@ const GameSession = () => {
     stats,
     language
   ])
+
+  useEffect(() => {
+    if (!campaignId || !characterProfile || openingGeneratedRef.current) {
+      return
+    }
+    void requestOpeningScene()
+  }, [campaignId, characterProfile, requestOpeningScene])
 
   const continueStoryAfterRoll = useCallback(
     async (payload: {
@@ -2759,6 +2763,52 @@ const GameSession = () => {
     },
     [renderPlainTextSegment, renderCharacterSegment, renderNpcDialogueSegment]
   )
+
+  const handleResetChat = useCallback(async () => {
+    if (!campaignId || isLoading) return
+
+    const confirmed = window.confirm(
+      language === 'ru'
+        ? 'Очистить весь чат и начать кампанию заново?'
+        : 'Clear the entire chat and start the campaign from the beginning?'
+    )
+    if (!confirmed) return
+
+    setMessages([])
+    setChatHistory([])
+    setSceneSummary('')
+    setInputValue('')
+    setBattleState(null)
+    setCombatEvents([])
+    setCombatAction({ action: null })
+    setAttemptText('')
+    clearSystemNotices()
+
+    lastSceneHeaderRef.current = ''
+    openingGeneratedRef.current = false
+    pendingCheckByMessageRef.current.clear()
+    rollStartedRef.current.clear()
+    lastPlayerActionRef.current = ''
+    lastPlayerMessageIdRef.current = null
+
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(`${CAMPAIGN_STATE_KEY_PREFIX}${campaignId}`)
+    }
+
+    try {
+      await resetSession(campaignId)
+    } catch (error) {
+      console.error('Failed to reset backend session:', error)
+    }
+
+    await requestOpeningScene()
+  }, [
+    campaignId,
+    isLoading,
+    language,
+    clearSystemNotices,
+    requestOpeningScene
+  ])
 
   const handleSendMessage = useCallback(
     async (event?: React.FormEvent) => {
@@ -3497,6 +3547,18 @@ const GameSession = () => {
           <div className="chat-header-main">
             <h2>The Gilded Griffin</h2>
             <p>{t('gameSession.campaign')} {campaignId || t('gameSession.default.soloTale')} - {t('gameSession.level')} {level} {characterProfile?.class || t('gameSession.default.adventurer')}</p>
+          </div>
+          <div className="chat-header-actions">
+            <button
+              type="button"
+              className="log-export-btn"
+              onClick={() => {
+                void handleResetChat()
+              }}
+              disabled={isLoading}
+            >
+              {language === 'ru' ? 'Сбросить чат' : 'Reset Chat'}
+            </button>
           </div>
         </div>
 

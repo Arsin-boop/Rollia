@@ -89,6 +89,10 @@ export const getBattle = (campaignId: string): CombatState | null => {
   return battles.get(campaignId) || null
 }
 
+export const clearBattle = (campaignId: string): void => {
+  battles.delete(campaignId)
+}
+
 const resolveAttack = (
   state: CombatState,
   intent: ActionIntent,

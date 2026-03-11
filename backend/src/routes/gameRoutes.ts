@@ -16,7 +16,7 @@ import {
   markBeatUsed
 } from '../services/backstoryArcStore.js'
 import { listNPCProfiles, listNPCDialoguePalette, localizeNpcName } from '../services/npcRegistry.js'
-import { getBattle, resolveAction, startBattle, type CombatEntity } from '../services/combatService.js'
+import { clearBattle, getBattle, resolveAction, startBattle, type CombatEntity } from '../services/combatService.js'
 import {
   classifyAction,
   processTurnWithActionType,
@@ -153,6 +153,35 @@ const appendHistoryMessage = (
   }
   return [...history, nextMessage]
 }
+
+router.post('/reset-session', (req, res) => {
+  try {
+    const { campaignId, characterId } = req.body || {}
+    const campaignKey = typeof campaignId === 'string' && campaignId.trim() ? campaignId.trim() : 'default'
+
+    pendingChecks.delete(campaignKey)
+    gameStateByCampaign.delete(campaignKey)
+    worldStateByCampaign.delete(campaignKey)
+    storyMemoryByCampaign.delete(campaignKey)
+    clearBattle(campaignKey)
+
+    upsertSession({
+      id: campaignKey,
+      characterId: typeof characterId === 'string' && characterId.trim() ? characterId.trim() : null,
+      history: [],
+      payload: {
+        worldState: { ...DEFAULT_WORLD_STATE, npcMood: { ...DEFAULT_WORLD_STATE.npcMood } },
+        storyMemory: { recentEvents: [], storySummary: [] },
+        gameState: { lastResolvedAction: null, turnIndex: 0 }
+      }
+    })
+
+    return res.json({ success: true, campaignId: campaignKey })
+  } catch (error: any) {
+    console.error('Failed to reset session:', error)
+    return res.status(500).json({ error: error?.message || 'Failed to reset session' })
+  }
+})
 
 const toResourceStat = (value: unknown, fallback: number): number => {
   if (typeof value === 'number' && Number.isFinite(value)) return value

@@ -317,6 +317,29 @@ export async function getDMResponse(
   }
 }
 
+export async function resetSession(
+  campaignId: string,
+  characterId?: string
+): Promise<{ success: boolean; campaignId: string }> {
+  const response = await fetch(`${API_BASE_URL}/game/reset-session`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      campaignId,
+      characterId: characterId || null
+    })
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+    throw new Error(errorData.error || `Failed to reset session (${response.status})`)
+  }
+
+  return response.json()
+}
+
 export async function summarizeScene(
   history: ChatMessage[],
   language: ApiLanguage = 'en'
