@@ -25,3 +25,25 @@ export const backstoryArcs = sqliteTable('backstory_arcs', {
   planJson: text('plan_json').notNull(),
   updatedAt: integer('updated_at').notNull()
 })
+
+export const quests = sqliteTable('quests', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id').references(() => sessions.id).notNull(),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  status: text('status').notNull(), // 'active', 'completed', 'failed'
+  objectives: text('objectives').notNull(), // JSON array of objectives
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull()
+})
+
+export const npcRelationships = sqliteTable('npc_relationships', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id').references(() => sessions.id).notNull(),
+  npcId: text('npc_id').notNull(),
+  npcName: text('npc_name').notNull(),
+  affinity: integer('affinity').notNull(), // scale e.g. 0 to 100, or -50 to +50
+  notes: text('notes'),
+  updatedAt: integer('updated_at').notNull()
+})
+

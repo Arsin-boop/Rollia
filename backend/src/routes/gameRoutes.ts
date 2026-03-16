@@ -6,7 +6,8 @@ import {
   generateStatusUpdate,
   generateBackstorySummary,
   generateIntentDecision,
-  generateBackstoryArcPlan
+  generateBackstoryArcPlan,
+  generateQuestNPCUpdates
 } from '../services/aiService.js'
 import {
   getBackstoryArc,
@@ -38,6 +39,8 @@ import {
 } from '../services/intentUtility.js'
 import { runNarrativeEngine } from '../services/narrativeEngine.js'
 import { interpretPlayerAction } from '../services/actionInterpreter.js'
+import { getQuestsForSession, createQuest, updateQuest } from '../services/questService.js'
+import { getNPCRelationshipsForSession, syncNPCRelationship } from '../services/npcMemoryService.js'
 
 const router = express.Router()
 const pendingChecks = new Map<string, PendingCheck>()
@@ -1403,6 +1406,69 @@ router.post('/dm-response', async (req, res) => {
 
     const responseText = narrativeResult.narration
 
+    // Extract Quest and NPC updates from the narration (non-blocking)
+    const sessionId = campaignKey
+    const [currentQuests, currentNPCRels] = await Promise.all([
+      getQuestsForSession(sessionId).catch(() => []),
+      getNPCRelationshipsForSession(sessionId).catch(() => [])
+    ])
+
+    let updatedQuests = currentQuests
+    let updatedNPCRelationships = currentNPCRels
+
+    try {
+      const questNpcUpdates = await generateQuestNPCUpdates(
+        responseText,
+        currentQuests.map(q => ({ id: q.id, title: q.title, status: q.status })),
+        currentNPCRels.map(r => ({ npcId: r.npcId, npcName: r.npcName, affinity: r.affinity })),
+        preferredLanguage
+      )
+
+      // Persist quest changes
+      for (const questUpdate of questNpcUpdates.quests) {
+        if (!questUpdate.title) continue
+        const existingQuest = currentQuests.find(
+          q => q.id === questUpdate.id || q.title.toLowerCase() === questUpdate.title!.toLowerCase()
+        )
+        if (existingQuest) {
+          await updateQuest(existingQuest.id, {
+            status: questUpdate.status as any,
+            objectives: questUpdate.objectives || existingQuest.objectives
+          })
+        } else if (questUpdate.status === 'active') {
+          await createQuest({
+            sessionId,
+            title: questUpdate.title,
+            description: '',
+            status: 'active',
+            objectives: questUpdate.objectives || []
+          })
+        }
+      }
+
+      // Persist NPC relationship changes
+      for (const rel of questNpcUpdates.npcRelationships) {
+        if (!rel.npcName) continue
+        await syncNPCRelationship(
+          sessionId,
+          rel.npcId || rel.npcName.toLowerCase().replace(/\s+/g, '-'),
+          rel.npcName,
+          rel.affinityDelta,
+          rel.notes || null
+        )
+      }
+
+      // Re-fetch updated state
+      const [freshQuests, freshRels] = await Promise.all([
+        getQuestsForSession(sessionId).catch(() => currentQuests),
+        getNPCRelationshipsForSession(sessionId).catch(() => currentNPCRels)
+      ])
+      updatedQuests = freshQuests
+      updatedNPCRelationships = freshRels
+    } catch (questNpcError) {
+      console.warn('Quest/NPC extraction skipped due to error:', questNpcError)
+    }
+
     console.log('Narrative engine response generated successfully, length:', responseText.length)
     const npcRegistry = listNPCProfiles(campaignKey).map(npc => ({
       id: npc.id,
@@ -1422,7 +1488,9 @@ router.post('/dm-response', async (req, res) => {
       pending_check: null,
       ui: { showRoll: false },
       npcRegistry,
-      npcPalette
+      npcPalette,
+      quests: updatedQuests,
+      npcRelationships: updatedNPCRelationships
     })
   } catch (error: any) {
     console.error('Error generating DM response:', error)

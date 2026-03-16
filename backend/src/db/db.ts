@@ -40,6 +40,29 @@ CREATE TABLE IF NOT EXISTS backstory_arcs (
   plan_json TEXT NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS quests (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  status TEXT NOT NULL,
+  objectives TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (session_id) REFERENCES sessions(id)
+);
+
+CREATE TABLE IF NOT EXISTS npc_relationships (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  npc_id TEXT NOT NULL,
+  npc_name TEXT NOT NULL,
+  affinity INTEGER NOT NULL,
+  notes TEXT,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (session_id) REFERENCES sessions(id)
+);
 `)
 
 export const rawDb = sqlite

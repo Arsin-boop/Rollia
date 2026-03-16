@@ -1,5 +1,5 @@
 import OpenAI from 'openai'
-import type { ChatCompletionMessage } from 'openai/resources/chat/completions'
+import type { ChatCompletionMessage, ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 import dotenv from 'dotenv'
 import {
   listNPCProfiles,
@@ -8,6 +8,7 @@ import {
   registerNPCProfile,
   localizeNpcName,
   slugify,
+  listNPCDialoguePalette,
   type NPCProfile
 } from './npcRegistry.js'
 import type { BackstoryProfile, BackstoryArcPlan, BackstoryBeat } from './backstoryArcStore.js'
@@ -67,7 +68,7 @@ export interface AIPromptOptions {
   userPrompt?: string
   temperature?: number
   maxTokens?: number
-  history?: ChatCompletionMessage[]
+  history?: ChatCompletionMessageParam[]
   responseFormat?: { type: 'json_object' }
   taskType?: TaskType
 }
@@ -169,6 +170,7 @@ export type TaskType =
   | 'CUSTOM_CLASS'
   | 'QUEST_JSON'
   | 'BACKSTORY_ARC_JSON'
+  | 'QUEST_NPC_JSON'
 
 export type PreferredLanguage = 'en' | 'ru'
 
@@ -212,7 +214,8 @@ const TASK_DEFAULTS: Record<
   CLASS_TAGS_JSON: { client: 'utility', maxTokens: 200, minCap: 120, maxCap: 250 },
   CUSTOM_CLASS: { client: 'utility', maxTokens: 1200 },
   QUEST_JSON: { client: 'utility', maxTokens: 800 },
-  BACKSTORY_ARC_JSON: { client: 'utility', maxTokens: 900, minCap: 600, maxCap: 1100 }
+  BACKSTORY_ARC_JSON: { client: 'utility', maxTokens: 900, minCap: 600, maxCap: 1100 },
+  QUEST_NPC_JSON: { client: 'utility', maxTokens: 600 }
 }
 
 export type CharacterAppearanceSpec = {
@@ -229,7 +232,7 @@ export type CharacterAppearanceSpec = {
 
 export async function callAI(
   taskType: TaskType,
-  messages: ChatCompletionMessage[],
+  messages: ChatCompletionMessageParam[],
   options: CallAIOptions = {}
 ): Promise<string> {
   if (!messages.length) {
@@ -307,7 +310,7 @@ export async function callAI(
 
 export async function generateAIResponse(options: AIPromptOptions): Promise<string> {
   try {
-    const messages: ChatCompletionMessage[] = []
+    const messages: ChatCompletionMessageParam[] = []
 
     if (options.systemPrompt) {
       messages.push({
@@ -554,7 +557,7 @@ Detail how this class approaches adventuring: the cadence of their combat rhythm
 }
 
 export async function generateStatusUpdate(
-  history: ChatCompletionMessage[],
+  history: ChatCompletionMessageParam[],
   statusState: StatusStateInput,
   language: PreferredLanguage = 'en'
 ): Promise<StatusUpdatePayload> {
@@ -722,7 +725,7 @@ Output JSON only.`
 }
 
 export async function generateSceneSummary(
-  history: ChatCompletionMessage[],
+  history: ChatCompletionMessageParam[],
   language: PreferredLanguage = 'en'
 ): Promise<string> {
   const filteredHistory = history.filter(
@@ -2748,9 +2751,11 @@ Hidden context: ${context.contextSnippet}`
       throw new Error('NPC profile JSON parse failed')
     }
     const resolvedName = parsed.name || name
+    const id = npcId || slugify(resolvedName)
     const profile: NPCProfile = {
-      id: npcId || slugify(resolvedName),
+      id,
       name: resolvedName,
+      dialogueColorId: assignDialogueColorId(id),
       age: 'unknown',
       occupation: parsed.role || 'wanderer',
       firstImpression: '',
@@ -2771,5 +2776,79 @@ Hidden context: ${context.contextSnippet}`
     console.error(`Failed to generate NPC profile for ${name}:`, error)
     return null
   }
+}
+
+/**
+ * Extracts quest and NPC relationship updates from a scene narration.
+ */
+export async function generateQuestNPCUpdates(
+  narration: string,
+  currentQuests: any[],
+  currentNPCs: any[],
+  language: PreferredLanguage = 'en'
+): Promise<{
+  quests: Array<{ id?: string; title?: string; status?: string; objectives?: string[] }>
+  npcRelationships: Array<{ npcId: string; npcName: string; affinityDelta: number; notes?: string }>
+}> {
+  const systemPrompt = `You are the Quest and Relationship monitor for a D&D session.
+Analyze the provided narration and extract any changes to active quests or NPC relationships.
+
+QUEST RULES:
+- If a new quest is mentioned, return it with a title, status "active", and initial objectives.
+- If an existing quest (by ID or Title) makes progress, return its updated status (active/completed/failed) or new objectives.
+- Only include quests that actually changed in this specific narration.
+
+NPC RELATIONSHIP RULES:
+- Identify NPCs mentioned and how their relationship with the player shifted.
+- affinityDelta: a number from -20 to +20. Positive for helpful/friendly acts, negative for hostile/insulting acts.
+- notes: a brief one-sentence recap of the interaction (e.g., "Player helped find the lost locket").
+- Only include NPCs who had a meaningful interaction in this scene.
+
+Return ONLY JSON with this exact structure:
+{
+  "quests": [{ "id": "optional-id", "title": "Quest Title", "status": "active|completed|failed", "objectives": ["obj1"] }],
+  "npcRelationships": [{ "npcId": "optional-id", "npcName": "NPC Name", "affinityDelta": number, "notes": "recap" }]
+}
+
+${languageDirective(language)}`
+
+  const userPrompt = `Narration:
+"${narration}"
+
+Current Quests:
+${JSON.stringify(currentQuests)}
+
+Current Known NPCs & Standing:
+${JSON.stringify(currentNPCs)}
+
+Output JSON only.`
+
+  try {
+    const response = await generateAIResponse({
+      systemPrompt,
+      userPrompt,
+      temperature: 0.2,
+      maxTokens: 600,
+      responseFormat: { type: 'json_object' },
+      taskType: 'QUEST_NPC_JSON'
+    })
+
+    const extracted = extractJsonObject(response) || response
+    const parsed = safeJsonParse(extracted)
+    
+    return {
+      quests: Array.isArray(parsed?.quests) ? parsed.quests : [],
+      npcRelationships: Array.isArray(parsed?.npcRelationships) ? parsed.npcRelationships : []
+    }
+  } catch (error) {
+    console.error('Failed to extract Quest/NPC updates:', error)
+    return { quests: [], npcRelationships: [] }
+  }
+}
+
+function assignDialogueColorId(npcId: string): string {
+  const palette = listNPCDialoguePalette()
+  const hash = npcId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  return palette[hash % palette.length].id
 }
 

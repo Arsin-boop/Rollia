@@ -27,3 +27,9 @@ backend/uploads/
 *.sln
 *.sw?
 
+# Local env and workspace
+.env
+.vs/
+tmp/
+backend/drizzle/
+
