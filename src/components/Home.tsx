@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "./ui/button";
-import { Sword, ScrollText, Play } from "lucide-react";
-import { StarryBackground } from "./StarryBackground";
 import { useI18n } from "../i18n";
-import { LanguageSwitcher } from "./LanguageSwitcher";
+import { GrimoirePage } from "./grimoire/GrimoirePage";
+import { GrimoireHeader } from "./grimoire/GrimoireHeader";
 
 const CHARACTER_KEY = "character";
 const LEGACY_CHARACTER_KEY = "dnd-ai-character";
@@ -23,29 +21,29 @@ export function Home() {
   const navigate = useNavigate();
   const { t } = useI18n();
   const [continueCampaignId, setContinueCampaignId] = useState<string | null>(null);
-  
+
   useEffect(() => {
     const readState = () => {
-    const primary = parseStored(localStorage.getItem(CHARACTER_KEY));
-    const legacy = parseStored(localStorage.getItem(LEGACY_CHARACTER_KEY));
-    const character = primary || legacy;
+      const primary = parseStored(localStorage.getItem(CHARACTER_KEY));
+      const legacy = parseStored(localStorage.getItem(LEGACY_CHARACTER_KEY));
+      const character = primary || legacy;
 
-    if (!character || typeof character !== "object") {
-      setContinueCampaignId(null);
-      return;
-    }
+      if (!character || typeof character !== "object") {
+        setContinueCampaignId(null);
+        return;
+      }
 
-    const campaignId =
-      (character as { activeCampaignId?: string | null }).activeCampaignId ||
-      localStorage.getItem(ACTIVE_CAMPAIGN_KEY);
+      const campaignId =
+        (character as { activeCampaignId?: string | null }).activeCampaignId ||
+        localStorage.getItem(ACTIVE_CAMPAIGN_KEY);
 
-    if (!campaignId) {
-      setContinueCampaignId(null);
-      return;
-    }
+      if (!campaignId) {
+        setContinueCampaignId(null);
+        return;
+      }
 
-    const hasSession = Boolean(localStorage.getItem(`session_${campaignId}`));
-    setContinueCampaignId(hasSession ? campaignId : null);
+      const hasSession = Boolean(localStorage.getItem(`session_${campaignId}`));
+      setContinueCampaignId(hasSession ? campaignId : null);
     };
 
     readState();
@@ -54,49 +52,108 @@ export function Home() {
   }, []);
 
   return (
-    <div className="size-full flex items-center justify-center bg-[#1C1B22] relative overflow-hidden py-8">
-      <StarryBackground />
-      <LanguageSwitcher />
+    <GrimoirePage showRunes emberCount={140}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+        <GrimoireHeader showNav />
 
-      <div className="text-center space-y-8 p-8 relative z-10 w-full max-w-6xl">
-        <div className="space-y-4">
-          <h1 className="text-6xl font-bold text-white">Rollia</h1>
-          <p className="text-xl text-[#B8BCC8]">
+        {/* Main centered content */}
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '40px 24px',
+          gap: 0,
+        }}>
+
+          {/* Decorative top rune line */}
+          <div className="g-ornament" style={{ width: '100%', maxWidth: 480, marginBottom: 32, opacity: 0.4 }}>
+            <div className="g-ornament-line" />
+            <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 11, color: 'var(--g-gold-dim)', letterSpacing: '0.3em' }}>✦</span>
+            <div className="g-ornament-line" />
+          </div>
+
+          {/* Title */}
+          <h1
+            className="g-title-display g-anim-fade-up"
+            style={{ fontSize: 'clamp(48px, 10vw, 88px)', marginBottom: 16, textAlign: 'center' }}
+          >
+            Rollia
+          </h1>
+
+          {/* Tagline */}
+          <p
+            className="g-body-italic g-anim-fade-up"
+            style={{
+              fontSize: 18,
+              textAlign: 'center',
+              maxWidth: 400,
+              marginBottom: 40,
+              animationDelay: '0.1s',
+              opacity: 0,
+            }}
+          >
             {t("home.tagline")}
           </p>
-        </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          {continueCampaignId && (
-            <Button
-              onClick={() => navigate(`/game/${continueCampaignId}`)}
-              size="lg"
-              className="gap-2 bg-[#C6A75E] hover:bg-[#b1924c] text-[#1C1B22]"
+          {/* Ornament divider */}
+          <div
+            className="g-ornament g-anim-fade-in"
+            style={{ width: '100%', maxWidth: 360, marginBottom: 36, animationDelay: '0.2s', opacity: 0 }}
+          >
+            <div className="g-ornament-line" />
+            <div className="g-ornament-diamond" />
+            <span className="g-ornament-text">Begin your tale</span>
+            <div className="g-ornament-diamond" />
+            <div className="g-ornament-line" />
+          </div>
+
+          {/* Action buttons */}
+          <div
+            className="g-anim-fade-up"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 12,
+              animationDelay: '0.3s',
+              opacity: 0,
+            }}
+          >
+            {continueCampaignId && (
+              <button
+                className="g-btn-primary"
+                style={{ minWidth: 240 }}
+                onClick={() => navigate(`/game/${continueCampaignId}`)}
+              >
+                ⚔ {t("home.continueSession")}
+              </button>
+            )}
+            <button
+              className="g-btn-primary"
+              style={{ minWidth: 240 }}
+              onClick={() => navigate("/character/name")}
             >
-              <Play className="size-5" />
-              {t("home.continueSession")}
-            </Button>
-          )}
-          <Button
-            onClick={() => navigate("/character/name")}
-            size="lg"
-            className="gap-2 bg-[#6C5CE7] hover:bg-[#5F4FD1] text-white"
-          >
-            <Sword className="size-5" />
-            {t("home.createCharacter")}
-          </Button>
-          <Button
-            onClick={() => navigate("/session/create")}
-            size="lg"
-            variant="outline"
-            className="gap-2 border-[#6C5CE7] text-[#6C5CE7] hover:bg-[#6C5CE7]/10"
-          >
-            <ScrollText className="size-5" />
-            {t("home.newSession")}
-          </Button>
+              ✦ {t("home.createCharacter")}
+            </button>
+            <button
+              className="g-btn-secondary"
+              style={{ minWidth: 240 }}
+              onClick={() => navigate("/session/create")}
+            >
+              ◈ {t("home.newSession")}
+            </button>
+          </div>
+
+          {/* Decorative bottom rune line */}
+          <div className="g-ornament" style={{ width: '100%', maxWidth: 480, marginTop: 48, opacity: 0.4 }}>
+            <div className="g-ornament-line" />
+            <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 11, color: 'var(--g-gold-dim)', letterSpacing: '0.3em' }}>✦</span>
+            <div className="g-ornament-line" />
+          </div>
         </div>
       </div>
-    </div>
+    </GrimoirePage>
   );
 }
-

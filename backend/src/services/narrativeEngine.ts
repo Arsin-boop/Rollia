@@ -136,15 +136,15 @@ Valid response example (structure only — do NOT copy this content):
 Rules:
 - Describe the immediate consequences of the player's action.
 - Describe events clearly and concretely.
-- Avoid poetic, abstract, or cryptic narration.
-- Avoid philosophical narration.
-- Do not avoid answering direct player questions.
+- CRITICAL: Avoid poetic, abstract, philosophical, or cryptic narration entirely. Do not use metaphors about "the air growing heavy" or "destiny weaving".
+- CRITICAL: You are a strict simulation engine. Do not invent events or locations not justified by the context.
+- Do not avoid answering direct player questions. If a player asks something, the NPC must reply based on their motivations.
 - If the player reads or examines a document (letter, note, book, map, inscription), reveal its contents or provide a concrete summary.
 - If the player inspects an object, container, or area, include the explicit result of that inspection.
-- NPC reactions must be realistic and grounded in Director notes.
+- NPC logic (strict): NPCs must act logically based ONLY on their stated motivations, emotional state, and recent events. They do NOT possess omniscient knowledge.
 - Never invent game mechanics, dice results, or rules.
 - Never override the Director.
-- Generate exactly 3 actionable choices.
+- Generate exactly 3 actionable choices. Ensure the final sentence of narration hands agency back to the player.
 - Keep choices short and distinct.
 - Return scene metadata only in the "scene" object.
 - Never place location/time lines inside "narration".
@@ -153,10 +153,10 @@ Rules:
 - Keep narration outside <npc> tags.
 - Do not output markdown bullets inside "narration".
 - Scene continuity rules (strict):
-  1) The location in "scene.location" MUST be copied verbatim from Context → Location. Never invent a new location mid-scene.
+  1) The location in "scene.location" MUST be copied verbatim from Context → Location. NEVER invent a new location mid-scene.
   2) The time in "scene.time" MUST be consistent with Context → Time. Never reset or vague-ify the time.
-  3) Do NOT introduce new NPCs unless they are already listed in the scene context.
-  4) Focus on immediate consequences of the latest player action.
+  3) Do NOT introduce new NPCs unless they are already listed in the scene context or make absolute logical sense based on the Director Notes.
+  4) Focus on immediate, physical consequences of the latest player action.
   5) Quest hooks in the Player Profile are hints for future story seeds — do NOT stage them as immediate events.
   6) Do NOT use meta game terms (NPC, Tension, HP, XP, boss) in narration — describe through fiction.
   7) Director Instructions are authoritative — follow them but do not quote or paraphrase them in narration.
@@ -237,12 +237,12 @@ export async function runNarrativeEngine(
   const prompt = buildNarrativePrompt(context, language)
   const callModel = async (extraInstruction?: string): Promise<string> =>
     await generateAIResponse({
-      systemPrompt: 'You are a deterministic RPG narrative formatter. Return strict JSON only.',
+      systemPrompt: 'You are a deterministic RPG narrative formatter. Keep formatting strict and narration grounded.',
       userPrompt:
         extraInstruction
           ? `${prompt}\n\n${language === 'ru' ? 'Output in Russian (Cyrillic).' : 'Output in English.'}\n\n${extraInstruction}`
           : `${prompt}\n\n${language === 'ru' ? 'Output in Russian (Cyrillic).' : 'Output in English.'}`,
-      temperature: 0.5,
+      temperature: 0.3, // Lowered temperature to reduce hallucinations/poetry
       maxTokens: 900,
       taskType: 'DM_NARRATION',
       responseFormat: { type: 'json_object' }

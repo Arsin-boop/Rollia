@@ -1,4 +1,4 @@
-﻿
+
 import { useState, useRef, useEffect, useMemo, useCallback, type ReactNode, type CSSProperties } from 'react'
 import { useParams } from 'react-router-dom'
 import {
@@ -2243,8 +2243,44 @@ const GameSession = () => {
         }
         startInlineRollRef.current?.(messageId, skillCheck.request)
       }
+
+      if (dmResponse.quests || dmResponse.npcRelationships) {
+        updateStoredProfile((prev) => {
+          if (!prev) return prev
+          
+          let nextQuests = prev.quests
+          if (dmResponse.quests) {
+            nextQuests = dmResponse.quests.map(q => ({
+              id: q.id,
+              title: q.title,
+              description: q.description || q.title,
+              status: q.status,
+              xp: 0,
+              log: [],
+              objectives: q.objectives,
+              objectiveStatus: q.objectiveStatus
+            }))
+          }
+
+          let nextRelations = prev.npcRelations
+          if (dmResponse.npcRelationships) {
+            nextRelations = dmResponse.npcRelationships.map(r => ({
+              id: canonicalNpcId(r.npc_id, r.npc_name),
+              name: r.npc_name,
+              affinity: r.affinity,
+              notes: r.notes || []
+            }))
+          }
+
+          return {
+            ...prev,
+            ...(dmResponse.quests ? { quests: nextQuests } : {}),
+            ...(dmResponse.npcRelationships ? { npcRelations: nextRelations } : {})
+          }
+        })
+      }
     },
-    [extractSkillCheckRequest, stripStructuredTags]
+    [extractSkillCheckRequest, stripStructuredTags, updateStoredProfile]
   )
 
   const buildStatusStateInput = useCallback(

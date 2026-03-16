@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
-import { StarryBackground } from '../components/StarryBackground'
 import { deleteCharacterFromDB, getCharactersFromDB, type CharacterRecord } from '../utils/api'
+import { GrimoirePage } from '../components/grimoire/GrimoirePage'
+import { GrimoireHeader } from '../components/grimoire/GrimoireHeader'
 
 const CHARACTER_KEY = 'character'
 const LEGACY_CHARACTER_KEY = 'dnd-ai-character'
@@ -71,9 +72,7 @@ export default function CharactersMenuPage() {
 
   useEffect(() => {
     void refresh()
-    const handleStorage = () => {
-      void refresh()
-    }
+    const handleStorage = () => { void refresh() }
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)
   }, [refresh])
@@ -110,58 +109,140 @@ export default function CharactersMenuPage() {
     })
   }
 
+  const createButton = (
+    <button
+      className="g-btn-secondary"
+      style={{ fontSize: 8, padding: '6px 16px' }}
+      onClick={() => navigate('/character/name')}
+    >
+      ✦ Summon New
+    </button>
+  )
+
   return (
-    <div className="size-full flex items-center justify-center bg-[#1C1B22] relative overflow-hidden py-8">
-      <StarryBackground />
-      <div className="w-full max-w-4xl rounded-xl border border-[#6C5CE7]/30 bg-slate-800/45 p-6 relative z-10">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl text-white font-semibold">Characters</h1>
-          <button
-            type="button"
-            className="text-sm px-3 py-2 rounded-md bg-[#6C5CE7]/20 text-[#d8d2ff] hover:bg-[#6C5CE7]/35"
-            onClick={() => navigate('/character/name')}
+    <GrimoirePage emberCount={80}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+        <GrimoireHeader centerText="Codex of Heroes" rightSlot={createButton} showNav />
+
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'center',
+          padding: '32px 24px',
+          overflowY: 'auto',
+        }}>
+          <div
+            className="g-panel g-anim-fade-up"
+            style={{
+              width: '100%',
+              maxWidth: 640,
+              clipPath: 'var(--g-clip-lg)',
+            }}
           >
-            Create Character
-          </button>
-        </div>
-        <div className="space-y-3 max-h-[60vh] overflow-auto pr-1">
-          {characters.length === 0 && (
-            <p className="text-[#B8BCC8] text-sm">No saved characters yet.</p>
-          )}
-          {characters.map(character => (
-            <article
-              key={character.id}
-              className="rounded-lg border border-[#6C5CE7]/25 bg-[#23222a]/80 px-3 py-3 flex items-center justify-between gap-3"
+            {/* Panel header */}
+            <div className="g-panel-section" style={{ padding: '16px 20px 12px' }}>
+              <div className="g-ornament" style={{ marginBottom: 10 }}>
+                <div className="g-ornament-line" />
+                <div className="g-ornament-diamond" />
+                <span className="g-ornament-text">Bound Souls</span>
+                <div className="g-ornament-diamond" />
+                <div className="g-ornament-line" />
+              </div>
+              <p className="g-section-title" style={{ marginBottom: 0, borderBottom: 'none' }}>
+                {characters.length} {characters.length === 1 ? 'soul' : 'souls'} recorded
+              </p>
+            </div>
+
+            {/* Character list */}
+            <div
+              className="g-scroll"
+              style={{
+                maxHeight: 'calc(100vh - 220px)',
+                overflowY: 'auto',
+                padding: '8px 0',
+              }}
             >
-              <div className="min-w-0">
-                <p className="text-white font-medium truncate">{character.name || 'Unnamed Hero'}</p>
-                <p className="text-xs text-[#B8BCC8] truncate">{character.class || 'Adventurer'}</p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  className={`text-xs px-2.5 py-1.5 rounded-md ${
-                    activeCharacterId === character.id
-                      ? 'bg-[#C6A75E]/85 text-[#1C1B22]'
-                      : 'bg-[#6C5CE7]/20 text-[#d8d2ff] hover:bg-[#6C5CE7]/35'
-                  }`}
-                  onClick={() => selectCharacter(character.id)}
-                >
-                  {activeCharacterId === character.id ? 'Selected' : 'Select'}
-                </button>
-                <button
-                  type="button"
-                  className="p-1.5 rounded-md text-[#f6b1b1] hover:bg-[#8C2F2F]/30"
-                  onClick={() => deleteCharacter(character.id)}
-                  aria-label={`Delete ${character.name || 'character'}`}
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </div>
-            </article>
-          ))}
+              {characters.length === 0 && (
+                <div style={{ padding: '32px 24px', textAlign: 'center' }}>
+                  <p className="g-body-italic" style={{ fontSize: 16 }}>
+                    No souls have been bound yet.<br />Summon your first hero to begin.
+                  </p>
+                </div>
+              )}
+
+              {characters.map((character, i) => {
+                const isActive = activeCharacterId === character.id
+                return (
+                  <div
+                    key={character.id}
+                    className={`g-card g-anim-fade-up ${isActive ? 'g-card-active' : ''}`}
+                    style={{
+                      margin: '6px 16px',
+                      padding: '12px 16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      animationDelay: `${i * 0.06}s`,
+                      opacity: 0,
+                    }}
+                    onClick={() => selectCharacter(character.id)}
+                  >
+                    {/* Character info */}
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <p className="g-title" style={{ fontSize: 14, marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {character.name || 'Unnamed Hero'}
+                      </p>
+                      <p className="g-label" style={{ fontSize: 7 }}>
+                        {character.class || 'Adventurer'}
+                      </p>
+                    </div>
+
+                    {/* Actions */}
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <button
+                        className="g-btn-sm"
+                        style={isActive ? {
+                          borderColor: 'var(--g-gold)',
+                          color: 'var(--g-gold)',
+                          background: 'rgba(200,165,74,0.08)',
+                        } : {}}
+                        onClick={() => selectCharacter(character.id)}
+                      >
+                        {isActive ? '✦ Chosen' : 'Select'}
+                      </button>
+                      <button
+                        type="button"
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--g-blood2)',
+                          opacity: 0.7,
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          transition: 'var(--g-transition)',
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.7' }}
+                        onClick={() => deleteCharacter(character.id)}
+                        aria-label={`Delete ${character.name || 'character'}`}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </GrimoirePage>
   )
 }

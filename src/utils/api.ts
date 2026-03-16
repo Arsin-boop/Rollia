@@ -91,6 +91,21 @@ export interface DMResponse {
     color: string
     glow?: string
   }>
+  quests?: Array<{
+    id: string
+    title: string
+    description: string
+    status: 'active' | 'completed' | 'failed'
+    objectives: string[]
+    objectiveStatus?: boolean[]
+  }>
+  npcRelationships?: Array<{
+    id: string
+    npc_id: string
+    npc_name: string
+    affinity: number
+    notes: string[]
+  }>
 }
 
 export interface CharacterRecord {
