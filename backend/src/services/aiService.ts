@@ -264,12 +264,13 @@ export async function callAI(
     resolvedMaxTokens = Math.min(maxCap, resolvedMaxTokens)
   }
 
+  // qwen3 and llama-4 on Groq use thinking mode by default and require temperature=1
+  // Passing response_format: json_object to thinking models causes a 400 validation error
+  const isThinkingModel = /qwen.?3|llama-4/i.test(model)
+  const effectiveTemperature = isThinkingModel ? 1 : (options.temperature ?? 0.7)
+
   try {
     console.log(`Calling AI task ${taskType} with model ${model}`)
-
-    // qwen3 on Groq uses thinking mode by default and requires temperature=1
-    const isQwen3 = /qwen.?3/i.test(model)
-    const effectiveTemperature = isQwen3 ? 1 : (options.temperature ?? 0.7)
 
     const completion = await runWithRetries(
       () =>
@@ -278,7 +279,7 @@ export async function callAI(
           model,
           temperature: effectiveTemperature,
           max_tokens: resolvedMaxTokens,
-          ...(options.responseFormat && !isQwen3 ? { response_format: options.responseFormat } : {})
+          ...(options.responseFormat && !isThinkingModel ? { response_format: options.responseFormat } : {})
         }),
       { label: `chat.completions.create:${taskType}` }
     )
@@ -317,7 +318,7 @@ export async function callAI(
         const retryCompletion = await activeClient!.chat.completions.create({
           messages,
           model,
-          temperature: options.temperature ?? 0.7,
+          temperature: effectiveTemperature,
           max_tokens: resolvedMaxTokens,
         })
         return stripThinkingBlocks(extractMessageContent(retryCompletion.choices[0]?.message))

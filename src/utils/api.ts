@@ -295,6 +295,10 @@ export async function getDMResponse(
     pendingCheckId?: string
     playerSnapshot?: { hp?: number; mp?: number }
     language?: ApiLanguage
+    worldState?: Record<string, unknown>
+    npcState?: Record<string, unknown>
+    sceneParticipants?: string[]
+    selectedTarget?: string | null
   }
 ): Promise<DMResponse> {
   try {
@@ -312,7 +316,11 @@ export async function getDMResponse(
         rollResult: options?.rollResult,
         pendingCheckId: options?.pendingCheckId,
         playerSnapshot: options?.playerSnapshot,
-        language: normalizeLanguage(options?.language)
+        language: normalizeLanguage(options?.language),
+        worldState: options?.worldState ?? null,
+        npcState: options?.npcState ?? null,
+        sceneParticipants: options?.sceneParticipants ?? [],
+        selectedTarget: options?.selectedTarget ?? null,
       }),
     })
 

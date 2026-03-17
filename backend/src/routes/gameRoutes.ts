@@ -41,6 +41,7 @@ import { runNarrativeEngine } from '../services/narrativeEngine.js'
 import { interpretPlayerAction } from '../services/actionInterpreter.js'
 import { getQuestsForSession, createQuest, updateQuest } from '../services/questService.js'
 import { getNPCRelationshipsForSession, syncNPCRelationship } from '../services/npcMemoryService.js'
+import { getSession, upsertSession } from '../services/sessionStore.js'
 
 const router = express.Router()
 const pendingChecks = new Map<string, PendingCheck>()
@@ -103,8 +104,8 @@ const sanitizeCharacterForNarrative = (characterInfo: any): Record<string, unkno
   // Passing them raw causes the narrative engine to literally stage them as opening events.
   const sanitizedQuests = Array.isArray(quests)
     ? quests.map(({ id, title, description, status, objectives }: any) => ({
-        id, title, description, status, objectives
-      }))
+      id, title, description, status, objectives
+    }))
     : undefined
   return sanitizedQuests ? { ...rest, quests: sanitizedQuests } : rest
 }
@@ -325,12 +326,12 @@ const buildSceneState = (
 ) => {
   const roster = Array.isArray(participants)
     ? Array.from(
-        new Set(
-          participants
-            .map(entry => entry?.name)
-            .filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
-        )
+      new Set(
+        participants
+          .map(entry => entry?.name)
+          .filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
       )
+    )
     : []
   return {
     location: extractLocationFromContext(context),
@@ -348,10 +349,10 @@ const extractLatestAssistantCue = (historyMessages: ChatCompletionMessage[]): st
       typeof rawContent === 'string'
         ? rawContent
         : Array.isArray(rawContent)
-        ? rawContent
+          ? rawContent
             .map((part: any) => (typeof part === 'string' ? part : part?.text || ''))
             .join('')
-        : ''
+          : ''
     const stripped = String(content || '')
       .replace(/<npc\s+id="[^"]+"[^>]*>/gi, '')
       .replace(/<\/npc>/gi, '')
@@ -992,21 +993,21 @@ router.post('/dm-response', async (req, res) => {
 
     const historyMessages: ChatCompletionMessage[] = Array.isArray(history)
       ? history
-          .map((entry: any) => {
-            if (
-              !entry ||
-              typeof entry.content !== 'string' ||
-              !entry.content.trim() ||
-              (entry.role !== 'user' && entry.role !== 'assistant' && entry.role !== 'system')
-            ) {
-              return null
-            }
-            return {
-              role: entry.role,
-              content: entry.content
-            } as ChatCompletionMessage
-          })
-          .filter((entry): entry is ChatCompletionMessage => Boolean(entry))
+        .map((entry: any) => {
+          if (
+            !entry ||
+            typeof entry.content !== 'string' ||
+            !entry.content.trim() ||
+            (entry.role !== 'user' && entry.role !== 'assistant' && entry.role !== 'system')
+          ) {
+            return null
+          }
+          return {
+            role: entry.role,
+            content: entry.content
+          } as ChatCompletionMessage
+        })
+        .filter((entry): entry is ChatCompletionMessage => Boolean(entry))
       : []
 
     const campaignKey = campaignId || 'default'
@@ -1098,10 +1099,10 @@ router.post('/dm-response', async (req, res) => {
             {
               attackRoll: typeof rollD20 === 'number'
                 ? {
-                    d20: rollD20,
-                    bonus: rollBonus,
-                    total: rollTotal
-                  }
+                  d20: rollD20,
+                  bonus: rollBonus,
+                  total: rollTotal
+                }
                 : undefined
             }
           )
@@ -1265,11 +1266,11 @@ router.post('/dm-response', async (req, res) => {
     const target = selectedTarget || detectTarget(effectivePlayerAction, sceneParticipants)
     const pendingCheck = decision.shouldRoll
       ? buildDecisionCheck({
-          decision,
-          target,
-          rawText: effectivePlayerAction,
-          sceneParticipants
-        })
+        decision,
+        target,
+        rawText: effectivePlayerAction,
+        sceneParticipants
+      })
       : null
 
     const activeBattle = getBattle(campaignKey)
@@ -1323,9 +1324,9 @@ router.post('/dm-response', async (req, res) => {
       const currentWorldState = worldState
         ? normalizeWorldState(worldState)
         : worldStateByCampaign.get(campaignKey) || {
-            ...DEFAULT_WORLD_STATE,
-            npcMood: { ...DEFAULT_WORLD_STATE.npcMood }
-          }
+          ...DEFAULT_WORLD_STATE,
+          npcMood: { ...DEFAULT_WORLD_STATE.npcMood }
+        }
       return res.json({
         response: '',
         requiresRoll: true,
@@ -1365,18 +1366,18 @@ router.post('/dm-response', async (req, res) => {
     const characterKey = buildCharacterKey(campaignKey, characterInfo)
     const backstoryArcContext = characterInfo?.backstory
       ? await buildBackstoryArcContext({
-          characterKey,
-          characterInfo,
-          backstory: characterInfo.backstory,
-          currentTurn
-        }).catch(err => { console.warn('Backstory arc context failed:', err); return null })
+        characterKey,
+        characterInfo,
+        backstory: characterInfo.backstory,
+        currentTurn
+      }).catch(err => { console.warn('Backstory arc context failed:', err); return null })
       : null
 
     const backstoryDirectorNote = backstoryArcContext?.eligibleBeat
       ? `Backstory beat to weave in subtly: ${backstoryArcContext.eligibleBeat.goal}. ` +
-        `Delivery: ${backstoryArcContext.eligibleBeat.deliveryModes.join(' or ')}. ` +
-        `Max reveal level: ${backstoryArcContext.eligibleBeat.constraints.maxRevealLevel}. ` +
-        `Do NOT state this explicitly — surface it through NPC reaction, environment, or coincidence.`
+      `Delivery: ${backstoryArcContext.eligibleBeat.deliveryModes.join(' or ')}. ` +
+      `Max reveal level: ${backstoryArcContext.eligibleBeat.constraints.maxRevealLevel}. ` +
+      `Do NOT state this explicitly — surface it through NPC reaction, environment, or coincidence.`
       : ''
 
     const { directorResult, memoryContext, recentEvents } = await applyDirectorMemoryPipeline({
@@ -1412,6 +1413,10 @@ router.post('/dm-response', async (req, res) => {
 
     // Extract Quest and NPC updates from the narration (non-blocking)
     const sessionId = campaignKey
+    // Ensure session row exists — quests/npc_relationships have FK on sessions(id)
+    if (!getSession(sessionId)) {
+      upsertSession({ id: sessionId, characterId: null, history: [], payload: {} })
+    }
     const [currentQuests, currentNPCRels] = await Promise.all([
       getQuestsForSession(sessionId).catch(() => []),
       getNPCRelationshipsForSession(sessionId).catch(() => [])
@@ -1500,7 +1505,7 @@ router.post('/dm-response', async (req, res) => {
     console.error('Error generating DM response:', error)
     console.error('Error stack:', error?.stack)
     const errorMessage = error?.message || 'Failed to generate DM response'
-    res.status(500).json({ 
+    res.status(500).json({
       error: errorMessage,
       details: error?.message || 'Unknown error occurred'
     })
@@ -1515,21 +1520,21 @@ router.post('/summarize-scene', async (req, res) => {
 
     const historyMessages: ChatCompletionMessage[] = Array.isArray(history)
       ? history
-          .map((entry: any) => {
-            if (
-              !entry ||
-              typeof entry.content !== 'string' ||
-              !entry.content.trim() ||
-              (entry.role !== 'user' && entry.role !== 'assistant' && entry.role !== 'system')
-            ) {
-              return null
-            }
-            return {
-              role: entry.role,
-              content: entry.content
-            } as ChatCompletionMessage
-          })
-          .filter((entry): entry is ChatCompletionMessage => Boolean(entry))
+        .map((entry: any) => {
+          if (
+            !entry ||
+            typeof entry.content !== 'string' ||
+            !entry.content.trim() ||
+            (entry.role !== 'user' && entry.role !== 'assistant' && entry.role !== 'system')
+          ) {
+            return null
+          }
+          return {
+            role: entry.role,
+            content: entry.content
+          } as ChatCompletionMessage
+        })
+        .filter((entry): entry is ChatCompletionMessage => Boolean(entry))
       : []
 
     if (!historyMessages.length) {
@@ -1556,21 +1561,21 @@ router.post('/status-update', async (req, res) => {
 
     const historyMessages: ChatCompletionMessage[] = Array.isArray(history)
       ? history
-          .map((entry: any) => {
-            if (
-              !entry ||
-              typeof entry.content !== 'string' ||
-              !entry.content.trim() ||
-              (entry.role !== 'user' && entry.role !== 'assistant' && entry.role !== 'system')
-            ) {
-              return null
-            }
-            return {
-              role: entry.role,
-              content: entry.content
-            } as ChatCompletionMessage
-          })
-          .filter((entry): entry is ChatCompletionMessage => Boolean(entry))
+        .map((entry: any) => {
+          if (
+            !entry ||
+            typeof entry.content !== 'string' ||
+            !entry.content.trim() ||
+            (entry.role !== 'user' && entry.role !== 'assistant' && entry.role !== 'system')
+          ) {
+            return null
+          }
+          return {
+            role: entry.role,
+            content: entry.content
+          } as ChatCompletionMessage
+        })
+        .filter((entry): entry is ChatCompletionMessage => Boolean(entry))
       : []
 
     if (!historyMessages.length) {

@@ -1696,34 +1696,39 @@ const GameSession = () => {
 
   const buildGameContext = useCallback(
     () => {
-      const segments: string[] = []
-      // Location MUST be first so extractLocationFromContext() on the backend reads it correctly
-      if (currentLocation) {
-        segments.push(`Location: ${currentLocation}`)
-      }
-      if (currentTime) {
-        segments.push(`Time: ${currentTime}`)
-      }
-      if (campaignId) {
-        segments.push(`Campaign: ${campaignId}`)
-      }
-      segments.push(`Scene ID: ${sceneId}`)
-      if (sceneSummary) {
-        segments.push(`Scene summary:\n${sceneSummary}`)
-      }
-      if (characterProfile?.backstorySummary) {
-        segments.push(`Backstory key moments:\n${characterProfile.backstorySummary}`)
-      }
-      if (statusEffects.length) {
-        const names = statusEffects.map(effect => effect.name).filter(Boolean)
-        if (names.length) {
-          segments.push(`Active conditions: ${names.join('; ')}`)
+      try {
+        const segments: string[] = []
+        // Location MUST be first so extractLocationFromContext() on the backend reads it correctly
+        if (currentLocation) {
+          segments.push(`Location: ${currentLocation}`)
         }
+        if (currentTime) {
+          segments.push(`Time: ${currentTime}`)
+        }
+        if (campaignId) {
+          segments.push(`Campaign: ${campaignId}`)
+        }
+        segments.push(`Scene ID: ${sceneId}`)
+        if (sceneSummary) {
+          segments.push(`Scene summary:\n${sceneSummary}`)
+        }
+        if (characterProfile?.backstorySummary) {
+          segments.push(`Backstory key moments:\n${characterProfile.backstorySummary}`)
+        }
+        if (statusEffects.length) {
+          const names = statusEffects.map(effect => effect.name).filter(Boolean)
+          if (names.length) {
+            segments.push(`Active conditions: ${names.join('; ')}`)
+          }
+        }
+        if (systemNotices.length) {
+          segments.push(`Recent system events: ${systemNotices.join(' | ')}`)
+        }
+        return segments.join('\n')
+      } catch (error) {
+        console.error('buildGameContext error:', error)
+        return ''
       }
-      if (systemNotices.length) {
-        segments.push(`Recent system events: ${systemNotices.join(' | ')}`)
-      }
-      return segments.join('\n')
     },
     [campaignId, currentLocation, currentTime, sceneSummary, statusEffects, systemNotices, characterProfile?.backstorySummary]
   )
@@ -2342,7 +2347,7 @@ const GameSession = () => {
       },
       buildGameContext(),
       [],
-      { campaignId, playerSnapshot: { hp: resources.hp, mp: resources.mp }, language }
+      { campaignId, playerSnapshot: { hp: resources.hp, mp: resources.mp }, language, worldState: undefined, npcState: undefined, sceneParticipants: [], selectedTarget: null }
     )
       .then(dmResponse => {
         const updatedHistory: ChatMessage[] = [{ role: 'assistant', content: dmResponse.response }]
@@ -2355,6 +2360,7 @@ const GameSession = () => {
       .catch(error => {
         openingGeneratedRef.current = false
         console.error('Failed to generate opening scene:', error)
+        console.error('Opening scene error details:', JSON.stringify(error))
         pushSystemMessage(error?.message || t('gameSession.error.openingScene'))
       })
       .finally(() => {
@@ -2428,7 +2434,11 @@ const GameSession = () => {
             },
             pendingCheckId,
             playerSnapshot: { hp: resources.hp, mp: resources.mp },
-            language
+            language,
+            worldState: undefined,
+            npcState: undefined,
+            sceneParticipants: [],
+            selectedTarget: null
           }
         )
 
@@ -2851,9 +2861,15 @@ const GameSession = () => {
 
   const handleSendMessage = useCallback(
     async (event?: React.FormEvent) => {
+      console.log('handleSendMessage called', { inputValue, characterProfile: !!characterProfile, campaignId })
       event?.preventDefault()
       const trimmedInput = inputValue.trim()
-      if (!trimmedInput || isLoading) {
+      if (!trimmedInput) {
+        console.log('early return: empty input')
+        return
+      }
+      if (isLoading) {
+        console.log('early return: isLoading')
         return
       }
       tickCooldowns()
@@ -2893,7 +2909,7 @@ const GameSession = () => {
           },
           buildGameContext(),
           historyWithPlayer,
-          { campaignId, playerSnapshot: { hp: resources.hp, mp: resources.mp }, language }
+          { campaignId, playerSnapshot: { hp: resources.hp, mp: resources.mp }, language, worldState: undefined, npcState: undefined, sceneParticipants: [], selectedTarget: null }
         )
 
         const updatedHistory: ChatMessage[] = [
@@ -2906,7 +2922,12 @@ const GameSession = () => {
         clearSystemNotices()
         handleDMResponseOutput(dmResponse)
       } catch (error: any) {
-        console.error('Failed to reach DM:', error)
+        console.error('handleSendMessage error:', error)
+        console.error('handleSendMessage error details:', {
+          message: error?.message,
+          status: error?.status,
+          stack: error?.stack,
+        })
         pushSystemMessage(error?.message || t('gameSession.error.weaveSilent'))
       } finally {
         setIsLoading(false)
@@ -3572,13 +3593,13 @@ const GameSession = () => {
           {sidebarButtons.map(btn => (
             <button key={btn.section}
               onClick={() => setActiveSidebar(btn.section)}
-              style={{ fontFamily: 'var(--g-font-title)', fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', border: '1px solid', borderColor: activeSidebar === btn.section ? 'rgba(200,165,74,0.35)' : 'var(--g-border)', color: activeSidebar === btn.section ? 'var(--g-gold)' : 'var(--g-parch-faint)', background: activeSidebar === btn.section ? 'rgba(200,165,74,0.07)' : 'transparent', padding: '5px 13px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))', transition: 'all 0.2s' }}
+              style={{ fontFamily: 'var(--g-font-title)', fontSize: 13, letterSpacing: '0.08em', textTransform: 'uppercase', border: '1px solid', borderColor: activeSidebar === btn.section ? 'rgba(200,165,74,0.35)' : 'var(--g-border)', color: activeSidebar === btn.section ? 'var(--g-gold)' : 'var(--g-parch-faint)', background: activeSidebar === btn.section ? 'rgba(200,165,74,0.07)' : 'transparent', padding: '5px 13px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))', transition: 'all 0.2s' }}
             >
               {btn.label}
             </button>
           ))}
           <div style={{ width: 1, height: 18, background: 'var(--g-border)' }} />
-          <button style={{ fontFamily: 'var(--g-font-title)', fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', border: '1px solid var(--g-border)', color: 'var(--g-parch-faint)', background: 'transparent', padding: '5px 13px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))', transition: 'all 0.2s' }}
+          <button style={{ fontFamily: 'var(--g-font-title)', fontSize: 13, letterSpacing: '0.08em', textTransform: 'uppercase', border: '1px solid var(--g-border)', color: 'var(--g-parch-faint)', background: 'transparent', padding: '5px 13px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))', transition: 'all 0.2s' }}
             onClick={() => void handleResetCampaignText()} disabled={isLoading}
           >
             Reset
@@ -3642,7 +3663,7 @@ const GameSession = () => {
             ].map(b => (
               <div key={b.label}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                  <span className="g-label" style={{ fontSize: 7 }}>{b.label}</span>
+                  <span className="g-label" style={{ fontSize: 9 }}>{b.label}</span>
                   <span style={{ fontFamily: 'var(--g-font-body)', fontSize: 13, color: 'var(--g-parch-dim)' }}>{b.val}</span>
                 </div>
                 <div className="g-bar"><div className={b.cls} style={{ width: `${b.pct}%` }} /></div>

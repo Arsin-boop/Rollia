@@ -579,17 +579,17 @@
 
 .g-attr-mod {
   font-family: var(--g-font-title);
-  font-size: 9px;
+  font-size: 10px;
   color: var(--g-blood2);
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .g-attr-label {
-  font-size: 7px;
+  font-size: 9px;
   letter-spacing: 0.12em;
   color: var(--g-parch-faint);
   text-transform: uppercase;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 /* —— ХЕДЕР GRIMOIRE —— */
@@ -944,8 +944,8 @@
 .g-label-gold  { font-size: 10px; letter-spacing: 0.25em; }
 .g-section-title { font-size: 10px; letter-spacing: 0.28em; padding-bottom: 8px; }
 .g-attr-value  { font-size: 18px; }
-.g-attr-mod    { font-size: 10px; margin-top: 2px; }
-.g-attr-label  { font-size: 8px; margin-top: 3px; }
+.g-attr-mod    { font-size: 11px; margin-top: 3px; }
+.g-attr-label  { font-size: 10px; margin-top: 4px; }
 .g-bar         { height: 4px; }
 .g-tag         { font-size: 11px; padding: 3px 11px; }
 .g-btn-primary   { font-size: 11px; padding: 13px 26px; letter-spacing: 0.22em; }

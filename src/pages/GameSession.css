@@ -1572,7 +1572,9 @@
 
 .game-session .scene-header-inline {
   color: #c6a75e !important;
-  letter-spacing: 0.14em !important;
+  font-size: 13px !important;
+  letter-spacing: 0.16em !important;
+  opacity: 0.92 !important;
 }
 
 .game-session .chat-input-container {
@@ -2194,7 +2196,9 @@
 
 .game-session .message.dm .message-content {
   padding: 1.3rem 1.45rem !important;
-  line-height: 1.67 !important;
+  font-size: 15.5px !important;
+  line-height: 1.75 !important;
+  letter-spacing: 0.01em !important;
   border: 1px solid rgba(108, 92, 231, 0.44) !important;
   box-shadow:
     0 16px 34px rgba(0, 0, 0, 0.34),
@@ -2215,8 +2219,9 @@
 }
 
 .game-session .scene-header-inline {
-  font-size: 0.74rem !important;
-  letter-spacing: 0.13em !important;
+  font-size: 13px !important;
+  letter-spacing: 0.16em !important;
+  opacity: 0.92 !important;
 }
 
 .game-session .sidebar-content h3 {
