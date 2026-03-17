@@ -52,31 +52,13 @@ export function GrimoireHeader({
         {showNav && (
           <>
             <button
-              className="g-btn-sm"
-              style={isActive('/characters') ? {
-                borderColor: '#c8a54a',
-                color: '#e8cc7a',
-                background: 'rgba(200,165,74,0.14)',
-                textShadow: '0 0 10px rgba(232,204,122,0.5)',
-              } : {
-                color: '#c8a54a',
-                borderColor: 'rgba(200,165,74,0.45)',
-              }}
+              className={`g-nav-btn${isActive('/characters') ? ' g-nav-btn-active' : ''}`}
               onClick={() => navigate('/characters')}
             >
               Characters
             </button>
             <button
-              className="g-btn-sm"
-              style={isActive('/sessions') ? {
-                borderColor: '#c8a54a',
-                color: '#e8cc7a',
-                background: 'rgba(200,165,74,0.14)',
-                textShadow: '0 0 10px rgba(232,204,122,0.5)',
-              } : {
-                color: '#c8a54a',
-                borderColor: 'rgba(200,165,74,0.45)',
-              }}
+              className={`g-nav-btn${isActive('/sessions') ? ' g-nav-btn-active' : ''}`}
               onClick={() => navigate('/sessions')}
             >
               Sessions

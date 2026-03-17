@@ -267,14 +267,18 @@ export async function callAI(
   try {
     console.log(`Calling AI task ${taskType} with model ${model}`)
 
+    // qwen3 on Groq uses thinking mode by default and requires temperature=1
+    const isQwen3 = /qwen.?3/i.test(model)
+    const effectiveTemperature = isQwen3 ? 1 : (options.temperature ?? 0.7)
+
     const completion = await runWithRetries(
       () =>
         activeClient.chat.completions.create({
           messages,
           model,
-          temperature: options.temperature ?? 0.7,
+          temperature: effectiveTemperature,
           max_tokens: resolvedMaxTokens,
-          ...(options.responseFormat ? { response_format: options.responseFormat } : {})
+          ...(options.responseFormat && !isQwen3 ? { response_format: options.responseFormat } : {})
         }),
       { label: `chat.completions.create:${taskType}` }
     )
@@ -303,6 +307,21 @@ export async function callAI(
       }
       console.warn(`Rate limited on utility task ${taskType}; returning no-op.`)
       return ''
+    }
+    // Groq returns 400 "Failed to validate JSON" when a thinking model outputs <think> blocks
+    // with response_format: json_object. Retry without it and extract JSON manually.
+    if (error?.status === 400) {
+      console.warn(`400 error on task ${taskType} (model: ${model}):`, JSON.stringify(error?.error ?? error?.message ?? String(error)))
+      if (options.responseFormat) {
+        console.warn(`Retrying ${taskType} without response_format`)
+        const retryCompletion = await activeClient!.chat.completions.create({
+          messages,
+          model,
+          temperature: options.temperature ?? 0.7,
+          max_tokens: resolvedMaxTokens,
+        })
+        return stripThinkingBlocks(extractMessageContent(retryCompletion.choices[0]?.message))
+      }
     }
     throw error
   }
@@ -1229,9 +1248,10 @@ export async function generateIntentDecision(payload: {
 Rules:
 - Never choose PAST_REF as primary if any REQUEST or ACTION_NOW exists.
 - PAST_REF segments never roll.
-- Speech/apology without conflict => no roll.
-- Requests for trivial items/services => no roll.
-- Use ACTION_NOW for immediate actions.
+- TRIVIALITY RULE: Basic actions (sitting, standing, walking normally, looking around) NEVER roll.
+- ROLEPLAY RULE: Speech/apology/normal conversation without conflict or high stakes => no roll.
+- Requests for trivial items or common services => no roll.
+- Use ACTION_NOW for immediate actions with stakes.
 - Keep actionLabel short (<= 8 words), no quotes.
 - If shouldRoll=false, set stat and dc to null.`
 
@@ -1438,7 +1458,8 @@ export async function generateDMResponse(
 - Keep metaphor usage minimal: at most one light metaphor in the entire response.
 - Default to concrete verbs and observable actions.
 - Keep NPC dialogue practical and conversational, not literary or prophetic.
-- Avoid rhetorical flourish if a direct sentence can express the same meaning.`
+- Avoid rhetorical flourish; use direct sentences to express clear meaning.
+- NPC logic must be grounded in their current anger/trust/suspicion state and recent events.`
     : ''
 
   const systemPrompt = `You are the Dungeon Master for a grounded dark-fantasy RPG with a Rollia House voice.

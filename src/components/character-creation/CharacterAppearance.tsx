@@ -1,67 +1,66 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "../ui/button";
-import { Textarea } from "../ui/textarea";
-import { Label } from "../ui/label";
-import { ArrowRight, ArrowLeft } from "lucide-react";
-import { StarryBackground } from "../StarryBackground";
-import { useI18n } from "../../i18n";
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useI18n } from '../../i18n'
+import { CharacterWizardLayout } from './CharacterWizardLayout'
 
 export function CharacterAppearance() {
-  const navigate = useNavigate();
-  const { t } = useI18n();
-  const [appearance, setAppearance] = useState("");
+  const navigate = useNavigate()
+  const { t }    = useI18n()
+  const [appearance, setAppearance] = useState(localStorage.getItem('characterAppearance') || '')
 
   const handleNext = () => {
-    if (appearance.trim()) {
-      localStorage.setItem("characterAppearance", appearance);
-      navigate("/character/review");
-    }
-  };
+    if (!appearance.trim()) return
+    localStorage.setItem('characterAppearance', appearance.trim())
+    navigate('/character/review')
+  }
 
   return (
-    <div className="size-full flex items-center justify-center bg-[#1C1B22] p-4 relative overflow-hidden">
-      <StarryBackground />
-      
-      <div className="w-full max-w-2xl p-8 space-y-6 bg-slate-800/50 rounded-lg border border-[#6C5CE7]/30 relative z-10">
-        <div className="space-y-2">
-          <h2 className="text-3xl font-bold text-white">{t("characterAppearance.title")}</h2>
-          <p className="text-[#B8BCC8]">{t("characterAppearance.step")}</p>
-        </div>
-
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="appearance" className="text-white">{t("characterAppearance.label")}</Label>
-            <Textarea
-              id="appearance"
-              value={appearance}
-              onChange={(e) => setAppearance(e.target.value)}
-              placeholder={t("characterAppearance.placeholder")}
-              className="min-h-[200px] bg-slate-700 border-[#6C5CE7]/30 text-white"
-            />
-          </div>
-
-          <div className="flex gap-4">
-            <Button
-              variant="outline"
-              onClick={() => navigate("/character/backstory")}
-              className="gap-2 border-[#6C5CE7] text-[#6C5CE7] hover:bg-[#6C5CE7]/10"
-            >
-              <ArrowLeft className="size-4" />
-              {t("common.back")}
-            </Button>
-            <Button
-              onClick={handleNext}
-              disabled={!appearance.trim()}
-              className="flex-1 gap-2 bg-[#6C5CE7] hover:bg-[#5F4FD1]"
-            >
-              {t("common.next")}
-              <ArrowRight className="size-4" />
-            </Button>
-          </div>
+    <CharacterWizardLayout
+      step={{ number: 4, total: 5, title: t('characterAppearance.title'), hint: t('characterAppearance.step') }}
+      onBack={() => navigate('/character/backstory')}
+      onNext={handleNext}
+      nextDisabled={!appearance.trim()}
+      nextLabel={t('common.next') + ' →'}
+      backLabel={'← ' + t('common.back')}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <label className="g-label" style={{ marginBottom: 4 }}>
+          {t('characterAppearance.label')}
+        </label>
+        <textarea
+          autoFocus
+          value={appearance}
+          onChange={e => setAppearance(e.target.value)}
+          placeholder={t('characterAppearance.placeholder')}
+          rows={8}
+          style={{
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid var(--g-border)',
+            borderBottom: '1px solid rgba(200,165,74,0.28)',
+            color: 'var(--g-parch)',
+            fontFamily: 'var(--g-font-body)',
+            fontStyle: 'italic',
+            fontSize: 15,
+            lineHeight: 1.75,
+            padding: '14px 16px',
+            outline: 'none',
+            resize: 'vertical',
+            width: '100%',
+            clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))',
+            transition: 'border-color 0.2s, background 0.2s',
+          }}
+          onFocus={e => { e.target.style.borderBottomColor = 'var(--g-gold)'; e.target.style.background = 'rgba(200,165,74,0.025)' }}
+          onBlur={e  => { e.target.style.borderBottomColor = 'rgba(200,165,74,0.28)'; e.target.style.background = 'rgba(255,255,255,0.02)' }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+          <p style={{ fontFamily: 'var(--g-font-italic)', fontStyle: 'italic', fontSize: 12, color: 'rgba(200,165,74,0.35)' }}>
+            How do others see you when you enter a room?
+          </p>
+          <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 9, letterSpacing: '0.15em', color: 'rgba(200,165,74,0.25)' }}>
+            {appearance.length} chars
+          </span>
         </div>
       </div>
-    </div>
-  );
+    </CharacterWizardLayout>
+  )
 }
-

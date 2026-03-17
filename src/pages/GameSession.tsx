@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback, type ReactNode, type CSSProperties } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
   BookOpen,
   Check,
@@ -34,6 +34,7 @@ import {
   type ActionIntent
 } from '../utils/api'
 import './GameSession.css'
+import { useEmberCanvas } from '../hooks/useEmberCanvas'
 import { useI18n } from '../i18n'
 import type { CharacterStats, InventoryItem } from '../types/character'
 
@@ -77,16 +78,16 @@ type RollState =
   | { status: 'pending'; request: SkillCheckRequest }
   | { status: 'rolling'; request: SkillCheckRequest; seed: string; startedAt: number }
   | {
-      status: 'done'
-      request: SkillCheckRequest
-      d20: number
-      bonus: number
-      statBonus: number
-      proficiencyBonus: number
-      total: number
-      success: boolean
-      resolvedAt: number
-    }
+    status: 'done'
+    request: SkillCheckRequest
+    d20: number
+    bonus: number
+    statBonus: number
+    proficiencyBonus: number
+    total: number
+    success: boolean
+    resolvedAt: number
+  }
 
 type SidebarSection = 'journal' | 'stats' | 'loadout' | 'social'
 type LoadoutTab = 'inventory' | 'spells'
@@ -411,11 +412,11 @@ const buildAbilitiesFromFeatures = (classData?: CustomClassResponse | null): Cha
     const derivedName = namePart?.trim()
       ? namePart.trim()
       : feature
-          .replace(/^feature\s*[:\-]?\s*/i, '')
-          .trim()
-          .split(/\s+/)
-          .slice(0, 4)
-          .join(' ')
+        .replace(/^feature\s*[:\-]?\s*/i, '')
+        .trim()
+        .split(/\s+/)
+        .slice(0, 4)
+        .join(' ')
     const finalName = derivedName || `${fallbackLabel} Technique`
     return {
       id: `${classData.className || 'class'}-${index}`,
@@ -773,9 +774,8 @@ const DiceRollHeader = ({
             </span>
           </div>
           <div
-            className={`roll-inline-result ${showResult ? 'show' : ''} ${
-              roll.success ? 'success' : 'fail'
-            }`}
+            className={`roll-inline-result ${showResult ? 'show' : ''} ${roll.success ? 'success' : 'fail'
+              }`}
           >
             {roll.success ? t('gameSession.dice.success') : t('gameSession.dice.fail')}
           </div>
@@ -787,6 +787,7 @@ const DiceRollHeader = ({
 
 const GameSession = () => {
   const { campaignId } = useParams()
+  const navigate = useNavigate()
   const { t, language } = useI18n()
   const [messages, setMessages] = useState<Message[]>([])
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
@@ -825,6 +826,7 @@ const GameSession = () => {
   const [openingSeed, setOpeningSeed] = useState(0)
   const battleUiEnabled = false
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fogCanvasRef = useEmberCanvas({ count: 55 })
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const questInitRef = useRef(false)
   const backstorySummaryAttemptedRef = useRef(false)
@@ -1002,9 +1004,9 @@ const GameSession = () => {
 
     const restoredMessages: Message[] = Array.isArray(stored.messages)
       ? stored.messages.map(entry => ({
-          ...entry,
-          timestamp: new Date(entry.timestamp)
-        }))
+        ...entry,
+        timestamp: new Date(entry.timestamp)
+      }))
       : []
     const restoredHistory: ChatMessage[] = Array.isArray(stored.chatHistory) ? stored.chatHistory : []
     const restoredSummary = typeof stored.sceneSummary === 'string' ? stored.sceneSummary : ''
@@ -1055,8 +1057,8 @@ const GameSession = () => {
         message.type === 'dm'
           ? DM_DISPLAY_NAME
           : message.type === 'player'
-          ? characterProfile?.name || t('gameSession.you')
-          : t('gameSession.system')
+            ? characterProfile?.name || t('gameSession.you')
+            : t('gameSession.system')
       const content = sanitizeLogText(message.content)
       const block: string[] = [`[${timeLabel}] ${actorLabel}`]
 
@@ -1066,8 +1068,7 @@ const GameSession = () => {
 
       if (message.type === 'player' && message.roll?.status === 'done') {
         block.push(
-          `${t('gameSession.check')}: ${message.roll.request.label} | ${
-            message.roll.success ? t('gameSession.dice.success') : t('gameSession.dice.fail')
+          `${t('gameSession.check')}: ${message.roll.request.label} | ${message.roll.success ? t('gameSession.dice.success') : t('gameSession.dice.fail')
           } | ${t('gameSession.dice.total')} ${message.roll.total}`
         )
       }
@@ -1177,11 +1178,11 @@ const GameSession = () => {
     if (!characterProfile.inventoryItems) {
       const converted = existingEquipment.length
         ? existingEquipment.map((name, index) => ({
-            id: `${name.toLowerCase().replace(/\s+/g, '-')}-${index}`,
-            name,
-            description: 'A trusted item from your pack.',
-            tags: ['equipment']
-          }))
+          id: `${name.toLowerCase().replace(/\s+/g, '-')}-${index}`,
+          name,
+          description: 'A trusted item from your pack.',
+          tags: ['equipment']
+        }))
         : []
       const mergedInventory = mergeUniqueInventoryItems(converted, generatedLoadout)
       updateStoredProfile(prev => ({
@@ -1211,7 +1212,7 @@ const GameSession = () => {
           setBattleState(response.battle)
         }
       })
-      .catch(() => {})
+      .catch(() => { })
   }, [campaignId])
 
   useEffect(() => {
@@ -1337,8 +1338,8 @@ const GameSession = () => {
     characterProfile?.avatarUrl && characterProfile.avatarUrl.startsWith('http')
       ? characterProfile.avatarUrl
       : characterProfile?.avatarUrl
-      ? `${API_ORIGIN}${characterProfile.avatarUrl}`
-      : null
+        ? `${API_ORIGIN}${characterProfile.avatarUrl}`
+        : null
 
   const getModifierFromLabel = useCallback(
     (label: string, statOverride?: string) => {
@@ -1825,12 +1826,12 @@ const GameSession = () => {
         const statusToken = attributes.status?.toLowerCase() || 'offer'
         const xpValue = Number(attributes.xp) || 0
         const trimmedBody = body?.trim() || ''
-      const objectives = attributes.objectives
-        ? attributes.objectives.split('|').map(item => item.trim()).filter(Boolean)
-        : undefined
-      const completedObjectives = attributes.complete
-        ? attributes.complete.split(',').map(item => Number(item.trim())).filter(Number.isFinite)
-        : []
+        const objectives = attributes.objectives
+          ? attributes.objectives.split('|').map(item => item.trim()).filter(Boolean)
+          : undefined
+        const completedObjectives = attributes.complete
+          ? attributes.complete.split(',').map(item => Number(item.trim())).filter(Number.isFinite)
+          : []
 
         const existingIndex = questsClone.findIndex(quest => quest.id === questId)
         const prevQuest = existingIndex >= 0 ? questsClone[existingIndex] : undefined
@@ -1838,15 +1839,15 @@ const GameSession = () => {
         const quest: Quest = prevQuest
           ? { ...prevQuest }
           : {
-              id: questId,
-              title: attributes.title || `Quest ${questsClone.length + 1}`,
-              description: trimmedBody || attributes.summary || 'An opportunity unfolds.',
-              xp: xpValue || 150,
-              status: 'active',
-              progress: trimmedBody,
-              objectives: objectives || [],
-              log: trimmedBody ? [trimmedBody] : []
-            }
+            id: questId,
+            title: attributes.title || `Quest ${questsClone.length + 1}`,
+            description: trimmedBody || attributes.summary || 'An opportunity unfolds.',
+            xp: xpValue || 150,
+            status: 'active',
+            progress: trimmedBody,
+            objectives: objectives || [],
+            log: trimmedBody ? [trimmedBody] : []
+          }
 
         if (!prevQuest) {
           newQuestTitle = quest.title
@@ -1962,11 +1963,11 @@ const GameSession = () => {
         const rumor: Rumor = existingIndex >= 0
           ? { ...rumorsClone[existingIndex] }
           : {
-              id: rumorId,
-              title,
-              detail: detail || attributes.detail || 'An unfinished whisper lingers.',
-              log: []
-            }
+            id: rumorId,
+            title,
+            detail: detail || attributes.detail || 'An unfinished whisper lingers.',
+            log: []
+          }
 
         if (title) {
           rumor.title = title
@@ -2160,18 +2161,18 @@ const GameSession = () => {
         }
       }
 
-    if (dmResponse.checkRequest?.stat) {
-      const dcValue = Number(dmResponse.checkRequest.difficulty)
-      return {
-        request: {
-          stat: dmResponse.checkRequest.stat.toUpperCase() as Stat,
-          label: dmResponse.checkRequest.context || t('gameSession.check'),
-          dc: Number.isFinite(dcValue) ? dcValue : undefined,
-          kind: dmResponse.checkRequest.type
-        },
-        pendingCheckId: dmResponse.checkRequest.id
+      if (dmResponse.checkRequest?.stat) {
+        const dcValue = Number(dmResponse.checkRequest.difficulty)
+        return {
+          request: {
+            stat: dmResponse.checkRequest.stat.toUpperCase() as Stat,
+            label: dmResponse.checkRequest.context || t('gameSession.check'),
+            dc: Number.isFinite(dcValue) ? dcValue : undefined,
+            kind: dmResponse.checkRequest.type
+          },
+          pendingCheckId: dmResponse.checkRequest.id
+        }
       }
-    }
 
       return null
     },
@@ -2214,8 +2215,8 @@ const GameSession = () => {
         dmResponse.scene?.location && dmResponse.scene?.time
           ? `${dmResponse.scene.location} · ${dmResponse.scene.time}`
           : dmResponse.scene?.location
-          ? dmResponse.scene.location
-          : ''
+            ? dmResponse.scene.location
+            : ''
       const finalHeader = sceneHeaderFromMeta || extractedHeader
       if (finalHeader) {
         lastSceneHeaderRef.current = finalHeader
@@ -2243,44 +2244,8 @@ const GameSession = () => {
         }
         startInlineRollRef.current?.(messageId, skillCheck.request)
       }
-
-      if (dmResponse.quests || dmResponse.npcRelationships) {
-        updateStoredProfile((prev) => {
-          if (!prev) return prev
-          
-          let nextQuests = prev.quests
-          if (dmResponse.quests) {
-            nextQuests = dmResponse.quests.map(q => ({
-              id: q.id,
-              title: q.title,
-              description: q.description || q.title,
-              status: q.status,
-              xp: 0,
-              log: [],
-              objectives: q.objectives,
-              objectiveStatus: q.objectiveStatus
-            }))
-          }
-
-          let nextRelations = prev.npcRelations
-          if (dmResponse.npcRelationships) {
-            nextRelations = dmResponse.npcRelationships.map(r => ({
-              id: canonicalNpcId(r.npc_id, r.npc_name),
-              name: r.npc_name,
-              affinity: r.affinity,
-              notes: r.notes || []
-            }))
-          }
-
-          return {
-            ...prev,
-            ...(dmResponse.quests ? { quests: nextQuests } : {}),
-            ...(dmResponse.npcRelationships ? { npcRelations: nextRelations } : {})
-          }
-        })
-      }
     },
-    [extractSkillCheckRequest, stripStructuredTags, updateStoredProfile]
+    [extractSkillCheckRequest, stripStructuredTags]
   )
 
   const buildStatusStateInput = useCallback(
@@ -2424,11 +2389,9 @@ const GameSession = () => {
       tickCooldowns()
       try {
         const pendingCheckId = pendingCheckByMessageRef.current.get(payload.messageId)
-        const followUp = `Outcome data for ${payload.request.label}: d20 ${payload.d20} + ${payload.bonus} = ${
-          payload.total
-        } (OUTCOME=${payload.success ? 'SUCCESS' : 'FAIL'}). Prior intent: ${
-          lastPlayerActionRef.current || 'follow-up to DM prompt'
-        }. Start from the outcome and world reaction. Describe ONLY the new consequences of this result. Do NOT restate the player's prior action or any preparation. Stay strictly diegetic. Do NOT mention rolls, numbers, or mechanics in narration.`
+        const followUp = `Outcome data for ${payload.request.label}: d20 ${payload.d20} + ${payload.bonus} = ${payload.total
+          } (OUTCOME=${payload.success ? 'SUCCESS' : 'FAIL'}). Prior intent: ${lastPlayerActionRef.current || 'follow-up to DM prompt'
+          }. Start from the outcome and world reaction. Describe ONLY the new consequences of this result. Do NOT restate the player's prior action or any preparation. Stay strictly diegetic. Do NOT mention rolls, numbers, or mechanics in narration.`
 
         const historyWithRoll: ChatMessage[] = [
           ...chatHistory,
@@ -2983,23 +2946,23 @@ const GameSession = () => {
       const labels =
         language === 'ru'
           ? {
-              head: 'Голова',
-              leftHand: 'Левая рука',
-              rightHand: 'Правая рука',
-              body: 'Тело',
-              arms: 'Руки',
-              legs: 'Ноги',
-              accessory: 'Аксессуар'
-            }
+            head: 'Голова',
+            leftHand: 'Левая рука',
+            rightHand: 'Правая рука',
+            body: 'Тело',
+            arms: 'Руки',
+            legs: 'Ноги',
+            accessory: 'Аксессуар'
+          }
           : {
-              head: 'Head',
-              leftHand: 'Left Hand',
-              rightHand: 'Right Hand',
-              body: 'Body',
-              arms: 'Arms',
-              legs: 'Legs',
-              accessory: 'Accessory'
-            }
+            head: 'Head',
+            leftHand: 'Left Hand',
+            rightHand: 'Right Hand',
+            body: 'Body',
+            arms: 'Arms',
+            legs: 'Legs',
+            accessory: 'Accessory'
+          }
       return labels[slot]
     }
     const emptySlotText = language === 'ru' ? 'Пусто' : 'Empty'
@@ -3026,7 +2989,7 @@ const GameSession = () => {
             ?.name || ''
         )
         ? inventoryItems.find(item => item.slot === 'weapon' || item.tags.some(tag => tag.toLowerCase() === 'weapon'))
-            ?.name || null
+          ?.name || null
         : firstByKeywords(['sword', 'blade', 'axe', 'mace', 'staff', 'bow', 'dagger', 'weapon', 'меч', 'клин', 'топор', 'булава', 'посох', 'лук', 'кинжал', 'оруж'], equippedItemNames)
     const armorName =
       inventoryItems.find(item => item.slot === 'armor' || item.tags.some(tag => tag.toLowerCase() === 'armor'))
@@ -3035,7 +2998,7 @@ const GameSession = () => {
             ?.name || ''
         )
         ? inventoryItems.find(item => item.slot === 'armor' || item.tags.some(tag => tag.toLowerCase() === 'armor'))
-            ?.name || null
+          ?.name || null
         : firstByKeywords(['armor', 'mail', 'plate', 'robe', 'leather', 'брон', 'доспех', 'латы', 'роб'], equippedItemNames)
     const leftHandName = firstByKeywords(['shield', 'buckler', 'щит'], equippedItemNames)
     const headName = firstByKeywords(['hood', 'helm', 'helmet', 'hat', 'cap', 'шлем', 'капюш', 'шап'], equippedItemNames)
@@ -3088,8 +3051,8 @@ const GameSession = () => {
                   >
                     <button
                       type="button"
-                      className="expandable-header"
                       onClick={() => toggleExpanded(setExpandedQuestIds, quest.id)}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 0', fontFamily: 'var(--g-font-title)', color: 'var(--g-parch-dim)', textAlign: 'left' }}
                     >
                       <div>
                         <h4>{quest.title}</h4>
@@ -3146,8 +3109,8 @@ const GameSession = () => {
                   >
                     <button
                       type="button"
-                      className="expandable-header"
                       onClick={() => toggleExpanded(setExpandedRumorIds, rumor.id)}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 0', fontFamily: 'var(--g-font-title)', color: 'var(--g-parch-dim)', textAlign: 'left' }}
                     >
                       <h4>{rumor.title}</h4>
                       <span className="quest-xp">{t('gameSession.unverified')}</span>
@@ -3203,15 +3166,15 @@ const GameSession = () => {
                   <p>{statusEffects.length ? t('gameSession.active') : t('gameSession.none')}</p>
                 </div>
                 {statusEffects.length ? (
-                  <div className="effects-list">
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
                     {statusEffects.map(effect => (
                       <button
                         key={effect.id}
                         type="button"
-                        className="effect-tag"
                         onClick={() =>
                           setActiveStatusName(prev => (prev === effect.id ? null : effect.id))
                         }
+                        style={{ fontFamily: 'var(--g-font-title)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', border: '1px solid', borderColor: activeStatusName === effect.id ? 'var(--g-gold)' : 'var(--g-border)', color: activeStatusName === effect.id ? 'var(--g-gold)' : 'var(--g-parch-dim)', background: 'transparent', padding: '3px 10px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 5px) 0,100% 5px,100% 100%,5px 100%,0 calc(100% - 5px))' }}
                       >
                         {effect.name}
                       </button>
@@ -3231,10 +3194,10 @@ const GameSession = () => {
                       match.severity && match.id === 'exhaustion'
                         ? `${statusDetailLabel('level')}: ${match.severity}`
                         : match.severity && match.id === 'corruption'
-                        ? `${statusDetailLabel('tier')}: ${match.severity}`
-                        : match.severity
-                        ? `${statusDetailLabel('severity')}: ${match.severity}`
-                        : ''
+                          ? `${statusDetailLabel('tier')}: ${match.severity}`
+                          : match.severity
+                            ? `${statusDetailLabel('severity')}: ${match.severity}`
+                            : ''
                     const formatModifiers = (modifiers?: StatusEffect['modifiers']) => {
                       if (!modifiers) return ''
                       const parts = Object.entries(modifiers)
@@ -3280,18 +3243,18 @@ const GameSession = () => {
         return (
           <>
             <h3>{t('gameSession.loadout')}</h3>
-            <div className="sidebar-subtabs">
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
               <button
                 type="button"
-                className={`sidebar-subtab ${activeLoadoutTab === 'inventory' ? 'active' : ''}`}
                 onClick={() => setActiveLoadoutTab('inventory')}
+                style={{ fontFamily: 'var(--g-font-title)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', border: '1px solid', borderColor: activeLoadoutTab === 'inventory' ? 'var(--g-gold)' : 'var(--g-border)', color: activeLoadoutTab === 'inventory' ? 'var(--g-gold)' : 'var(--g-parch-dim)', background: 'transparent', padding: '4px 12px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 5px) 0,100% 5px,100% 100%,5px 100%,0 calc(100% - 5px))' }}
               >
                 {t('gameSession.inventory')}
               </button>
               <button
                 type="button"
-                className={`sidebar-subtab ${activeLoadoutTab === 'spells' ? 'active' : ''}`}
                 onClick={() => setActiveLoadoutTab('spells')}
+                style={{ fontFamily: 'var(--g-font-title)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', border: '1px solid', borderColor: activeLoadoutTab === 'spells' ? 'var(--g-gold)' : 'var(--g-border)', color: activeLoadoutTab === 'spells' ? 'var(--g-gold)' : 'var(--g-parch-dim)', background: 'transparent', padding: '4px 12px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 5px) 0,100% 5px,100% 100%,5px 100%,0 calc(100% - 5px))' }}
               >
                 {t('gameSession.spells')}
               </button>
@@ -3300,61 +3263,33 @@ const GameSession = () => {
             {activeLoadoutTab === 'inventory' ? (
               <>
                 {/* Equipment Box */}
-                <div className="bg-[#1C1B22]/80 rounded-lg p-3 border border-[#C6A75E]/30">
-                  <h4 className="text-xs font-semibold text-[#C6A75E] mb-3 uppercase tracking-wide flex items-center gap-2">
-                    <Shield className="size-3.5" />
-                    {equipmentTitle}
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="col-span-2 p-2.5 bg-[#23222A]/60 rounded-lg border border-[#6C5CE7]/20 hover:border-[#6C5CE7]/40 transition-all cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[#B8BCC8] text-xs">{slotLabel('head')}</span>
-                        <span className={`text-xs ${isEmptyValue(slotValues.head) ? 'text-[#8f94a3]' : 'text-[#E0E3EA]'}`}>{slotValues.head}</span>
-                      </div>
-                      {slotStats.head ? <p className="equipment-slot-stats">{slotStats.head}</p> : null}
-                    </div>
-                    <div className="p-2.5 bg-[#23222A]/60 rounded-lg border border-[#6C5CE7]/20 hover:border-[#6C5CE7]/40 transition-all cursor-pointer">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[#B8BCC8] text-xs">{slotLabel('leftHand')}</span>
-                        <span className={`text-xs font-medium ${isEmptyValue(slotValues.leftHand) ? 'text-[#8f94a3]' : 'text-[#E0E3EA]'}`}>{slotValues.leftHand}</span>
-                      </div>
-                      {slotStats.leftHand ? <p className="equipment-slot-stats">{slotStats.leftHand}</p> : null}
-                    </div>
-                    <div className="p-2.5 bg-[#23222A]/60 rounded-lg border border-[#6C5CE7]/20 hover:border-[#6C5CE7]/40 transition-all cursor-pointer">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[#B8BCC8] text-xs">{slotLabel('rightHand')}</span>
-                        <span className={`text-xs font-medium ${isEmptyValue(slotValues.rightHand) ? 'text-[#8f94a3]' : 'text-[#E0E3EA]'}`}>{slotValues.rightHand}</span>
-                      </div>
-                      {slotStats.rightHand ? <p className="equipment-slot-stats">{slotStats.rightHand}</p> : null}
-                    </div>
-                    <div className="col-span-2 p-2.5 bg-[#23222A]/60 rounded-lg border border-[#6C5CE7]/20 hover:border-[#6C5CE7]/40 transition-all cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[#B8BCC8] text-xs">{slotLabel('body')}</span>
-                        <span className={`text-xs ${isEmptyValue(slotValues.body) ? 'text-[#8f94a3]' : 'text-[#E0E3EA]'}`}>{slotValues.body}</span>
-                      </div>
-                      {slotStats.body ? <p className="equipment-slot-stats">{slotStats.body}</p> : null}
-                    </div>
-                    <div className="p-2.5 bg-[#23222A]/60 rounded-lg border border-[#6C5CE7]/20 hover:border-[#6C5CE7]/40 transition-all cursor-pointer">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[#B8BCC8] text-xs">{slotLabel('arms')}</span>
-                        <span className={`text-xs font-medium ${isEmptyValue(slotValues.arms) ? 'text-[#8f94a3]' : 'text-[#E0E3EA]'}`}>{slotValues.arms}</span>
-                      </div>
-                      {slotStats.arms ? <p className="equipment-slot-stats">{slotStats.arms}</p> : null}
-                    </div>
-                    <div className="p-2.5 bg-[#23222A]/60 rounded-lg border border-[#6C5CE7]/20 hover:border-[#6C5CE7]/40 transition-all cursor-pointer">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[#B8BCC8] text-xs">{slotLabel('legs')}</span>
-                        <span className={`text-xs font-medium ${isEmptyValue(slotValues.legs) ? 'text-[#8f94a3]' : 'text-[#E0E3EA]'}`}>{slotValues.legs}</span>
-                      </div>
-                      {slotStats.legs ? <p className="equipment-slot-stats">{slotStats.legs}</p> : null}
-                    </div>
-                    <div className="col-span-2 p-2.5 bg-[#23222A]/60 rounded-lg border border-[#C6A75E]/30 hover:border-[#C6A75E]/50 transition-all cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[#B8BCC8] text-xs">{slotLabel('accessory')}</span>
-                        <span className={`text-xs font-medium ${isEmptyValue(slotValues.accessory) ? 'text-[#8f94a3]' : 'text-[#C6A75E]'}`}>{slotValues.accessory}</span>
-                      </div>
-                      {slotStats.accessory ? <p className="equipment-slot-stats">{slotStats.accessory}</p> : null}
-                    </div>
+                <div style={{ border: '1px solid var(--g-border)', background: 'rgba(7,5,10,0.6)', clipPath: 'polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px))', padding: '10px', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <Shield size={11} style={{ color: 'var(--g-gold-dim)', flexShrink: 0 }} />
+                    <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 9, letterSpacing: '0.24em', color: 'var(--g-gold-dim)', textTransform: 'uppercase' }}>{equipmentTitle}</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                    {([
+                      { slot: 'head' as const, span: 2 },
+                      { slot: 'leftHand' as const, span: 1 },
+                      { slot: 'rightHand' as const, span: 1 },
+                      { slot: 'body' as const, span: 2 },
+                      { slot: 'arms' as const, span: 1 },
+                      { slot: 'legs' as const, span: 1 },
+                      { slot: 'accessory' as const, span: 2 },
+                    ]).map(({ slot, span }) => {
+                      const isEmpty = isEmptyValue(slotValues[slot])
+                      const isAccessory = slot === 'accessory'
+                      return (
+                        <div key={slot} style={{ gridColumn: `span ${span}`, padding: '6px 8px', background: 'rgba(200,165,74,0.02)', border: '1px solid', borderColor: isAccessory && !isEmpty ? 'rgba(200,165,74,0.2)' : 'rgba(255,255,255,0.05)', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                            <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 8, letterSpacing: '0.14em', color: 'var(--g-parch-faint)', textTransform: 'uppercase', flexShrink: 0 }}>{slotLabel(slot)}</span>
+                            <span style={{ fontFamily: 'var(--g-font-body)', fontSize: 10, color: isEmpty ? 'rgba(255,255,255,0.12)' : isAccessory ? 'var(--g-gold-dim)' : 'var(--g-parch-dim)', textAlign: 'right' }}>{slotValues[slot]}</span>
+                          </div>
+                          {slotStats[slot] ? <p style={{ fontFamily: 'var(--g-font-title)', fontSize: 8, letterSpacing: '0.1em', color: 'var(--g-gold-dim)', opacity: 0.7, margin: '3px 0 0' }}>{slotStats[slot]}</p> : null}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               </>
@@ -3368,8 +3303,8 @@ const GameSession = () => {
                         <div className={`spell-item expandable ${expandedSpellIds.has(skill.id) ? 'open' : ''}`} key={skill.id}>
                           <button
                             type="button"
-                            className="expandable-header"
                             onClick={() => toggleExpanded(setExpandedSpellIds, skill.id)}
+                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 0', fontFamily: 'var(--g-font-title)', color: 'var(--g-parch-dim)', textAlign: 'left' }}
                           >
                             <strong>{skill.name}</strong>
                             <span className="item-count">{t('gameSession.ready')}</span>
@@ -3379,11 +3314,11 @@ const GameSession = () => {
                               <p>{skill.description}</p>
                               <button
                                 type="button"
-                                className="roll-btn optional"
                                 onClick={() => {
                                   pushSystemMessage(`${skill.name} ${t('gameSession.notice.skillUsed')}`)
                                   addSystemNotice(`${skill.name} ${t('gameSession.notice.skillUsed')}`)
                                 }}
+                                style={{ fontFamily: 'var(--g-font-title)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', border: '1px solid var(--g-border)', color: 'var(--g-parch-dim)', background: 'transparent', padding: '4px 12px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 5px) 0,100% 5px,100% 100%,5px 100%,0 calc(100% - 5px))' }}
                               >
                                 {t('gameSession.useTechnique')}
                               </button>
@@ -3405,8 +3340,8 @@ const GameSession = () => {
                         <div className={`spell-item expandable ${expandedSpellIds.has(spell.id) ? 'open' : ''} ${activeSpellId === spell.id ? 'casting' : ''}`} key={spell.id}>
                           <button
                             type="button"
-                            className="expandable-header"
                             onClick={() => toggleExpanded(setExpandedSpellIds, spell.id)}
+                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 0', fontFamily: 'var(--g-font-title)', color: 'var(--g-parch-dim)', textAlign: 'left' }}
                           >
                             <strong>{spell.name}</strong>
                             <span className="item-count">
@@ -3416,7 +3351,11 @@ const GameSession = () => {
                           {expandedSpellIds.has(spell.id) && (
                             <div className="expandable-body">
                               <p>{spell.description}</p>
-                              <button type="button" className="roll-btn optional" onClick={() => useSpell(spell)}>
+                              <button
+                                type="button"
+                                onClick={() => useSpell(spell)}
+                                style={{ fontFamily: 'var(--g-font-title)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', border: '1px solid var(--g-border)', color: 'var(--g-parch-dim)', background: 'transparent', padding: '4px 12px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 5px) 0,100% 5px,100% 100%,5px 100%,0 calc(100% - 5px))' }}
+                              >
                                 {t('gameSession.castSpell')}
                               </button>
                             </div>
@@ -3446,61 +3385,62 @@ const GameSession = () => {
                   const itemKey = `${entry}-${index}`
                   const isExpanded = expandedEquipmentItem === itemKey
                   return (
-                  <div className={`inventory-item equipment-entry ${isExpanded ? 'expanded' : ''}`} key={itemKey}>
-                    <div className="equipment-entry-main">
-                      <button
-                        type="button"
-                        className="equipment-name-btn"
-                        onClick={() => setExpandedEquipmentItem(prev => (prev === itemKey ? null : itemKey))}
-                      >
-                        {entry}
-                      </button>
-                      {itemStats ? <span className="equipment-inline-stats">{itemStats}</span> : null}
-                      <div className="equipment-actions">
-                        {isEquipped ? (
-                          <button
-                            type="button"
-                            className="equipment-action-btn unequip"
-                            title={unequipActionLabel}
-                            aria-label={unequipActionLabel}
-                            onClick={() =>
-                              updateStoredProfile(prev => {
-                                if (!prev) return prev
-                                const next = (prev.equipment || []).filter(item => item !== entry)
-                                return { ...prev, equipment: next }
-                              })
-                            }
-                          >
-                            <X size={12} />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="equipment-action-btn equip"
-                            title={equipActionLabel}
-                            aria-label={equipActionLabel}
-                            onClick={() =>
-                              updateStoredProfile(prev => {
-                                if (!prev) return prev
-                                const current = prev.equipment || []
-                                if (current.includes(entry)) return prev
-                                return { ...prev, equipment: [...current, entry] }
-                              })
-                            }
-                          >
-                            <Check size={12} />
-                          </button>
-                        )}
+                    <div className={`inventory-item equipment-entry ${isExpanded ? 'expanded' : ''}`} key={itemKey}>
+                      <div className="equipment-entry-main">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedEquipmentItem(prev => (prev === itemKey ? null : itemKey))}
+                          style={{ fontFamily: 'var(--g-font-title)', fontSize: 11, letterSpacing: '0.1em', border: 'none', color: isExpanded ? 'var(--g-gold)' : 'var(--g-parch-dim)', background: 'transparent', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+                        >
+                          {entry}
+                        </button>
+                        {itemStats ? <span className="equipment-inline-stats">{itemStats}</span> : null}
+                        <div className="equipment-actions">
+                          {isEquipped ? (
+                            <button
+                              type="button"
+                              title={unequipActionLabel}
+                              aria-label={unequipActionLabel}
+                              onClick={() =>
+                                updateStoredProfile(prev => {
+                                  if (!prev) return prev
+                                  const next = (prev.equipment || []).filter(item => item !== entry)
+                                  return { ...prev, equipment: next }
+                                })
+                              }
+                              style={{ border: '1px solid var(--g-border)', color: 'var(--g-parch-dim)', background: 'transparent', padding: '2px 5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              <X size={12} />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              title={equipActionLabel}
+                              aria-label={equipActionLabel}
+                              onClick={() =>
+                                updateStoredProfile(prev => {
+                                  if (!prev) return prev
+                                  const current = prev.equipment || []
+                                  if (current.includes(entry)) return prev
+                                  return { ...prev, equipment: [...current, entry] }
+                                })
+                              }
+                              style={{ border: '1px solid var(--g-gold-dim)', color: 'var(--g-gold-dim)', background: 'transparent', padding: '2px 5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              <Check size={12} />
+                            </button>
+                          )}
+                        </div>
                       </div>
+                      {isExpanded && (
+                        <>
+                          <p className="equipment-description">{itemDescription}</p>
+                          {itemStats ? <p className="equipment-description stats">{itemStats}</p> : null}
+                        </>
+                      )}
                     </div>
-                    {isExpanded && (
-                      <>
-                        <p className="equipment-description">{itemDescription}</p>
-                        {itemStats ? <p className="equipment-description stats">{itemStats}</p> : null}
-                      </>
-                    )}
-                  </div>
-                )})}
+                  )
+                })}
               </div>
             ) : (
               <p className="empty-text">{t('gameSession.empty.noItemsEquipped')}</p>
@@ -3531,8 +3471,8 @@ const GameSession = () => {
                   <div key={npc.id} className={`inventory-item npc-card expandable ${expandedNpcIds.has(npc.id) ? 'open' : ''}`}>
                     <button
                       type="button"
-                      className="expandable-header npc-header"
                       onClick={() => toggleExpanded(setExpandedNpcIds, npc.id)}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 0', fontFamily: 'var(--g-font-title)', color: 'var(--g-parch-dim)', textAlign: 'left' }}
                     >
                       <span>{npc.name}</span>
                     </button>
@@ -3571,347 +3511,423 @@ const GameSession = () => {
     { section: 'social' as SidebarSection, icon: Users, label: t('gameSession.npcs') }
   ]
 
+  // ── Derived display values ──
+  const hpMax = characterProfile?.customClassData?.stats
+    ? Math.max(20, Math.floor((((characterProfile.customClassData.stats as Record<string, number>).constitution ?? 10) - 10) / 2) * level + 20)
+    : 20
+  const mpMax = 24
+  const hpPct = Math.round((resources.hp / hpMax) * 100)
+  const mpPct = Math.round((resources.mp / mpMax) * 100)
+
+  const classIconMap: Record<string, string> = {
+    warrior: '⚔️', mage: '🧙', paladin: '🛡️', rogue: '🗡️',
+    cleric: '✨', warlock: '📖', ranger: '🏹', druid: '🌿', bard: '🎭',
+  }
+  const charIcon = (() => {
+    const c = (characterProfile?.class || '').toLowerCase()
+    return Object.entries(classIconMap).find(([k]) => c.includes(k))?.[1] ?? '🎲'
+  })()
+
+  const activeConditions = statusEffects.map(e => ({
+    name: e.name,
+    type: e.type as 'buff' | 'debuff' | 'condition',
+  }))
+
   return (
-    <div className="game-session gs-redesign">
-      <aside className="left-sidebar">
-        <div className="sidebar-buttons">
-          {sidebarButtons.map(button => (
-            <button
-              key={button.section}
-              className={`sidebar-btn ${activeSidebar === button.section ? 'active' : ''}`}
-              onClick={() => setActiveSidebar(button.section)}
-              title={button.label}
-              type="button"
+    <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden', background: 'var(--g-ink)', display: 'grid', gridTemplateColumns: '300px 1fr 280px', gridTemplateRows: '58px 1fr 110px' }}>
+
+      {/* ── FOG CANVAS ── */}
+      <canvas ref={fogCanvasRef} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }} />
+      {/* Grain */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none', backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.88' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E")` }} />
+      {/* Vignette */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 2, pointerEvents: 'none', background: 'radial-gradient(ellipse at 50% 50%, transparent 42%, rgba(3,2,6,0.72) 100%)' }} />
+
+      {/* ════════════════════════════════════
+          HEADER
+      ════════════════════════════════════ */}
+      <header style={{ gridColumn: '1/-1', position: 'relative', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 22px', background: 'rgba(4,2,8,0.88)', borderBottom: '1px solid var(--g-border)', backdropFilter: 'blur(6px)' }}>
+        {/* Left: logo + location */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <span onClick={() => navigate('/')} style={{ fontFamily: 'var(--g-font-display)', fontSize: 19, fontWeight: 700, color: 'var(--g-gold)', letterSpacing: '0.1em', textShadow: '0 0 16px rgba(200,165,74,0.3)', animation: 'g-flicker 8s ease-in-out infinite', cursor: 'pointer' }}>
+            Rol<span style={{ color: 'var(--g-blood2)' }}>l</span>ia
+          </span>
+          <div style={{ width: 1, height: 18, background: 'var(--g-border)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'var(--g-font-title)', fontSize: 11, letterSpacing: '0.2em', color: 'var(--g-parch-faint)', textTransform: 'uppercase' }}>
+            <div style={{ width: 5, height: 5, background: 'var(--g-blood2)', borderRadius: '50%', boxShadow: '0 0 6px rgba(168,28,48,0.6)', animation: 'g-pulse-dot 2.4s ease-in-out infinite' }} />
+            <span>{t('gameSession.default.soloTale')}</span>
+          </div>
+        </div>
+        {/* Center: time + turn */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontFamily: 'var(--g-font-italic)', fontSize: 11, fontStyle: 'italic', color: 'var(--g-parch-faint)' }}>
+            Level {level} · {characterProfile?.class || t('gameSession.default.adventurer')}
+          </span>
+          <div style={{ fontFamily: 'var(--g-font-title)', fontSize: 10, letterSpacing: '0.18em', color: 'var(--g-gold-dim)', border: '1px solid var(--g-border)', padding: '4px 13px', clipPath: 'polygon(0 0,calc(100% - 5px) 0,100% 5px,100% 100%,5px 100%,0 calc(100% - 5px))' }}>
+            {xp} XP
+          </div>
+        </div>
+        {/* Right: actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {sidebarButtons.map(btn => (
+            <button key={btn.section}
+              onClick={() => setActiveSidebar(btn.section)}
+              style={{ fontFamily: 'var(--g-font-title)', fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', border: '1px solid', borderColor: activeSidebar === btn.section ? 'rgba(200,165,74,0.35)' : 'var(--g-border)', color: activeSidebar === btn.section ? 'var(--g-gold)' : 'var(--g-parch-faint)', background: activeSidebar === btn.section ? 'rgba(200,165,74,0.07)' : 'transparent', padding: '5px 13px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))', transition: 'all 0.2s' }}
             >
-              <button.icon size={20} />
-              <span className="sidebar-btn-label">{button.label}</span>
+              {btn.label}
             </button>
           ))}
+          <div style={{ width: 1, height: 18, background: 'var(--g-border)' }} />
+          <button style={{ fontFamily: 'var(--g-font-title)', fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', border: '1px solid var(--g-border)', color: 'var(--g-parch-faint)', background: 'transparent', padding: '5px 13px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))', transition: 'all 0.2s' }}
+            onClick={() => void handleResetCampaignText()} disabled={isLoading}
+          >
+            Reset
+          </button>
         </div>
-        <div className="sidebar-panel">
-          <div className="sidebar-content">{renderSidebarContent()}</div>
-        </div>
-      </aside>
+      </header>
 
-      <section className="main-content">
-        {battleUiEnabled && battleState && battleState.phase !== 'ended' && (
-          <div className="battle-panel">
-            <div className="battle-header">
-              <h4>{t('gameSession.combatModeRound')} {battleState.round}</h4>
-              <span>{battleState.phase.replace('_', ' ')}</span>
-            </div>
-            <div className="battle-enemies">
-              {battleState.entities
-                .filter(entity => entity.type === 'enemy')
-                .map(enemy => (
-                  <div className="battle-enemy" key={enemy.id}>
-                    <strong>{enemy.name}</strong>
-                    <span>{enemy.hp} / {enemy.hp_max} HP</span>
-                  </div>
-                ))}
-            </div>
-            <div className="battle-log">
-              {combatEvents.slice(-4).map((event, index) => (
-                <p key={`${event.type}-${index}`}>{event.type}</p>
-              ))}
-            </div>
-          </div>
-        )}
+      {/* ════════════════════════════════════
+          LEFT — TAROT PANEL
+      ════════════════════════════════════ */}
+      <aside style={{ position: 'relative', zIndex: 10, borderRight: '1px solid var(--g-border)', background: 'rgba(7,5,10,0.72)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        <div className="chat-header">
-          <div className="chat-header-main">
-            <h2>The Gilded Griffin</h2>
-            <p>{t('gameSession.campaign')} {campaignId || t('gameSession.default.soloTale')} - {t('gameSession.level')} {level} {characterProfile?.class || t('gameSession.default.adventurer')}</p>
-          </div>
-          <div className="chat-header-actions">
-            <button
-              type="button"
-              className="log-export-btn"
-              onClick={() => void handleResetCampaignText()}
-              disabled={isLoading}
-            >
-              {language === 'ru' ? 'Сбросить чат' : 'Reset Chat'}
-            </button>
+        {/* Tarot card portrait */}
+        <div style={{ padding: '14px 14px 0', flexShrink: 0 }}>
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '2.2/3.5', maxHeight: 185, background: 'linear-gradient(170deg,#1a0f20 0%,#0f0c18 45%,#1c0c10 100%)', clipPath: 'polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))', border: '1px solid rgba(200,165,74,0.22)', overflow: 'hidden' }}>
+            {/* Bg glow */}
+            <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 70%,rgba(107,17,34,0.3) 0%,transparent 65%)' }} />
+            {/* Arcana label */}
+            <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', fontFamily: 'var(--g-font-title)', fontSize: 7, letterSpacing: '0.18em', color: 'rgba(200,165,74,0.35)', zIndex: 5, whiteSpace: 'nowrap' }}>
+              {characterProfile?.class?.toUpperCase() || 'THE WANDERER'}
+            </div>
+            {/* Top ornament bar */}
+            <div style={{ position: 'absolute', top: 18, left: 10, right: 10, height: 1, background: 'rgba(200,165,74,0.15)', zIndex: 4 }} />
+            {/* Figure */}
+            {resolvedAvatarUrl ? (
+              <img src={resolvedAvatarUrl} alt={characterProfile?.name || ''} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 2, opacity: 0.85 }} />
+            ) : (
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 68, filter: 'drop-shadow(0 4px 14px rgba(200,165,74,0.2))', zIndex: 2 }}>
+                {charIcon}
+              </div>
+            )}
+            {/* Bottom ornament bar */}
+            <div style={{ position: 'absolute', bottom: 18, left: 10, right: 10, height: 1, background: 'rgba(200,165,74,0.15)', zIndex: 4 }} />
+            {/* Inner border */}
+            <div style={{ position: 'absolute', inset: 4, border: '1px solid rgba(200,165,74,0.12)', clipPath: 'polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px))', pointerEvents: 'none', zIndex: 3 }} />
+            {/* Corners */}
+            <div className="g-corner g-corner-tl" /><div className="g-corner g-corner-tr" />
+            <div className="g-corner g-corner-bl" /><div className="g-corner g-corner-br" />
           </div>
         </div>
 
-        {battleUiEnabled && battleState && battleState.phase !== 'ended' && (
-          <div className="battle-panel">
-            <div className="battle-header">
-              <h4>{t('gameSession.combatModeRound')} {battleState.round}</h4>
-              <span>{battleState.phase.replace('_', ' ')}</span>
-            </div>
-            <div className="battle-enemies">
-              {battleState.entities
-                .filter(entity => entity.type === 'enemy')
-                .map(enemy => (
-                  <div className="battle-enemy" key={enemy.id}>
-                    <strong>{enemy.name}</strong>
-                    <span>{enemy.hp} / {enemy.hp_max} HP</span>
-                  </div>
-                ))}
-            </div>
-            <div className="battle-log">
-              {combatEvents.slice(-4).map((event, index) => (
-                <p key={`${event.type}-${index}`}>{event.type}</p>
-              ))}
-            </div>
-            <div className="combat-actions">
-              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'attack' })}>{t('gameSession.combat.attack')}</button>
-              <button type="button" className="roll-btn optional" onClick={() => sendCombatIntent({ action: 'defend', actor: 'player' })}>{t('gameSession.combat.defend')}</button>
-              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'move' })}>{t('gameSession.combat.move')}</button>
-              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'item' })}>{t('gameSession.combat.item')}</button>
-              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'spell' })}>{t('gameSession.combat.spell')}</button>
-              <button type="button" className="roll-btn optional" onClick={() => setCombatAction({ action: 'attempt' })}>{t('gameSession.combat.attempt')}</button>
-            </div>
-
-            {combatAction.action === 'attack' && (
-              <div className="combat-panel">
-                <p>{t('gameSession.combat.chooseTarget')}</p>
-                <div className="combat-targets">
-                  {getEnemyTargets().map(enemy => (
-                    <button
-                      key={enemy.id}
-                      type="button"
-                      className="roll-btn required"
-                      onClick={() => sendCombatIntent({ action: 'attack', actor: 'player', target: enemy.id })}
-                    >
-                      {enemy.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {combatAction.action === 'move' && (
-              <div className="combat-panel">
-                <p>{t('gameSession.combat.chooseMovement')}</p>
-                <div className="combat-targets">
-                  {[
-                    { value: 'closer', label: t('gameSession.combat.moveCloser') },
-                    { value: 'farther', label: t('gameSession.combat.moveFarther') },
-                    { value: 'cover', label: t('gameSession.combat.moveCover') }
-                  ].map(option => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className="roll-btn required"
-                      onClick={() => sendCombatIntent({ action: 'move', actor: 'player', params: { move_type: option.value } })}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {combatAction.action === 'item' && (
-              <div className="combat-panel">
-                <p>{t('gameSession.combat.selectItem')}</p>
-                <div className="combat-targets">
-                  {inventoryItems.filter(item => item.consumable).map(item => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className="roll-btn required"
-                      onClick={() => {
-                        useItem(item.id)
-                        sendCombatIntent({ action: 'item', actor: 'player', params: { item_id: item.id } })
-                      }}
-                    >
-                      {item.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {combatAction.action === 'spell' && (
-              <div className="combat-panel">
-                <p>{t('gameSession.combat.selectSpell')}</p>
-                <div className="combat-targets">
-                  {unlockedSpells.map(spell => (
-                    <button
-                      key={spell.id}
-                      type="button"
-                      className="roll-btn required"
-                      onClick={() => {
-                        useSpell(spell)
-                        sendCombatIntent({ action: 'spell', actor: 'player', params: { spell_id: spell.id } })
-                      }}
-                    >
-                      {spell.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {combatAction.action === 'attempt' && (
-              <div className="combat-panel">
-                <p>{t('gameSession.combat.describeAttempt')}</p>
-                <textarea
-                  className="combat-attempt-input"
-                  rows={2}
-                  value={attemptText}
-                  onChange={event => setAttemptText(event.target.value)}
-                />
-                <div className="combat-targets">
-                  {getEnemyTargets().map(enemy => (
-                    <button
-                      key={enemy.id}
-                      type="button"
-                      className="roll-btn required"
-                      onClick={() =>
-                        sendCombatIntent({
-                          action: 'attempt',
-                          actor: 'player',
-                          target: enemy.id,
-                          free_text: attemptText || 'attempt'
-                        })
-                      }
-                    >
-                      {enemy.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+        {/* Name + class */}
+        <div style={{ padding: '8px 14px 4px', textAlign: 'center', flexShrink: 0 }}>
+          <div style={{ fontFamily: 'var(--g-font-title)', fontSize: 16, fontWeight: 600, color: 'var(--g-gold)', letterSpacing: '0.07em', textShadow: '0 0 10px rgba(200,165,74,0.22)' }}>
+            {characterProfile?.name || t('gameSession.default.unnamedHero')}
           </div>
-        )}
+          <div style={{ fontFamily: 'var(--g-font-italic)', fontSize: 13, fontStyle: 'italic', color: 'var(--g-parch-faint)', marginTop: 3 }}>
+            {characterProfile?.class || t('gameSession.default.wanderer')}
+          </div>
+        </div>
 
-        <div className="chat-messages">
-          <div className="chat-messages-inner">
-            {messages.map(message => (
-              <div key={message.id} className={`message ${message.type}`}>
-                <div className="message-header">
-                  <span className="message-type">
-                    {message.type === 'dm'
-                      ? DM_DISPLAY_NAME
-                      : message.type === 'player'
-                      ? characterProfile?.name || t('gameSession.you')
-                      : t('gameSession.system')}
-                  </span>
-                  <span className="message-time">
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+        {/* Scrollable stats area */}
+        <div className="g-scroll" style={{ flex: 1, overflowY: 'auto', padding: '6px 14px 14px' }}>
+
+          {/* HP/MP/XP bars */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+            {[
+              { label: 'Vitality', val: resources.hp, max: hpMax, pct: hpPct, cls: 'g-bar-hp' },
+              { label: 'Arcane', val: resources.mp, max: mpMax, pct: mpPct, cls: 'g-bar-mp' },
+              { label: 'Experience', val: xp, max: nextThreshold, pct: xpProgress, cls: 'g-bar-xp' },
+            ].map(b => (
+              <div key={b.label}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <span className="g-label" style={{ fontSize: 7 }}>{b.label}</span>
+                  <span style={{ fontFamily: 'var(--g-font-body)', fontSize: 13, color: 'var(--g-parch-dim)' }}>{b.val}</span>
                 </div>
-                {message.type === 'dm' && message.sceneHeader && (
-                  <div className="scene-header-inline">{message.sceneHeader}</div>
-                )}
-                <div
-                  className={`message-content ${message.type === 'dm' ? 'dm-bubble dmBubble' : ''}`}
-                >
-                  {message.type === 'player' && message.roll && message.roll.status !== 'idle' && (
-                    <DiceRollHeader roll={message.roll} t={t} />
-                  )}
-                  {message.type === 'dm'
-                    ? renderMessageContent(message.content)
-                    : renderPlainTextSegment(message.content, `${message.id}-content`)}
-                </div>
+                <div className="g-bar"><div className={b.cls} style={{ width: `${b.pct}%` }} /></div>
               </div>
             ))}
-            {isLoading && (
-              <div className="message dm message-typing" aria-live="polite">
-                <div className="message-header">
-                  <span className="message-type">{DM_DISPLAY_NAME}</span>
-                  <span className="message-time">
-                    {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+          </div>
+
+          {/* Divider */}
+          <div className="g-divider" style={{ marginBottom: 8 }}><span className="g-divider-icon">✦</span></div>
+
+          {/* Attributes grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 4, marginBottom: 10 }}>
+            {(['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const).map(key => {
+              const statKey = ({ STR: 'strength', DEX: 'dexterity', CON: 'constitution', INT: 'intelligence', WIS: 'wisdom', CHA: 'charisma' } as const)[key]
+              const score = stats[statKey] ?? 10
+              const mod = Math.floor((score - 10) / 2)
+              return (
+                <div key={key} className="g-attr" style={{ padding: '5px 3px' }}>
+                  <span className="g-attr-value" style={{ fontSize: 17 }}>{score}</span>
+                  <span className="g-attr-mod">{mod >= 0 ? '+' : ''}{mod}</span>
+                  <span className="g-attr-label">{key}</span>
                 </div>
-                <div className="message-content dm-bubble dmBubble">
-                  <span className="typing-indicator">
-                    <span className="typing-label">{language === 'ru' ? 'Печатаем' : 'Typing'}</span>
-                    <span className="typing-dots">{TYPING_DOT_FRAMES[typingFrame]}</span>
+              )
+            })}
+          </div>
+
+          {/* Status conditions */}
+          {activeConditions.length > 0 && (
+            <>
+              <div className="g-divider" style={{ marginBottom: 8 }}><span className="g-divider-icon">✦</span></div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {activeConditions.map((c, i) => (
+                  <span key={i} className={`g-tag ${c.type === 'buff' ? 'g-tag-buff' : 'g-tag-debuff'}`} style={{ fontSize: 9 }}>
+                    {c.name}
                   </span>
+                ))}
+              </div>
+            </>
+          )}
+
+        </div>
+      </aside>
+
+      {/* ════════════════════════════════════
+          CENTER — INK SCROLL NARRATIVE
+      ════════════════════════════════════ */}
+      <main style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', background: 'rgba(5,3,8,0.45)', overflow: 'hidden' }}>
+
+        {/* Parchment overlay */}
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1, background: 'radial-gradient(ellipse at 50% 0%,rgba(200,165,74,0.02) 0%,transparent 55%)' }} />
+
+        {/* Scroll top rod */}
+        <div style={{ position: 'relative', zIndex: 3, flexShrink: 0, padding: '8px 24px 0', display: 'flex', alignItems: 'center', gap: 0 }}>
+          <div style={{ flex: 1, height: 8, background: 'linear-gradient(180deg,rgba(200,165,74,0.14) 0%,rgba(200,165,74,0.05) 50%,rgba(200,165,74,0.14) 100%)', borderTop: '1px solid rgba(200,165,74,0.15)', borderBottom: '1px solid rgba(200,165,74,0.07)', position: 'relative' }}>
+            <div style={{ position: 'absolute', top: '50%', left: 0, transform: 'translateY(-50%)', width: 8, height: 8, borderRadius: '50%', background: 'radial-gradient(circle,rgba(200,165,74,0.4) 0%,rgba(200,165,74,0.08) 100%)', border: '1px solid rgba(200,165,74,0.25)' }} />
+            <div style={{ position: 'absolute', top: '50%', right: 0, transform: 'translateY(-50%)', width: 8, height: 8, borderRadius: '50%', background: 'radial-gradient(circle,rgba(200,165,74,0.4) 0%,rgba(200,165,74,0.08) 100%)', border: '1px solid rgba(200,165,74,0.25)' }} />
+          </div>
+          <div style={{ padding: '0 14px', fontFamily: 'var(--g-font-title)', fontSize: 11, letterSpacing: '0.18em', color: 'var(--g-parch-faint)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            ⟨ {t('gameSession.default.soloTale')} ⟩
+          </div>
+          <div style={{ flex: 1, height: 8, background: 'linear-gradient(180deg,rgba(200,165,74,0.14) 0%,rgba(200,165,74,0.05) 50%,rgba(200,165,74,0.14) 100%)', borderTop: '1px solid rgba(200,165,74,0.15)', borderBottom: '1px solid rgba(200,165,74,0.07)' }}>
+            <div style={{ position: 'absolute', top: '50%', left: 0, transform: 'translateY(-50%)', width: 8, height: 8, borderRadius: '50%', background: 'radial-gradient(circle,rgba(200,165,74,0.4) 0%,rgba(200,165,74,0.08) 100%)', border: '1px solid rgba(200,165,74,0.25)' }} />
+            <div style={{ position: 'absolute', top: '50%', right: 0, transform: 'translateY(-50%)', width: 8, height: 8, borderRadius: '50%', background: 'radial-gradient(circle,rgba(200,165,74,0.4) 0%,rgba(200,165,74,0.08) 100%)', border: '1px solid rgba(200,165,74,0.25)' }} />
+          </div>
+        </div>
+
+        {/* Combat banner */}
+        {battleUiEnabled && battleState && battleState.phase !== 'ended' && (
+          <div style={{ position: 'relative', zIndex: 3, flexShrink: 0, margin: '6px 16px 0', border: '1px solid rgba(168,28,48,0.4)', background: 'rgba(107,17,34,0.12)', clipPath: 'polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px))', padding: '10px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 9, letterSpacing: '0.2em', color: 'var(--g-blood2)', textTransform: 'uppercase' }}>
+                ⚔ {t('gameSession.combatModeRound')} {battleState.round}
+              </span>
+              <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 8, color: 'var(--g-parch-faint)', letterSpacing: '0.1em' }}>
+                {battleState.phase.replace('_', ' ')}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+              {battleState.entities.filter(e => e.type === 'enemy').map(enemy => (
+                <div key={enemy.id} style={{ fontFamily: 'var(--g-font-title)', fontSize: 9, color: 'var(--g-parch-dim)', border: '1px solid var(--g-border)', padding: '2px 8px', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))' }}>
+                  {enemy.name} · {enemy.hp}/{enemy.hp_max} HP
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {([
+                { action: 'attack', label: t('gameSession.combat.attack') },
+                { action: 'defend', label: t('gameSession.combat.defend') },
+                { action: 'move', label: t('gameSession.combat.move') },
+                { action: 'item', label: t('gameSession.combat.item') },
+                { action: 'spell', label: t('gameSession.combat.spell') },
+                { action: 'attempt', label: t('gameSession.combat.attempt') },
+              ] as const).map(act => (
+                <button key={act.action}
+                  onClick={() => act.action === 'defend'
+                    ? sendCombatIntent({ action: 'defend', actor: 'player' })
+                    : setCombatAction({ action: act.action as ActionIntent['action'] })
+                  }
+                  style={{ fontFamily: 'var(--g-font-title)', fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase', border: '1px solid', borderColor: combatAction.action === act.action ? 'var(--g-gold)' : 'var(--g-border)', color: combatAction.action === act.action ? 'var(--g-gold)' : 'var(--g-parch-faint)', background: combatAction.action === act.action ? 'rgba(200,165,74,0.07)' : 'transparent', padding: '4px 10px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))', transition: 'all 0.2s' }}
+                >
+                  {act.label}
+                </button>
+              ))}
+            </div>
+            {combatAction.action === 'attack' && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontFamily: 'var(--g-font-italic)', fontSize: 12, fontStyle: 'italic', color: 'var(--g-parch-faint)', marginBottom: 5 }}>{t('gameSession.combat.chooseTarget')}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {getEnemyTargets().map(enemy => (
+                    <button key={enemy.id} onClick={() => sendCombatIntent({ action: 'attack', actor: 'player', target: enemy.id })}
+                      style={{ fontFamily: 'var(--g-font-title)', fontSize: 9, border: '1px solid var(--g-blood)', color: 'var(--g-blood2)', background: 'rgba(107,17,34,0.15)', padding: '4px 12px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))' }}
+                    >{enemy.name}</button>
+                  ))}
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
+            {combatAction.action === 'move' && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontFamily: 'var(--g-font-italic)', fontSize: 12, fontStyle: 'italic', color: 'var(--g-parch-faint)', marginBottom: 5 }}>{t('gameSession.combat.chooseMovement')}</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[{ value: 'closer', label: t('gameSession.combat.moveCloser') }, { value: 'farther', label: t('gameSession.combat.moveFarther') }, { value: 'cover', label: t('gameSession.combat.moveCover') }].map(opt => (
+                    <button key={opt.value} onClick={() => sendCombatIntent({ action: 'move', actor: 'player', params: { move_type: opt.value } })}
+                      style={{ fontFamily: 'var(--g-font-title)', fontSize: 9, border: '1px solid var(--g-border)', color: 'var(--g-parch-dim)', background: 'transparent', padding: '4px 12px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))' }}
+                    >{opt.label}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {combatAction.action === 'item' && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontFamily: 'var(--g-font-italic)', fontSize: 12, fontStyle: 'italic', color: 'var(--g-parch-faint)', marginBottom: 5 }}>{t('gameSession.combat.selectItem')}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {inventoryItems.filter(item => item.consumable).map(item => (
+                    <button key={item.id} onClick={() => { useItem(item.id); sendCombatIntent({ action: 'item', actor: 'player', params: { item_id: item.id } }) }}
+                      style={{ fontFamily: 'var(--g-font-title)', fontSize: 9, border: '1px solid var(--g-border)', color: 'var(--g-parch-dim)', background: 'transparent', padding: '4px 12px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))' }}
+                    >{item.name}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {combatAction.action === 'spell' && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontFamily: 'var(--g-font-italic)', fontSize: 12, fontStyle: 'italic', color: 'var(--g-parch-faint)', marginBottom: 5 }}>{t('gameSession.combat.selectSpell')}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {unlockedSpells.map(spell => (
+                    <button key={spell.id} onClick={() => { useSpell(spell); sendCombatIntent({ action: 'spell', actor: 'player', params: { spell_id: spell.id } }) }}
+                      style={{ fontFamily: 'var(--g-font-title)', fontSize: 9, border: '1px solid var(--g-border)', color: 'var(--g-parch-dim)', background: 'transparent', padding: '4px 12px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))' }}
+                    >{spell.name}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {combatAction.action === 'attempt' && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontFamily: 'var(--g-font-italic)', fontSize: 12, fontStyle: 'italic', color: 'var(--g-parch-faint)', marginBottom: 5 }}>{t('gameSession.combat.describeAttempt')}</div>
+                <textarea rows={2} value={attemptText} onChange={e => setAttemptText(e.target.value)}
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--g-border)', color: 'var(--g-parch)', fontFamily: 'var(--g-font-mono)', fontSize: 12, padding: '6px 10px', outline: 'none', resize: 'none', marginBottom: 6, clipPath: 'polygon(0 0,calc(100% - 5px) 0,100% 5px,100% 100%,5px 100%,0 calc(100% - 5px))' }}
+                />
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {getEnemyTargets().map(enemy => (
+                    <button key={enemy.id} onClick={() => sendCombatIntent({ action: 'attempt', actor: 'player', target: enemy.id, free_text: attemptText || 'attempt' })}
+                      style={{ fontFamily: 'var(--g-font-title)', fontSize: 9, border: '1px solid var(--g-blood)', color: 'var(--g-blood2)', background: 'rgba(107,17,34,0.15)', padding: '4px 12px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))' }}
+                    >{enemy.name}</button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+        )}
+
+        {/* Message feed */}
+        <div className="g-scroll" style={{ flex: 1, overflowY: 'auto', padding: '22px 32px 12px', position: 'relative', zIndex: 2 }}>
+          {messages.map(message => (
+            <div key={message.id} style={{ marginBottom: 24, animation: 'g-typing 0.4s ease forwards' }}>
+
+              {/* DM message */}
+              {message.type === 'dm' && (
+                <div style={{
+                  padding: '18px 22px 18px 28px', background: 'rgba(0,0,0,0.18)', borderLeft: '2px solid var(--g-blood)', position: 'relative',
+                  // Ink reveal animation
+                  animationName: 'inkReveal',
+                  animationDuration: '0.6s',
+                  animationTimingFunction: 'cubic-bezier(0.22,0.68,0,1.2)',
+                  animationFillMode: 'forwards',
+                }}>
+                  <div style={{ position: 'absolute', top: 12, left: -10, color: 'var(--g-blood2)', fontSize: 13, background: 'rgba(5,3,8,0.95)', lineHeight: 1 }}>❧</div>
+                  {message.sceneHeader && (
+                    <div style={{ fontFamily: 'var(--g-font-title)', fontSize: 9, letterSpacing: '0.2em', color: 'var(--g-gold-dim)', textTransform: 'uppercase', marginBottom: 8, opacity: 0.7 }}>
+                      {message.sceneHeader}
+                    </div>
+                  )}
+                  <div style={{ fontFamily: 'var(--g-font-body)', fontSize: 18, lineHeight: 1.78, color: 'var(--g-parch)', fontStyle: 'italic' }}>
+                    {renderMessageContent(message.content)}
+                  </div>
+                </div>
+              )}
+
+              {/* Player message */}
+              {message.type === 'player' && (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, paddingLeft: 6 }}>
+                  <div style={{ width: 22, height: 22, flexShrink: 0, border: '1px solid var(--g-gold-dim)', background: 'rgba(200,165,74,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--g-gold-dim)', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))' }}>
+                    ⚔
+                  </div>
+                  <div style={{ paddingTop: 3 }}>
+                    {message.roll && message.roll.status !== 'idle' && (
+                      <DiceRollHeader roll={message.roll} t={t} />
+                    )}
+                    <div style={{ fontFamily: 'var(--g-font-mono)', fontSize: 15, lineHeight: 1.55, color: 'var(--g-parch-dim)' }}>
+                      {renderPlainTextSegment(message.content, `${message.id}-content`)}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* System message */}
+              {message.type === 'system' && (
+                <div style={{ textAlign: 'center', padding: '4px' }}>
+                  <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 11, letterSpacing: '0.25em', color: 'var(--g-gold-dim)', textTransform: 'uppercase', opacity: 0.5 }}>
+                    {message.content}
+                  </span>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Typing indicator */}
+          {isLoading && (
+            <div style={{ padding: '14px 18px 14px 22px', background: 'rgba(0,0,0,0.14)', borderLeft: '2px solid rgba(107,17,34,0.4)', marginBottom: 18 }}>
+              <div style={{ position: 'absolute', left: -10, color: 'rgba(168,28,48,0.4)', fontSize: 13, background: 'rgba(5,3,8,0.95)' }}>❧</div>
+              <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 10, letterSpacing: '0.2em', color: 'var(--g-parch-faint)', textTransform: 'uppercase' }}>
+                {language === 'ru' ? 'Печатаем' : 'Typing'} {TYPING_DOT_FRAMES[typingFrame]}
+              </span>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
         </div>
+      </main>
 
-        <form className="chat-input-container" onSubmit={handleSendMessage}>
-          <textarea
-            ref={inputRef}
-            className="chat-input"
-            rows={3}
-            placeholder={t('gameSession.chatPlaceholder')}
-            value={inputValue}
-            onChange={event => setInputValue(event.target.value)}
-            onKeyDown={handleInputKeyDown}
-            disabled={isLoading}
-          />
-          <div className="input-actions">
-            <button
-              type="submit"
-              className="send-btn"
-              disabled={!inputValue.trim() || isLoading}
-              aria-label={t('gameSession.sendAction')}
-            >
-              {isLoading ? <span className="loading-spinner" /> : <Send size={18} />}
-            </button>
+      {/* ════════════════════════════════════
+          RIGHT — JOURNAL / SIDEBAR
+      ════════════════════════════════════ */}
+      <aside style={{ position: 'relative', zIndex: 10, borderLeft: '1px solid var(--g-border)', background: 'rgba(7,5,10,0.7)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="g-scroll" style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ padding: '16px 16px 12px' }}>
+            <div className="g-section-title">{sidebarButtons.find(b => b.section === activeSidebar)?.label || ''}</div>
           </div>
-        </form>
-      </section>
-
-      <aside className="right-sidebar">
-        <div className="player-info">
-          <h3>{t('gameSession.default.adventurer')}</h3>
-            <div className="player-card">
-              <div className="player-avatar">
-                {resolvedAvatarUrl ? (
-                  <img src={resolvedAvatarUrl} alt={`${characterProfile?.name || t('gameSession.player')} ${t('gameSession.avatar')}`} />
-                ) : (
-                  <span>{characterProfile?.name?.charAt(0) || '?'}</span>
-                )}
-              </div>
-            <div className="player-details">
-              <h4>{characterProfile?.name || t('gameSession.default.unnamedHero')}</h4>
-              <p>{characterProfile?.class || t('gameSession.default.wanderer')}</p>
-            </div>
-            <div className="player-stats">
-              <div className="stat-bar">
-                <span className="stat-label">HP</span>
-                <div className="bar-container">
-                  <div className="bar hp-bar" style={{ width: '100%' }} />
-                </div>
-                <span className="stat-value">{resources.hp}</span>
-              </div>
-              <div className="stat-bar">
-                <span className="stat-label">MP</span>
-                <div className="bar-container">
-                  <div className="bar mp-bar" style={{ width: '100%' }} />
-                </div>
-                <span className="stat-value">{resources.mp}</span>
-              </div>
-              <div className="stat-bar">
-                <span className="stat-label">XP</span>
-                <div className="bar-container">
-                  <div className="bar xp-bar" style={{ width: `${xpProgress}%` }} />
-                </div>
-                <span className="stat-value">
-                  {xp} / {nextThreshold}
-                </span>
-              </div>
-            </div>
-            <div className="status-effects">
-              <span className="status-label">{t('gameSession.unlockedAbilities')}</span>
-              <div className="effects-list">
-                {unlockedAbilities.length ? (
-                  unlockedAbilities.slice(0, 4).map(ability => (
-                    <span className="effect-tag" key={ability.id}>
-                      {ability.name}
-                    </span>
-                  ))
-                ) : (
-                  <span className="effect-tag">{t('gameSession.noneYet')}</span>
-                )}
-              </div>
-            </div>
+          <div className="gs-sidebar-body" style={{ padding: '0 13px 14px' }}>
+            {renderSidebarContent()}
           </div>
         </div>
       </aside>
+
+      {/* ════════════════════════════════════
+          INPUT BAR
+      ════════════════════════════════════ */}
+      <div style={{ gridColumn: '1/-1', position: 'relative', zIndex: 50, display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', background: 'rgba(4,2,8,0.9)', borderTop: '1px solid var(--g-border)', backdropFilter: 'blur(6px)' }}>
+        <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 8, letterSpacing: '0.2em', color: 'var(--g-gold-dim)', textTransform: 'uppercase', whiteSpace: 'nowrap', opacity: 0.6 }}>
+          {t('gameSession.your-action')}
+        </span>
+        <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <span style={{ position: 'absolute', left: 12, color: 'var(--g-blood2)', fontSize: 15, pointerEvents: 'none', opacity: 0.7 }}>⟩</span>
+          <textarea
+            ref={inputRef}
+            rows={2}
+            value={inputValue}
+            onChange={e => setInputValue(e.target.value)}
+            onKeyDown={handleInputKeyDown}
+            disabled={isLoading}
+            placeholder={t('gameSession.chatPlaceholder')}
+            style={{ width: '100%', background: 'rgba(255,255,255,0.018)', border: '1px solid var(--g-border)', borderBottom: '1px solid rgba(200,165,74,0.28)', color: 'var(--g-parch)', fontFamily: 'var(--g-font-mono)', fontSize: 15, padding: '11px 14px 11px 34px', outline: 'none', resize: 'none', lineHeight: 1.5, clipPath: 'polygon(0 0,calc(100% - 9px) 0,100% 9px,100% 100%,9px 100%,0 calc(100% - 9px))', transition: 'border-color 0.2s,background 0.2s' }}
+            onFocus={e => { e.target.style.borderBottomColor = 'var(--g-gold)'; e.target.style.background = 'rgba(200,165,74,0.022)' }}
+            onBlur={e => { e.target.style.borderBottomColor = 'rgba(200,165,74,0.28)'; e.target.style.background = 'rgba(255,255,255,0.018)' }}
+          />
+        </div>
+        <button
+          onClick={e => { e.preventDefault(); void handleSendMessage(e as unknown as React.FormEvent) }}
+          disabled={!inputValue.trim() || isLoading}
+          style={{ background: 'transparent', border: '1px solid var(--g-blood)', color: 'var(--g-blood2)', fontFamily: 'var(--g-font-title)', fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', padding: '12px 22px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 6px) 0,100% 6px,100% 100%,6px 100%,0 calc(100% - 6px))', transition: 'all 0.2s', opacity: !inputValue.trim() || isLoading ? 0.4 : 1, whiteSpace: 'nowrap' }}
+          onMouseEnter={e => { if (inputValue.trim() && !isLoading) { (e.target as HTMLElement).style.background = 'rgba(107,17,34,0.28)'; (e.target as HTMLElement).style.color = 'var(--g-parch)' } }}
+          onMouseLeave={e => { (e.target as HTMLElement).style.background = 'transparent'; (e.target as HTMLElement).style.color = 'var(--g-blood2)' }}
+        >
+          {isLoading ? '...' : 'Invoke ✦'}
+        </button>
+      </div>
+
     </div>
   )
 }

@@ -1220,7 +1220,11 @@ router.post('/dm-response', async (req, res) => {
         rawText: effectivePlayerAction,
         segments,
         lastResolvedAction: gameState.lastResolvedAction || null,
-        sceneContext: null
+        sceneContext: {
+          memory: memoryContext,
+          recentEvents: recentEvents,
+          location: sceneState.location
+        }
       })
       console.log('Intent decision:', {
         intentType: decision.intentType,

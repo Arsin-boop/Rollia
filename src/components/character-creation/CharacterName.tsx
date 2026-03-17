@@ -1,58 +1,45 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
-import { ArrowRight } from "lucide-react";
-import { StarryBackground } from "../StarryBackground";
-import { useI18n } from "../../i18n";
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useI18n } from '../../i18n'
+import { CharacterWizardLayout } from './CharacterWizardLayout'
 
 export function CharacterName() {
-  const navigate = useNavigate();
-  const { t } = useI18n();
-  const [name, setName] = useState("");
+  const navigate = useNavigate()
+  const { t }    = useI18n()
+  const [name, setName] = useState(localStorage.getItem('characterName') || '')
 
   const handleNext = () => {
-    if (name.trim()) {
-      localStorage.setItem("characterName", name);
-      navigate("/character/class");
-    }
-  };
+    if (!name.trim()) return
+    localStorage.setItem('characterName', name.trim())
+    navigate('/character/class')
+  }
 
   return (
-    <div className="size-full flex items-center justify-center bg-[#1C1B22] relative overflow-hidden">
-      <StarryBackground />
-      
-      <div className="w-full max-w-md p-8 space-y-6 bg-slate-800/50 rounded-lg border border-[#6C5CE7]/30 relative z-10">
-        <div className="space-y-2">
-          <h2 className="text-3xl font-bold text-white">{t("characterName.title")}</h2>
-          <p className="text-[#B8BCC8]">{t("characterName.step")}</p>
+    <CharacterWizardLayout
+      step={{ number: 1, total: 5, title: t('characterName.title'), hint: t('characterName.step') }}
+      onNext={handleNext}
+      nextDisabled={!name.trim()}
+      nextLabel={t('common.next') + ' →'}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <label className="g-label" style={{ marginBottom: 4 }}>
+          {t('characterName.label')}
+        </label>
+        <div style={{ position: 'relative' }}>
+          <input
+            autoFocus
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleNext()}
+            placeholder={t('characterName.placeholder')}
+            className="g-input"
+            style={{ fontSize: 16, padding: '12px 16px' }}
+          />
         </div>
-
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name" className="text-white">{t("characterName.label")}</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t("characterName.placeholder")}
-              className="bg-slate-700 border-[#6C5CE7]/30 text-white"
-              onKeyPress={(e) => e.key === "Enter" && handleNext()}
-            />
-          </div>
-
-          <Button
-            onClick={handleNext}
-            disabled={!name.trim()}
-            className="w-full gap-2 bg-[#6C5CE7] hover:bg-[#5F4FD1]"
-          >
-            {t("common.next")}
-            <ArrowRight className="size-4" />
-          </Button>
-        </div>
+        <p style={{ fontFamily: 'var(--g-font-italic)', fontStyle: 'italic', fontSize: 12, color: 'rgba(200,165,74,0.35)', marginTop: 4 }}>
+          This name will echo through every tale that follows.
+        </p>
       </div>
-    </div>
-  );
+    </CharacterWizardLayout>
+  )
 }
-

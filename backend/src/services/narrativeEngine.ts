@@ -111,55 +111,17 @@ Required JSON schema (exactly these fields):
 }
 
 Field rules:
-- "scene.location" MUST equal the Location provided in Context. Do NOT invent or change it.
-- "scene.time" MUST equal the Time provided in Context. If Time is "Unspecified", derive it from the narrative but keep it consistent with previous turns. Do NOT output "Unspecified", "Unknown", "Не указано", "Неопределено" or any equivalent — use a concrete time of day instead.
+- "scene.location" MUST match the Location provided in Context. NEVER change, move, or 'hallucinate' a location shift unless the Director Notes explicitly state a successful move occurred.
+- "scene.time" MUST be consistent with Context → Time. Do NOT output "Unspecified" or vague terms; if unspecified, pick a concrete time and stick with it.
 - "narration" must contain only narrative events and character actions.
 - Do NOT include location or time inside "narration".
-- Do NOT use game terms like "NPC", "Tension", "tension level", "boss", "mob", "HP", "XP" inside "narration" — use character names, roles, or descriptive prose instead.
-- "choices" must be an array with exactly 3 elements.
-- Each choice must be a short actionable sentence.
-
-Valid response example (structure only — do NOT copy this content):
-{
-  "scene": {
-    "location": "<current scene location>",
-    "time": "<time of day>"
-  },
-  "narration": "<2-3 paragraphs of narrative prose based on the current scene>",
-  "choices": [
-    "<first actionable option>",
-    "<second actionable option>",
-    "<third actionable option>"
-  ]
-}
-
-Rules:
-- Describe the immediate consequences of the player's action.
-- Describe events clearly and concretely.
-- CRITICAL: Avoid poetic, abstract, philosophical, or cryptic narration entirely. Do not use metaphors about "the air growing heavy" or "destiny weaving".
-- CRITICAL: You are a strict simulation engine. Do not invent events or locations not justified by the context.
-- Do not avoid answering direct player questions. If a player asks something, the NPC must reply based on their motivations.
-- If the player reads or examines a document (letter, note, book, map, inscription), reveal its contents or provide a concrete summary.
-- If the player inspects an object, container, or area, include the explicit result of that inspection.
-- NPC logic (strict): NPCs must act logically based ONLY on their stated motivations, emotional state, and recent events. They do NOT possess omniscient knowledge.
-- Never invent game mechanics, dice results, or rules.
-- Never override the Director.
-- Generate exactly 3 actionable choices. Ensure the final sentence of narration hands agency back to the player.
-- Keep choices short and distinct.
-- Return scene metadata only in the "scene" object.
-- Never place location/time lines inside "narration".
-- If an NPC speaks, wrap dialogue with tags:
-  <npc id="npc_id">"Dialogue"</npc>
-- Keep narration outside <npc> tags.
-- Do not output markdown bullets inside "narration".
-- Scene continuity rules (strict):
-  1) The location in "scene.location" MUST be copied verbatim from Context → Location. NEVER invent a new location mid-scene.
-  2) The time in "scene.time" MUST be consistent with Context → Time. Never reset or vague-ify the time.
-  3) Do NOT introduce new NPCs unless they are already listed in the scene context or make absolute logical sense based on the Director Notes.
-  4) Focus on immediate, physical consequences of the latest player action.
-  5) Quest hooks in the Player Profile are hints for future story seeds — do NOT stage them as immediate events.
-  6) Do NOT use meta game terms (NPC, Tension, HP, XP, boss) in narration — describe through fiction.
-  7) Director Instructions are authoritative — follow them but do not quote or paraphrase them in narration.
+- Do NOT use game terms like "NPC", "Tension", "HP", "XP" inside "narration".
+- "choices" must be an array with exactly 3 actionable elements.
+- CHARACTER LOGIC: NPCs MUST act logically based on their history, mood, and recent events. They are NOT omniscient. 
+- SPATIAL GROUNDING: Players and NPCs cannot teleport. Respect walls, floors, and distances.
+- NO POETIC VAGUENESS: Avoid abstract metaphors (e.g., "shadows of fate") in favor of physical, concrete descriptions.
+- CONSISTENCY: Do NOT contradict recent history or current world state.
+${russianGrammarRules} in narration.
 ${russianGrammarRules}
 
 Context:
@@ -198,7 +160,17 @@ ${safeString(context.playerAction, '').trim()}`
 
 export function parseNarrativeResponse(response: string): NarrativeResult | null {
   try {
-    const parsed = JSON.parse(response) as Partial<NarrativeResult>
+    // Strip <think>...</think> blocks (Qwen3 thinking mode)
+    let cleaned = response.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+    // Strip markdown code fences
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+    // Extract first {...} JSON object
+    const start = cleaned.indexOf('{')
+    const end = cleaned.lastIndexOf('}')
+    if (start === -1 || end === -1) return null
+    cleaned = cleaned.slice(start, end + 1)
+
+    const parsed = JSON.parse(cleaned) as Partial<NarrativeResult>
     const candidate: Partial<NarrativeResult> = {
       scene:
         parsed.scene && typeof parsed.scene === 'object'
@@ -244,8 +216,7 @@ export async function runNarrativeEngine(
           : `${prompt}\n\n${language === 'ru' ? 'Output in Russian (Cyrillic).' : 'Output in English.'}`,
       temperature: 0.3, // Lowered temperature to reduce hallucinations/poetry
       maxTokens: 900,
-      taskType: 'DM_NARRATION',
-      responseFormat: { type: 'json_object' }
+      taskType: 'DM_NARRATION'
     })
 
   const firstRaw = await callModel()
