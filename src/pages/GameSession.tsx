@@ -826,7 +826,7 @@ const GameSession = () => {
   const [openingSeed, setOpeningSeed] = useState(0)
   const battleUiEnabled = false
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const fogCanvasRef = useEmberCanvas({ count: 55 })
+  const fogCanvasRef = useEmberCanvas({ count: 55, spawnYFactor: 0.95 })
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const questInitRef = useRef(false)
   const backstorySummaryAttemptedRef = useRef(false)
@@ -2047,9 +2047,9 @@ const GameSession = () => {
           id: 'player',
           name: characterProfile?.name || 'Player',
           hp: resources.hp,
-          hp_max: resources.hp,
+          hp_max: maxResources.hp,
           mp: resources.mp,
-          mp_max: resources.mp
+          mp_max: maxResources.mp
         }
         startBattle({
           campaignId: campaignId || 'local',
@@ -3533,10 +3533,17 @@ const GameSession = () => {
   ]
 
   // ── Derived display values ──
-  const hpMax = characterProfile?.customClassData?.stats
-    ? Math.max(20, Math.floor((((characterProfile.customClassData.stats as Record<string, number>).constitution ?? 10) - 10) / 2) * level + 20)
-    : 20
-  const mpMax = 24
+  const maxResources = useMemo(() => {
+    const profile = characterProfile
+    if (!profile) return { hp: 24, mp: 16 }
+    const s = profile.customClassData?.stats || DEFAULT_STATS
+    const hitDie = Number(profile.customClassData?.hitDie?.replace('d', '')) || 8
+    const maxHp = Math.max(1, hitDie + (s.constitution || DEFAULT_STATS.constitution))
+    const maxMp = Math.max(8, Math.round(((s.intelligence || 10) + (s.wisdom || 10) + (s.charisma || 10)) / 3))
+    return { hp: maxHp, mp: maxMp }
+  }, [characterProfile])
+  const hpMax = maxResources.hp
+  const mpMax = maxResources.mp
   const hpPct = Math.round((resources.hp / hpMax) * 100)
   const mpPct = Math.round((resources.mp / mpMax) * 100)
 
@@ -3603,6 +3610,11 @@ const GameSession = () => {
             onClick={() => void handleResetCampaignText()} disabled={isLoading}
           >
             Reset
+          </button>
+          <button style={{ fontFamily: 'var(--g-font-title)', fontSize: 13, letterSpacing: '0.08em', textTransform: 'uppercase', border: '1px solid rgba(200,165,74,0.3)', color: 'rgba(200,165,74,0.7)', background: 'transparent', padding: '5px 13px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))', transition: 'all 0.2s' }}
+            onClick={handleExportTranscript} disabled={!messages.length}
+          >
+            Export Log
           </button>
         </div>
       </header>

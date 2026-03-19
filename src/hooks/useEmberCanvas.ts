@@ -3,10 +3,11 @@ import { useEffect, useRef } from 'react'
 interface EmberOptions {
   count?: number
   includeRunes?: boolean
+  spawnYFactor?: number
 }
 
 export function useEmberCanvas(options: EmberOptions = {}) {
-  const { count = 120, includeRunes = false } = options
+  const { count = 120, includeRunes = false, spawnYFactor = 1.0 } = options
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -55,8 +56,8 @@ export function useEmberCanvas(options: EmberOptions = {}) {
         // Угольки вылетают из нижней трети экрана, не из одной точки
         this.x = w * 0.2 + Math.random() * w * 0.6
         this.y = init
-          ? h * 0.4 + Math.random() * h * 0.6
-          : h + Math.random() * 40
+          ? Math.random() * h * spawnYFactor
+          : h * spawnYFactor + Math.random() * 40
 
         // Форма угольков: вытянутые или почти круглые, небольшие
         const baseR = Math.random() * 1.6 + 0.5
@@ -332,7 +333,7 @@ export function useEmberCanvas(options: EmberOptions = {}) {
       window.removeEventListener('resize', resize)
       cancelAnimationFrame(raf)
     }
-  }, [count, includeRunes])
+  }, [count, includeRunes, spawnYFactor])
 
   return canvasRef
 }

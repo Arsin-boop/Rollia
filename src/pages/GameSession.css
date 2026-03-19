@@ -519,11 +519,13 @@
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  padding: 0.6rem 0.8rem;
+  padding: 0.6rem 0.8rem 0.6rem 1rem;
   margin-bottom: 0.8rem;
-  border: 1px solid var(--border-color);
-  border-radius: 0.6rem;
-  background: rgba(14, 16, 22, 0.55);
+  background: rgba(10, 8, 14, 0.85);
+  border: 1px solid var(--g-border);
+  border-left: 2px solid var(--g-gold-dim);
+  border-radius: 0;
+  clip-path: var(--g-clip-md);
 }
 
 .roll-inline-header {
@@ -533,17 +535,19 @@
 }
 
 .roll-inline-title {
-  font-size: 0.85rem;
-  letter-spacing: 0.08em;
+  font-family: var(--g-font-title);
+  font-size: 10px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--g-parch-faint);
 }
 
 .roll-inline-meta {
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
+  font-family: var(--g-font-title);
+  font-size: 9px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--g-gold-dim);
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -561,9 +565,11 @@
 }
 
 .roll-inline-value {
+  font-family: var(--g-font-title);
   font-size: 2.4rem;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-weight: 600;
+  color: var(--g-gold);
+  text-shadow: 0 0 18px rgba(200, 165, 74, 0.35);
 }
 
 .roll-inline-value.flicker {
@@ -575,8 +581,9 @@
   flex-direction: column;
   align-items: center;
   gap: 0.3rem;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
+  font-family: var(--g-font-body);
+  font-size: 13px;
+  color: var(--g-parch-dim);
   text-align: center;
 }
 
@@ -596,13 +603,15 @@
   align-self: center;
   text-align: center;
   transform-origin: center center;
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-family: var(--g-font-title);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
+  padding: 4px 14px;
+  border-radius: 0;
   border: 1px solid transparent;
+  clip-path: var(--g-clip-sm);
   opacity: 0;
   transform: translateY(8px) scale(0.94);
   filter: blur(1.6px);
@@ -617,15 +626,15 @@
 }
 
 .roll-inline-result.success {
-  color: var(--success);
-  border-color: rgba(107, 203, 119, 0.6);
-  box-shadow: 0 0 10px rgba(107, 203, 119, 0.3);
+  color: var(--g-moss2, #4a9c6a);
+  border-color: rgba(74, 156, 106, 0.4);
+  box-shadow: 0 0 10px rgba(74, 156, 106, 0.18);
 }
 
 .roll-inline-result.fail {
-  color: var(--error);
-  border-color: rgba(140, 47, 47, 0.7);
-  box-shadow: 0 0 10px rgba(140, 47, 47, 0.3);
+  color: var(--g-blood2, #a81c30);
+  border-color: rgba(168, 28, 48, 0.45);
+  box-shadow: 0 0 10px rgba(168, 28, 48, 0.18);
 }
 
 .roll-inline-result.show.success {

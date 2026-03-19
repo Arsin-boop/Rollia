@@ -6,8 +6,7 @@ import {
   generateStatusUpdate,
   generateBackstorySummary,
   generateIntentDecision,
-  generateBackstoryArcPlan,
-  generateQuestNPCUpdates
+  generateBackstoryArcPlan
 } from '../services/aiService.js'
 import {
   getBackstoryArc,
@@ -39,9 +38,7 @@ import {
 } from '../services/intentUtility.js'
 import { runNarrativeEngine } from '../services/narrativeEngine.js'
 import { interpretPlayerAction } from '../services/actionInterpreter.js'
-import { getQuestsForSession, createQuest, updateQuest } from '../services/questService.js'
-import { getNPCRelationshipsForSession, syncNPCRelationship } from '../services/npcMemoryService.js'
-import { getSession, upsertSession } from '../services/sessionStore.js'
+import { upsertSession } from '../services/sessionStore.js'
 
 const router = express.Router()
 const pendingChecks = new Map<string, PendingCheck>()
@@ -58,11 +55,6 @@ const DEFAULT_WORLD_STATE: WorldState = {
     suspicion: 10,
     trust: 20
   }
-}
-
-const DEFAULT_STORY_MEMORY: StoryMemory = {
-  recentEvents: [],
-  storySummary: []
 }
 
 const toFiniteNumber = (value: unknown, fallback: number): number =>
@@ -100,12 +92,10 @@ const normalizeNpcState = (value: unknown, fallbackWorldState: WorldState): NPCS
 const sanitizeCharacterForNarrative = (characterInfo: any): Record<string, unknown> => {
   if (!characterInfo || typeof characterInfo !== 'object') return {}
   const { quests, ...rest } = characterInfo
-  // Strip quest hooks/logs — these are DM hints, not scene instructions.
-  // Passing them raw causes the narrative engine to literally stage them as opening events.
   const sanitizedQuests = Array.isArray(quests)
     ? quests.map(({ id, title, description, status, objectives }: any) => ({
-      id, title, description, status, objectives
-    }))
+        id, title, description, status, objectives
+      }))
     : undefined
   return sanitizedQuests ? { ...rest, quests: sanitizedQuests } : rest
 }
@@ -207,13 +197,13 @@ const PERSON_TARGET_PATTERN = /\b(him|her|them|guard|bartender|barkeep|innkeeper
 const normalizeInput = (text: string) =>
   text
     .toLowerCase()
-    .replace(/[“”]/g, '"')
-    .replace(/[‘’]/g, "'")
+    .replace(/[""]/g, '"')
+    .replace(/['']/g, "'")
     .replace(/\s+/g, ' ')
     .trim()
 
 const summarizeActionText = (rawText: string, maxWords: number = 6) => {
-  let text = rawText.replace(/["“”][^"“”]*["“”]/g, '').trim()
+  let text = rawText.replace(/[""][^""]*[""]/g, '').trim()
   text = text.replace(/^\s*(i\s+)?(try|attempt)\s+to\s+/i, '')
   text = text.replace(/^\s*i\s+(want to|would like to|am going to|will|gonna)\s+/i, '')
   text = text.replace(/^\s*i\s+/i, '')
@@ -326,12 +316,12 @@ const buildSceneState = (
 ) => {
   const roster = Array.isArray(participants)
     ? Array.from(
-      new Set(
-        participants
-          .map(entry => entry?.name)
-          .filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
+        new Set(
+          participants
+            .map(entry => entry?.name)
+            .filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
+        )
       )
-    )
     : []
   return {
     location: extractLocationFromContext(context),
@@ -349,10 +339,10 @@ const extractLatestAssistantCue = (historyMessages: ChatCompletionMessage[]): st
       typeof rawContent === 'string'
         ? rawContent
         : Array.isArray(rawContent)
-          ? rawContent
+        ? rawContent
             .map((part: any) => (typeof part === 'string' ? part : part?.text || ''))
             .join('')
-          : ''
+        : ''
     const stripped = String(content || '')
       .replace(/<npc\s+id="[^"]+"[^>]*>/gi, '')
       .replace(/<\/npc>/gi, '')
@@ -368,122 +358,39 @@ const updateLastResolvedAction = (campaignKey: string, next: LastResolvedAction)
 }
 
 const violenceWords = [
-  /\battack\b/i,
-  /\bhit\b/i,
-  /\bpunch\b/i,
-  /\bkick\b/i,
-  /\bstrike\b/i,
-  /\bstab\b/i,
-  /\bslash\b/i,
-  /\bcut\b/i,
-  /\bshoot\b/i,
-  /\bkill\b/i,
-  /\bchoke\b/i,
-  /\bstrangle\b/i,
-  /\bgrapple\b/i,
-  /\bwrestle\b/i,
-  /\btackle\b/i,
-  /\bdisarm\b/i,
-  /\btrip\b/i,
-  /\bshove\b/i,
-  /\bbrawl\b/i,
-  /\bduel\b/i,
-  /\bfight\b/i,
-  /\bbash\b/i,
-  /\bsmash\b/i
+  /\battack\b/i, /\bhit\b/i, /\bpunch\b/i, /\bkick\b/i, /\bstrike\b/i,
+  /\bstab\b/i, /\bslash\b/i, /\bcut\b/i, /\bshoot\b/i, /\bkill\b/i,
+  /\bchoke\b/i, /\bstrangle\b/i, /\bgrapple\b/i, /\bwrestle\b/i, /\btackle\b/i,
+  /\bdisarm\b/i, /\btrip\b/i, /\bshove\b/i, /\bbrawl\b/i, /\bduel\b/i,
+  /\bfight\b/i, /\bbash\b/i, /\bsmash\b/i
 ]
 
 const stealthWords = [
-  /\bsneak\b/i,
-  /\bhide\b/i,
-  /\bconceal\b/i,
-  /\bshadow\b/i,
-  /\bstalk\b/i,
-  /\bfollow\s+quietly\b/i,
-  /\bsteal\b/i,
-  /\bpickpocket\b/i,
-  /\bswipe\b/i,
-  /\bsnatch\b/i,
-  /\blockpick\b/i,
-  /\bpick\s+the\s+lock\b/i,
-  /\beavesdrop\b/i,
-  /\bspy\b/i,
-  /\bpeek\b/i,
-  /\bscout\b/i,
-  /\brecon\b/i,
-  /\bslip\s+past\b/i,
-  /\bavoid\s+notice\b/i,
-  /\bcreep\b/i,
-  /\bcrawl\b/i
+  /\bsneak\b/i, /\bhide\b/i, /\bconceal\b/i, /\bshadow\b/i, /\bstalk\b/i,
+  /\bfollow\s+quietly\b/i, /\bsteal\b/i, /\bpickpocket\b/i, /\bswipe\b/i,
+  /\bsnatch\b/i, /\blockpick\b/i, /\bpick\s+the\s+lock\b/i, /\beavesdrop\b/i,
+  /\bspy\b/i, /\bpeek\b/i, /\bscout\b/i, /\brecon\b/i, /\bslip\s+past\b/i,
+  /\bavoid\s+notice\b/i, /\bcreep\b/i, /\bcrawl\b/i
 ]
 
 const socialWords = [
-  /\bpersuade\b/i,
-  /\bconvince\b/i,
-  /\bnegotiate\b/i,
-  /\bbargain\b/i,
-  /\bthreaten\b/i,
-  /\bintimidate\b/i,
-  /\blie\b/i,
-  /\bbluff\b/i,
-  /\bdeceive\b/i,
-  /\btrick\b/i,
-  /\bflatter\b/i,
-  /\bcharm\b/i,
-  /\bargue\b/i,
-  /\breason\b/i,
-  /\bprovoke\b/i,
-  /\bcalm\b/i,
-  /\breassure\b/i,
-  /\binterrogate\b/i,
-  /\bconfront\b/i,
-  /\bmock\b/i,
-  /\binsult\b/i,
-  /\btaunt\b/i
+  /\bpersuade\b/i, /\bconvince\b/i, /\bnegotiate\b/i, /\bbargain\b/i,
+  /\bthreaten\b/i, /\bintimidate\b/i, /\blie\b/i, /\bbluff\b/i, /\bdeceive\b/i,
+  /\btrick\b/i, /\bflatter\b/i, /\bcharm\b/i, /\bargue\b/i, /\breason\b/i,
+  /\bprovoke\b/i, /\bcalm\b/i, /\breassure\b/i, /\binterrogate\b/i,
+  /\bconfront\b/i, /\bmock\b/i, /\binsult\b/i, /\btaunt\b/i
 ]
 
 const physicalWords = [
-  /\bjump\b/i,
-  /\bleap\b/i,
-  /\bhop\b/i,
-  /\bvault\b/i,
-  /\bclimb\b/i,
-  /\bscale\b/i,
-  /\bbalance\b/i,
-  /\brun\b/i,
-  /\bsprint\b/i,
-  /\bswim\b/i,
-  /\bbackflip\b/i,
-  /\bfrontflip\b/i,
-  /\bflip\b/i,
-  /\bsomersault\b/i,
-  /\bcartwheel\b/i,
-  /\broll\b/i,
-  /\bdive\b/i,
-  /\bslide\b/i,
-  /\bpush\b/i,
-  /\bpull\b/i,
-  /\blift\b/i,
-  /\bcarry\b/i,
-  /\bthrow\b/i,
-  /\bdrag\b/i,
-  /\bbreak\b/i,
-  /\bbend\b/i,
-  /\bforce\b/i,
-  /\bshoulder\s+bash\b/i,
-  /\bsmash\b/i,
-  /\bkick\b/i,
-  /\bacrobat\b/i,
-  /\bacrobatics\b/i,
-  /\btumble\b/i,
-  /\bparkour\b/i,
-  /\bhold\s+on\b/i,
-  /\bhang\b/i,
-  /\bgrip\b/i,
-  /\bgrab\b/i,
-  /\bendure\b/i,
-  /\bresist\b/i,
-  /\bhold\s+breath\b/i
+  /\bjump\b/i, /\bleap\b/i, /\bhop\b/i, /\bvault\b/i, /\bclimb\b/i,
+  /\bscale\b/i, /\bbalance\b/i, /\brun\b/i, /\bsprint\b/i, /\bswim\b/i,
+  /\bbackflip\b/i, /\bfrontflip\b/i, /\bflip\b/i, /\bsomersault\b/i,
+  /\bcartwheel\b/i, /\broll\b/i, /\bdive\b/i, /\bslide\b/i, /\bpush\b/i,
+  /\bpull\b/i, /\blift\b/i, /\bcarry\b/i, /\bthrow\b/i, /\bdrag\b/i,
+  /\bbreak\b/i, /\bbend\b/i, /\bforce\b/i, /\bshoulder\s+bash\b/i, /\bsmash\b/i,
+  /\bkick\b/i, /\bacrobat\b/i, /\bacrobatics\b/i, /\btumble\b/i, /\bparkour\b/i,
+  /\bhold\s+on\b/i, /\bhang\b/i, /\bgrip\b/i, /\bgrab\b/i, /\bendure\b/i,
+  /\bresist\b/i, /\bhold\s+breath\b/i
 ]
 
 const hasAny = (text: string, patterns: RegExp[]) => patterns.some(pattern => pattern.test(text))
@@ -495,19 +402,11 @@ const detectTarget = (text: string, candidates?: Array<{ id?: string; name?: str
       const name = candidate.name?.toLowerCase()
       return name && lowered.includes(name)
     })
-    if (matched?.id) {
-      return matched.id
-    }
-    if (matched?.name) {
-      return matched.name
-    }
+    if (matched?.id) return matched.id
+    if (matched?.name) return matched.name
   }
-
   const roleMatch = text.match(/\bthe\s+(bartender|barkeep|innkeeper|guard|man|woman|stranger|soldier|bandit|thug)\b/i)
-  if (roleMatch) {
-    return roleMatch[1].toLowerCase()
-  }
-
+  if (roleMatch) return roleMatch[1].toLowerCase()
   return null
 }
 
@@ -515,9 +414,7 @@ const resolveTargetLabel = (target: string | null, candidates?: Array<{ id?: str
   if (!target) return 'Enemy'
   if (Array.isArray(candidates)) {
     const matched = candidates.find(candidate => candidate.id === target || candidate.name === target)
-    if (matched?.name) {
-      return matched.name
-    }
+    if (matched?.name) return matched.name
   }
   return target
 }
@@ -554,22 +451,16 @@ const PATTERN_LIBRARY = [
     /\b(just\s*kill me|let me die|i want to die|i die)\b/i,
     /\b(i don'?t want to fight|i won'?t fight|i stop resisting)\b/i
   ], {
-    tag: 'social',
-    suggested_check: 'none',
-    stakes: 'medium',
-    reason: 'surrender or refusal to act',
-    action: 'talk'
+    tag: 'social', suggested_check: 'none', stakes: 'medium',
+    reason: 'surrender or refusal to act', action: 'talk'
   }),
   makePattern('explicit_attack', [
     /\b(i\s*)?attack\b/i,
     /\b(hit|punch|stab|slash|shoot|strike|kick)\b.*\b(him|her|you|bartender|barkeep|guard|man|woman|enemy|foe)\b/i,
     /\b(i\s*(swing|lunge|charge|rush|strike|draw and|raise))\b.*\b(weapon|sword|dagger|knife|axe|bow)\b/i
   ], {
-    tag: 'violence',
-    suggested_check: 'combat',
-    stakes: 'medium',
-    reason: 'explicit attack intent',
-    action: 'attack'
+    tag: 'violence', suggested_check: 'combat', stakes: 'medium',
+    reason: 'explicit attack intent', action: 'attack'
   }),
   makePattern('coercion_threat', [
     /\bif\b.+\b(again|one more time|next time)\b.+\b(i'?ll|i will|i'?m gonna|i am going to)\b.+\b(kill|hurt|break|cut|gut|end|cripple|smash)\b/i,
@@ -582,12 +473,8 @@ const PATTERN_LIBRARY = [
     /\b(touch me)\b.+\b(and)\b.+\b(you'?re|you are|i'?ll)\b.+\b(dead|done|finished|kill)\b/i,
     /\b(i'?m gonna|i am going to|i will)\b.+\b(kill|hurt|break|cut|end|cripple)\b/i
   ], {
-    tag: 'social',
-    suggested_check: 'contest',
-    stakes: 'medium',
-    reason: 'implicit threat or ultimatum',
-    action: 'talk',
-    escalation_hint: 'do_not_start_combat'
+    tag: 'social', suggested_check: 'contest', stakes: 'medium',
+    reason: 'implicit threat or ultimatum', action: 'talk', escalation_hint: 'do_not_start_combat'
   }),
   makePattern('stealth_covert', [
     /\b(slip past|avoid notice|avoid being seen|don'?t get seen|stay unseen)\b/i,
@@ -597,33 +484,24 @@ const PATTERN_LIBRARY = [
     /\b(take)\b.+\b(without (him|her|them) noticing|unnoticed)\b/i,
     /\b(pick the lock|lockpick|tamper with the lock)\b/i
   ], {
-    tag: 'stealth',
-    suggested_check: 'contest',
-    stakes: 'medium',
-    reason: 'covert action',
-    action: 'attempt'
+    tag: 'stealth', suggested_check: 'contest', stakes: 'medium',
+    reason: 'covert action', action: 'attempt'
   }),
   makePattern('social_deception', [
     /\b(pretend|act like|play the part|fake)\b/i,
     /\b(fake name|false name|make up|invent)\b.+\b(story|excuse|reason)\b/i,
     /\b(distract)\b.+\b(with talk|with conversation|by talking)\b/i
   ], {
-    tag: 'social',
-    suggested_check: 'contest',
-    stakes: 'medium',
-    reason: 'deception or manipulation',
-    action: 'talk'
+    tag: 'social', suggested_check: 'contest', stakes: 'medium',
+    reason: 'deception or manipulation', action: 'talk'
   }),
   makePattern('social_persuasion', [
     /\b(convince|talk (him|her|them) into|persuade)\b/i,
     /\b(negotiate|bargain|offer|deal)\b/i,
     /\b(calm down|let'?s talk|we don'?t have to fight|stand down)\b/i
   ], {
-    tag: 'social',
-    suggested_check: 'contest',
-    stakes: 'low',
-    reason: 'persuasion or negotiation',
-    action: 'talk'
+    tag: 'social', suggested_check: 'contest', stakes: 'low',
+    reason: 'persuasion or negotiation', action: 'talk'
   }),
   makePattern('physical_stunt', [
     /\b(flip|back ?flip|front ?flip|somersault|cartwheel|vault)\b/i,
@@ -632,11 +510,8 @@ const PATTERN_LIBRARY = [
     /\b(kick)\b.+\b(door)\b/i,
     /\b(break|force)\b.+\b(door|lock|bar|chain)\b/i
   ], {
-    tag: 'physical',
-    suggested_check: 'skill',
-    stakes: 'medium',
-    reason: 'physical stunt or force',
-    action: 'attempt'
+    tag: 'physical', suggested_check: 'skill', stakes: 'medium',
+    reason: 'physical stunt or force', action: 'attempt'
   })
 ]
 
@@ -706,71 +581,25 @@ const classifyIntent = (
 
   if (violenceMatch) {
     const stakes = /\b(kill|strangle|choke)\b/i.test(normalized) ? 'high' : 'medium'
-    return {
-      action: 'attack',
-      target: target || null,
-      tags: ['violence'],
-      stakes,
-      suggested_check: 'combat',
-      reason: 'hostile action'
-    }
+    return { action: 'attack', target: target || null, tags: ['violence'], stakes, suggested_check: 'combat', reason: 'hostile action' }
   }
   if (stealthMatch) {
-    return {
-      action: 'attempt',
-      target: target || null,
-      tags: ['stealth'],
-      stakes: contextFlags.targetHostile ? 'medium' : 'low',
-      suggested_check: 'contest',
-      reason: 'stealth action'
-    }
+    return { action: 'attempt', target: target || null, tags: ['stealth'], stakes: contextFlags.targetHostile ? 'medium' : 'low', suggested_check: 'contest', reason: 'stealth action' }
   }
   if (socialMatch) {
-    return {
-      action: attemptLead ? 'attempt' : 'talk',
-      target: target || null,
-      tags: ['social'],
-      stakes: /\b(threaten|intimidate)\b/i.test(normalized) ? 'medium' : 'low',
-      suggested_check: 'contest',
-      reason: 'social pressure'
-    }
+    return { action: attemptLead ? 'attempt' : 'talk', target: target || null, tags: ['social'], stakes: /\b(threaten|intimidate)\b/i.test(normalized) ? 'medium' : 'low', suggested_check: 'contest', reason: 'social pressure' }
   }
   if (physicalMatch) {
-    return {
-      action: 'attempt',
-      target: target || null,
-      tags: ['physical'],
-      stakes: contextFlags.indoors || contextFlags.crowded || contextFlags.armored ? 'medium' : 'low',
-      suggested_check: 'skill',
-      reason: 'physical strain'
-    }
+    return { action: 'attempt', target: target || null, tags: ['physical'], stakes: contextFlags.indoors || contextFlags.crowded || contextFlags.armored ? 'medium' : 'low', suggested_check: 'skill', reason: 'physical strain' }
   }
-
   if (attemptLead) {
-    return {
-      action: 'attempt',
-      target: target || null,
-      tags: ['physical'],
-      stakes: 'medium',
-      suggested_check: 'skill',
-      reason: 'attempted action'
-    }
+    return { action: 'attempt', target: target || null, tags: ['physical'], stakes: 'medium', suggested_check: 'skill', reason: 'attempted action' }
   }
-
-  return {
-    action: 'talk',
-    target: target || null,
-    tags: [],
-    stakes: 'low',
-    suggested_check: 'none',
-    reason: 'safe interaction'
-  }
+  return { action: 'talk', target: target || null, tags: [], stakes: 'low', suggested_check: 'none', reason: 'safe interaction' }
 }
 
 const resolveCheck = (intent: ActionIntent, rawText: string, gameContext?: string): PendingCheck | null => {
-  if (intent.suggested_check === 'none' || intent.suggested_check === 'combat') {
-    return null
-  }
+  if (intent.suggested_check === 'none' || intent.suggested_check === 'combat') return null
 
   const baseContext = rawText.length > 120 ? `${rawText.slice(0, 120)}...` : rawText
   const summaryContext = summarizeActionText(rawText)
@@ -778,48 +607,32 @@ const resolveCheck = (intent: ActionIntent, rawText: string, gameContext?: strin
   if (intent.tags.includes('stealth')) {
     const isLockpick = /\blockpick\b|\bpick\s+the\s+lock\b/i.test(rawText)
     return {
-      id: generateCheckId(),
-      type: 'contest',
-      actor: 'player',
-      target: intent.target ?? 'npc',
-      stat: 'DEX',
-      difficulty: intent.target ? 'opposed' : 13,
+      id: generateCheckId(), type: 'contest', actor: 'player', target: intent.target ?? 'npc',
+      stat: 'DEX', difficulty: intent.target ? 'opposed' : 13,
       context: summaryContext || baseContext || (isLockpick ? 'pick the lock' : 'slip past unnoticed'),
       reason: isLockpick ? 'lockpick' : 'stealth'
     }
   }
-
   if (intent.tags.includes('social')) {
     return {
-      id: generateCheckId(),
-      type: 'contest',
-      actor: 'player',
-      target: intent.target ?? 'npc',
-      stat: 'CHA',
-      difficulty: intent.target ? 'opposed' : 13,
+      id: generateCheckId(), type: 'contest', actor: 'player', target: intent.target ?? 'npc',
+      stat: 'CHA', difficulty: intent.target ? 'opposed' : 13,
       context: summaryContext || baseContext || 'pressure the target',
       reason: 'social'
     }
   }
-
   if (intent.tags.includes('physical')) {
     const isStunt = /\b(backflip|frontflip|flip|somersault|cartwheel|vault|balance|tumble|acrobatics|parkour|climb|jump|leap|dive|slide|roll)\b/i.test(rawText)
-    const isForce = /\b(break|force|push|pull|lift|carry|drag|bend|shoulder\s+bash|smash|kick)\b/i.test(rawText)
     const isEndure = /\b(endure|resist|hold\s+breath)\b/i.test(rawText)
     const contextFlags = inferContextFlags(gameContext)
-
     return {
-      id: generateCheckId(),
-      type: isEndure ? 'save' : 'skill',
-      actor: 'player',
-      target: intent.target ?? null,
+      id: generateCheckId(), type: isEndure ? 'save' : 'skill', actor: 'player', target: intent.target ?? null,
       stat: isEndure ? 'CON' : isStunt ? 'DEX' : 'STR',
       difficulty: contextFlags.indoors || contextFlags.crowded || contextFlags.armored ? 13 : 12,
       context: summaryContext || baseContext || (isEndure ? 'endure the strain' : isStunt ? 'pull off the stunt' : 'force the obstacle'),
       reason: isEndure ? 'endurance' : isStunt ? 'stunt' : 'physical force'
     }
   }
-
   return null
 }
 
@@ -844,20 +657,10 @@ const buildCombatCheck = (
 ): PendingCheck => {
   const profile = inferCombatProfile(rawText)
   return {
-    id: generateCheckId(),
-    type: 'attack',
-    actor: 'player',
-    target: intent.target ?? null,
+    id: generateCheckId(), type: 'attack', actor: 'player', target: intent.target ?? null,
     targetLabel: resolveTargetLabel(intent.target, sceneParticipants),
-    stat: profile.stat,
-    difficulty: 10,
-    context: profile.label,
-    reason: profile.actionType,
-    intent: {
-      action: intent.action,
-      tags: intent.tags,
-      target: intent.target
-    }
+    stat: profile.stat, difficulty: 10, context: profile.label, reason: profile.actionType,
+    intent: { action: intent.action, tags: intent.tags, target: intent.target }
   }
 }
 
@@ -878,112 +681,55 @@ const buildDecisionCheck = (params: {
   const actionLabel = String(decision.actionLabel || '').trim()
 
   if (domain === 'violence') {
-    const intent: ActionIntent = {
-      action: 'attack',
-      target,
-      tags: ['violence'],
-      stakes: 'medium',
-      suggested_check: 'combat',
-      reason: 'violence intent'
-    }
+    const intent: ActionIntent = { action: 'attack', target, tags: ['violence'], stakes: 'medium', suggested_check: 'combat', reason: 'violence intent' }
     const combatCheck = buildCombatCheck(intent, rawText, sceneParticipants)
-    return {
-      ...combatCheck,
-      context: actionLabel || combatCheck.context,
-      actionLabel,
-      domain,
-      skill: decision.skill ?? null,
-      intentType
-    }
+    return { ...combatCheck, context: actionLabel || combatCheck.context, actionLabel, domain, skill: decision.skill ?? null, intentType }
   }
 
-  if (!stat) {
-    return null
-  }
+  if (!stat) return null
 
   const dcValue = Number.isFinite(decision.dc) ? Number(decision.dc) : null
   if (domain === 'social' || domain === 'stealth') {
     return {
-      id: generateCheckId(),
-      type: 'contest',
-      actor: 'player',
-      target: target ?? 'npc',
-      stat,
+      id: generateCheckId(), type: 'contest', actor: 'player', target: target ?? 'npc', stat,
       difficulty: dcValue ?? 13,
       context: actionLabel || summarizeActionText(rawText) || 'pressure the target',
-      reason: domain,
-      actionLabel,
-      domain,
-      skill: decision.skill ?? null,
-      intentType
+      reason: domain, actionLabel, domain, skill: decision.skill ?? null, intentType
     }
   }
 
   const checkType = stat === 'CON' ? 'save' : 'skill'
   return {
-    id: generateCheckId(),
-    type: checkType,
-    actor: 'player',
-    target,
-    stat,
+    id: generateCheckId(), type: checkType, actor: 'player', target, stat,
     difficulty: dcValue ?? 12,
     context: actionLabel || summarizeActionText(rawText) || 'overcome the challenge',
-    reason: domain || 'physical',
-    actionLabel,
-    domain: domain || 'physical',
-    skill: decision.skill ?? null,
-    intentType
+    reason: domain || 'physical', actionLabel, domain: domain || 'physical', skill: decision.skill ?? null, intentType
   }
 }
 
-const stripOutcomeWithoutCheck = (text: string): { cleaned: string; removed: boolean } => {
-  if (!text) {
-    return { cleaned: text, removed: false }
+const computePlayerResources = (characterInfo: any): { hp: number; hp_max: number; mp: number; mp_max: number } => {
+  if (characterInfo?.resources) {
+    const r = characterInfo.resources
+    return { hp: typeof r.hp === 'number' ? r.hp : 20, hp_max: typeof r.hp === 'number' ? r.hp : 20, mp: typeof r.mp === 'number' ? r.mp : 0, mp_max: typeof r.mp === 'number' ? r.mp : 0 }
   }
-  const outcomePatterns = [
-    /\b(hit|hits|strikes|smashes|breaks|cracks|slashes|stabs|cuts)\b/i,
-    /\b(disarm|disarms|knock(?:s|ed)?\s+away)\b/i,
-    /\b(bleed|blood|wound|injur(?:y|ies))\b/i,
-    /\b(falls|collapses|drops)\b/i,
-    /\b(grapple|grapples|pinned|restrained)\b/i,
-    /\b(damage|harm)\b/i,
-    /\byou\s+(succeed|fail)\b/i,
-    /\blands?\s+awkwardly\b/i,
-    /\bconnects?\b/i,
-    /\bknocks?\s+you\s+out\b/i
-  ]
-
-  const sentences = text.split(/(?<=[.!?])\s+/)
-  let removed = false
-  const kept = sentences.filter(sentence => {
-    if (outcomePatterns.some(pattern => pattern.test(sentence))) {
-      removed = true
-      return false
-    }
-    return true
-  })
-
-  const cleaned = kept.join(' ').trim()
-  return { cleaned, removed }
+  const stats = characterInfo?.customClassData?.stats || {}
+  const hitDie = Number(String(characterInfo?.customClassData?.hitDie || 'd8').replace('d', '')) || 8
+  const con = typeof stats.constitution === 'number' ? stats.constitution : 10
+  const int_ = typeof stats.intelligence === 'number' ? stats.intelligence : 10
+  const wis = typeof stats.wisdom === 'number' ? stats.wisdom : 10
+  const cha = typeof stats.charisma === 'number' ? stats.charisma : 10
+  const maxHp = Math.max(1, hitDie + con)
+  const maxMp = Math.max(8, Math.round((int_ + wis + cha) / 3))
+  return { hp: maxHp, hp_max: maxHp, mp: maxMp, mp_max: maxMp }
 }
 
 // Get DM response for player action
 router.post('/dm-response', async (req, res) => {
   try {
     const {
-      playerAction,
-      characterInfo,
-      gameContext,
-      history,
-      campaignId,
-      rollResult,
-      pendingCheckId,
-      selectedTarget,
-      sceneParticipants,
-      playerSnapshot,
-      worldState,
-      npcState,
-      language
+      playerAction, characterInfo, gameContext, history, campaignId,
+      rollResult, pendingCheckId, selectedTarget, sceneParticipants,
+      playerSnapshot, worldState, npcState, language
     } = req.body
     const preferredLanguage = normalizeLanguage(language)
 
@@ -993,21 +739,12 @@ router.post('/dm-response', async (req, res) => {
 
     const historyMessages: ChatCompletionMessage[] = Array.isArray(history)
       ? history
-        .map((entry: any) => {
-          if (
-            !entry ||
-            typeof entry.content !== 'string' ||
-            !entry.content.trim() ||
-            (entry.role !== 'user' && entry.role !== 'assistant' && entry.role !== 'system')
-          ) {
-            return null
-          }
-          return {
-            role: entry.role,
-            content: entry.content
-          } as ChatCompletionMessage
-        })
-        .filter((entry): entry is ChatCompletionMessage => Boolean(entry))
+          .map((entry: any) => {
+            if (!entry || typeof entry.content !== 'string' || !entry.content.trim() ||
+              (entry.role !== 'user' && entry.role !== 'assistant' && entry.role !== 'system')) return null
+            return { role: entry.role, content: entry.content } as ChatCompletionMessage
+          })
+          .filter((entry): entry is ChatCompletionMessage => Boolean(entry))
       : []
 
     const campaignKey = campaignId || 'default'
@@ -1015,10 +752,8 @@ router.post('/dm-response', async (req, res) => {
     const currentTurn = (gameState.turnIndex || 0) + 1
     gameStateByCampaign.set(campaignKey, { ...gameState, turnIndex: currentTurn })
 
-    // On the first turn of a new session, clear stale NPCs from previous sessions
-    if (currentTurn === 1) {
-      clearNPCRegistry(campaignKey)
-    }
+    if (currentTurn === 1) clearNPCRegistry(campaignKey)
+
     const sceneState = buildSceneState(gameContext || '', sceneParticipants)
     const interpretedAction = interpretPlayerAction(playerAction, {
       location: sceneState.location,
@@ -1037,37 +772,22 @@ router.post('/dm-response', async (req, res) => {
         pendingChecks.delete(campaignKey)
         console.log('Pending check cleared:', pending.id)
         const { directorResult, memoryContext, recentEvents } = await applyDirectorMemoryPipeline({
-          campaignKey,
-          playerInput: effectivePlayerAction,
-          turnNumber: currentTurn,
-          worldStateOverride: worldState,
-          npcStateOverride: npcState
+          campaignKey, playerInput: effectivePlayerAction, turnNumber: currentTurn,
+          worldStateOverride: worldState, npcStateOverride: npcState
         })
         if (pending.type === 'attack') {
           let battleState = getBattle(campaignKey)
           if (!battleState) {
-            const baseHp = typeof playerSnapshot?.hp === 'number' ? playerSnapshot.hp : 20
-            const baseMp = typeof playerSnapshot?.mp === 'number' ? playerSnapshot.mp : 0
+            const { hp: maxHp, hp_max, mp: maxMp, mp_max } = computePlayerResources(characterInfo)
+            const baseHp = typeof playerSnapshot?.hp === 'number' ? playerSnapshot.hp : maxHp
+            const baseMp = typeof playerSnapshot?.mp === 'number' ? playerSnapshot.mp : maxMp
             const playerEntity: CombatEntity = {
-              id: 'player',
-              type: 'player',
-              name: characterInfo?.name || 'Player',
-              hp: baseHp,
-              hp_max: baseHp,
-              mp: baseMp,
-              mp_max: baseMp,
-              statuses: [],
-              statusEffects: []
+              id: 'player', type: 'player', name: characterInfo?.name || 'Player',
+              hp: baseHp, hp_max: hp_max, mp: baseMp, mp_max: mp_max, statuses: [], statusEffects: []
             }
             const enemyName = pending.targetLabel || 'Enemy'
             const enemyEntity: CombatEntity = {
-              id: 'enemy-0',
-              type: 'enemy',
-              name: enemyName,
-              hp: 12,
-              hp_max: 12,
-              statuses: [],
-              statusEffects: []
+              id: 'enemy-0', type: 'enemy', name: enemyName, hp: 12, hp_max: 12, statuses: [], statusEffects: []
             }
             battleState = startBattle(campaignKey, playerEntity, [enemyEntity])
           }
@@ -1080,31 +800,13 @@ router.post('/dm-response', async (req, res) => {
 
           const rollTotal = rollResult.total ?? rollResult.result ?? 0
           const rollD20 = typeof rollResult.d20 === 'number' ? rollResult.d20 : undefined
-          const rollBonus =
-            typeof rollResult.bonus === 'number'
-              ? rollResult.bonus
-              : typeof rollD20 === 'number'
-                ? rollTotal - rollD20
-                : 0
+          const rollBonus = typeof rollResult.bonus === 'number' ? rollResult.bonus : typeof rollD20 === 'number' ? rollTotal - rollD20 : 0
 
           const resolved = resolveAction(
             campaignKey,
-            {
-              action: 'attack',
-              actor: 'player',
-              target: targetId,
-              params: { action_type: pending.reason, label: pending.context }
-            },
+            { action: 'attack', actor: 'player', target: targetId, params: { action_type: pending.reason, label: pending.context } },
             playerSnapshot,
-            {
-              attackRoll: typeof rollD20 === 'number'
-                ? {
-                  d20: rollD20,
-                  bonus: rollBonus,
-                  total: rollTotal
-                }
-                : undefined
-            }
+            { attackRoll: typeof rollD20 === 'number' ? { d20: rollD20, bonus: rollBonus, total: rollTotal } : undefined }
           )
 
           const narrativeResult = await runNarrativeEngine(
@@ -1131,26 +833,16 @@ router.post('/dm-response', async (req, res) => {
           if (pending.actionLabel || pending.context) {
             const label = pending.actionLabel || pending.context
             updateLastResolvedAction(campaignKey, {
-              summary: label,
-              domain: pending.domain || 'violence',
-              stat: pending.stat || null,
-              skill: pending.skill ?? null,
-              timestamp: Date.now(),
-              keywords: extractKeywords(label)
+              summary: label, domain: pending.domain || 'violence', stat: pending.stat || null,
+              skill: pending.skill ?? null, timestamp: Date.now(), keywords: extractKeywords(label)
             })
           }
 
           return res.json({
-            scene: narrativeResult.scene,
-            narrative: narrativeResult.narration,
-            response: narrativeResult.narration,
-            choices: narrativeResult.choices,
-            battle: resolved.state,
-            events: resolved.events,
-            updatedWorldState: directorResult.updatedWorldState,
-            directorNotes: directorResult.directorNotes,
-            ui: { showRoll: false },
-            pending_check: null
+            scene: narrativeResult.scene, narrative: narrativeResult.narration, response: narrativeResult.narration,
+            choices: narrativeResult.choices, battle: resolved.state, events: resolved.events,
+            updatedWorldState: directorResult.updatedWorldState, directorNotes: directorResult.directorNotes,
+            ui: { showRoll: false }, pending_check: null
           })
         }
 
@@ -1180,35 +872,21 @@ router.post('/dm-response', async (req, res) => {
         if (pending.actionLabel || pending.context) {
           const label = pending.actionLabel || pending.context
           updateLastResolvedAction(campaignKey, {
-            summary: label,
-            domain: pending.domain || 'other',
-            stat: pending.stat || null,
-            skill: pending.skill ?? null,
-            timestamp: Date.now(),
-            keywords: extractKeywords(label)
+            summary: label, domain: pending.domain || 'other', stat: pending.stat || null,
+            skill: pending.skill ?? null, timestamp: Date.now(), keywords: extractKeywords(label)
           })
         }
 
         console.log('Narrative engine response generated successfully, length:', narrativeResult.narration.length)
         const npcRegistry = listNPCProfiles(campaignKey).map(npc => ({
-          id: npc.id,
-          name: localizeNpcName(npc.name, preferredLanguage),
-          dialogueColorId: npc.dialogueColorId
+          id: npc.id, name: localizeNpcName(npc.name, preferredLanguage), dialogueColorId: npc.dialogueColorId
         }))
         const npcPalette = listNPCDialoguePalette()
         return res.json({
-          scene: narrativeResult.scene,
-          narrative: narrativeResult.narration,
-          response: narrativeResult.narration,
-          choices: narrativeResult.choices,
-          requiresRoll: false,
-          checkRequest: null,
-          updatedWorldState: directorResult.updatedWorldState,
-          directorNotes: directorResult.directorNotes,
-          ui: { showRoll: false },
-          pending_check: null,
-          npcRegistry,
-          npcPalette
+          scene: narrativeResult.scene, narrative: narrativeResult.narration, response: narrativeResult.narration,
+          choices: narrativeResult.choices, requiresRoll: false, checkRequest: null,
+          updatedWorldState: directorResult.updatedWorldState, directorNotes: directorResult.directorNotes,
+          ui: { showRoll: false }, pending_check: null, npcRegistry, npcPalette
         })
       }
     }
@@ -1218,30 +896,14 @@ router.post('/dm-response', async (req, res) => {
     let decision: any = null
     try {
       decision = await generateIntentDecision({
-        rawText: effectivePlayerAction,
-        segments,
-        lastResolvedAction: gameState.lastResolvedAction || null,
-        sceneContext: {
-          memory: memoryContext,
-          recentEvents: recentEvents,
-          location: sceneState.location
-        }
+        rawText: effectivePlayerAction, segments, lastResolvedAction: gameState.lastResolvedAction || null, sceneContext: null
       })
-      console.log('Intent decision:', {
-        intentType: decision.intentType,
-        domain: decision.domain,
-        shouldRoll: decision.shouldRoll,
-        actionLabel: decision.actionLabel
-      })
+      console.log('Intent decision:', { intentType: decision.intentType, domain: decision.domain, shouldRoll: decision.shouldRoll, actionLabel: decision.actionLabel })
     } catch (error: any) {
       console.error('Intent decision failed, using fallback:', error?.message || error)
     }
 
-    const fallbackIntent = classifyIntent(effectivePlayerAction, {
-      selectedTarget,
-      sceneParticipants,
-      gameContext
-    })
+    const fallbackIntent = classifyIntent(effectivePlayerAction, { selectedTarget, sceneParticipants, gameContext })
 
     if (!decision) {
       const primarySegment =
@@ -1255,8 +917,7 @@ router.post('/dm-response', async (req, res) => {
         intentType: primarySegment?.hint || 'UNKNOWN',
         domain: fallbackIntent.tags[0] || (fallbackIntent.action === 'attack' ? 'violence' : 'other'),
         shouldRoll: Boolean(resolvedCheck) && primarySegment?.hint === 'ACTION_NOW',
-        stat: resolvedCheck?.stat || null,
-        skill: null,
+        stat: resolvedCheck?.stat || null, skill: null,
         dc: typeof resolvedCheck?.difficulty === 'number' ? resolvedCheck.difficulty : null,
         actionLabel: summarizeActionText(primarySegment?.text || effectivePlayerAction) || summarizeActionText(effectivePlayerAction),
         narration: ''
@@ -1265,37 +926,18 @@ router.post('/dm-response', async (req, res) => {
 
     const target = selectedTarget || detectTarget(effectivePlayerAction, sceneParticipants)
     const pendingCheck = decision.shouldRoll
-      ? buildDecisionCheck({
-        decision,
-        target,
-        rawText: effectivePlayerAction,
-        sceneParticipants
-      })
+      ? buildDecisionCheck({ decision, target, rawText: effectivePlayerAction, sceneParticipants })
       : null
 
     const activeBattle = getBattle(campaignKey)
     if (pendingCheck?.type === 'attack' && !activeBattle) {
+      const { hp: playerHp, hp_max: playerHpMax, mp: playerMp, mp_max: playerMpMax } = computePlayerResources(characterInfo)
       const playerEntity: CombatEntity = {
-        id: 'player',
-        type: 'player',
-        name: characterInfo?.name || 'Player',
-        hp: 20,
-        hp_max: 20,
-        mp: 0,
-        mp_max: 0,
-        statuses: [],
-        statusEffects: []
+        id: 'player', type: 'player', name: characterInfo?.name || 'Player',
+        hp: playerHp, hp_max: playerHpMax, mp: playerMp, mp_max: playerMpMax, statuses: [], statusEffects: []
       }
       const enemyName = pendingCheck.targetLabel || 'Enemy'
-      const enemyEntity: CombatEntity = {
-        id: 'enemy-0',
-        type: 'enemy',
-        name: enemyName,
-        hp: 12,
-        hp_max: 12,
-        statuses: [],
-        statusEffects: []
-      }
+      const enemyEntity: CombatEntity = { id: 'enemy-0', type: 'enemy', name: enemyName, hp: 12, hp_max: 12, statuses: [], statusEffects: [] }
       startBattle(campaignKey, playerEntity, [enemyEntity])
       console.log('Combat state created for narrative resolution.')
     }
@@ -1303,48 +945,24 @@ router.post('/dm-response', async (req, res) => {
     if (pendingCheck) {
       pendingChecks.set(campaignKey, {
         ...pendingCheck,
-        intent: {
-          action: fallbackIntent.action,
-          tags: fallbackIntent.tags,
-          target: fallbackIntent.target
-        }
+        intent: { action: fallbackIntent.action, tags: fallbackIntent.tags, target: fallbackIntent.target }
       })
       console.log('Pending check created:', pendingCheck)
-      console.log('Check details:', {
-        id: pendingCheck.id,
-        type: pendingCheck.type,
-        stat: pendingCheck.stat,
-        difficulty: pendingCheck.difficulty,
-        context: pendingCheck.context
-      })
+      console.log('Check details:', { id: pendingCheck.id, type: pendingCheck.type, stat: pendingCheck.stat, difficulty: pendingCheck.difficulty, context: pendingCheck.context })
     }
 
     if (pendingCheck) {
       console.log('Skipping DM call until check/combat result is resolved.')
       const currentWorldState = worldState
         ? normalizeWorldState(worldState)
-        : worldStateByCampaign.get(campaignKey) || {
-          ...DEFAULT_WORLD_STATE,
-          npcMood: { ...DEFAULT_WORLD_STATE.npcMood }
-        }
+        : worldStateByCampaign.get(campaignKey) || { ...DEFAULT_WORLD_STATE, npcMood: { ...DEFAULT_WORLD_STATE.npcMood } }
       return res.json({
-        response: '',
-        requiresRoll: true,
-        updatedWorldState: currentWorldState,
-        pending_check: pendingCheck,
-        ui: { showRoll: true },
+        response: '', requiresRoll: true, updatedWorldState: currentWorldState,
+        pending_check: pendingCheck, ui: { showRoll: true },
         checkRequest: {
-          id: pendingCheck.id,
-          type: pendingCheck.type,
-          actor: pendingCheck.actor,
-          stat: pendingCheck.stat,
-          difficulty:
-            typeof pendingCheck.difficulty === 'number'
-              ? String(pendingCheck.difficulty)
-              : pendingCheck.difficulty,
-          context: pendingCheck.context,
-          on_success: 'resolve',
-          on_failure: 'resolve'
+          id: pendingCheck.id, type: pendingCheck.type, actor: pendingCheck.actor, stat: pendingCheck.stat,
+          difficulty: typeof pendingCheck.difficulty === 'number' ? String(pendingCheck.difficulty) : pendingCheck.difficulty,
+          context: pendingCheck.context, on_success: 'resolve', on_failure: 'resolve'
         }
       })
     }
@@ -1353,12 +971,8 @@ router.post('/dm-response', async (req, res) => {
       const actionLabel = String(decision.actionLabel || '').trim()
       if (actionLabel) {
         updateLastResolvedAction(campaignKey, {
-          summary: actionLabel,
-          domain: decision.domain || 'other',
-          stat: decision.stat || null,
-          skill: decision.skill ?? null,
-          timestamp: Date.now(),
-          keywords: extractKeywords(actionLabel)
+          summary: actionLabel, domain: decision.domain || 'other', stat: decision.stat || null,
+          skill: decision.skill ?? null, timestamp: Date.now(), keywords: extractKeywords(actionLabel)
         })
       }
     }
@@ -1366,26 +980,20 @@ router.post('/dm-response', async (req, res) => {
     const characterKey = buildCharacterKey(campaignKey, characterInfo)
     const backstoryArcContext = characterInfo?.backstory
       ? await buildBackstoryArcContext({
-        characterKey,
-        characterInfo,
-        backstory: characterInfo.backstory,
-        currentTurn
-      }).catch(err => { console.warn('Backstory arc context failed:', err); return null })
+          characterKey, characterInfo, backstory: characterInfo.backstory, currentTurn
+        }).catch(err => { console.warn('Backstory arc context failed:', err); return null })
       : null
 
     const backstoryDirectorNote = backstoryArcContext?.eligibleBeat
       ? `Backstory beat to weave in subtly: ${backstoryArcContext.eligibleBeat.goal}. ` +
-      `Delivery: ${backstoryArcContext.eligibleBeat.deliveryModes.join(' or ')}. ` +
-      `Max reveal level: ${backstoryArcContext.eligibleBeat.constraints.maxRevealLevel}. ` +
-      `Do NOT state this explicitly — surface it through NPC reaction, environment, or coincidence.`
+        `Delivery: ${backstoryArcContext.eligibleBeat.deliveryModes.join(' or ')}. ` +
+        `Max reveal level: ${backstoryArcContext.eligibleBeat.constraints.maxRevealLevel}. ` +
+        `Do NOT state this explicitly — surface it through NPC reaction, environment, or coincidence.`
       : ''
 
     const { directorResult, memoryContext, recentEvents } = await applyDirectorMemoryPipeline({
-      campaignKey,
-      playerInput: effectivePlayerAction,
-      turnNumber: currentTurn,
-      worldStateOverride: worldState,
-      npcStateOverride: npcState
+      campaignKey, playerInput: effectivePlayerAction, turnNumber: currentTurn,
+      worldStateOverride: worldState, npcStateOverride: npcState
     })
     console.log('Generating narrative engine response for action:', effectivePlayerAction.substring(0, 100))
     const narrativeResult = await runNarrativeEngine(
@@ -1410,105 +1018,22 @@ router.post('/dm-response', async (req, res) => {
     )
 
     const responseText = narrativeResult.narration
-
-    // Extract Quest and NPC updates from the narration (non-blocking)
-    const sessionId = campaignKey
-    // Ensure session row exists — quests/npc_relationships have FK on sessions(id)
-    if (!getSession(sessionId)) {
-      upsertSession({ id: sessionId, characterId: null, history: [], payload: {} })
-    }
-    const [currentQuests, currentNPCRels] = await Promise.all([
-      getQuestsForSession(sessionId).catch(() => []),
-      getNPCRelationshipsForSession(sessionId).catch(() => [])
-    ])
-
-    let updatedQuests = currentQuests
-    let updatedNPCRelationships = currentNPCRels
-
-    try {
-      const questNpcUpdates = await generateQuestNPCUpdates(
-        responseText,
-        currentQuests.map(q => ({ id: q.id, title: q.title, status: q.status })),
-        currentNPCRels.map(r => ({ npcId: r.npcId, npcName: r.npcName, affinity: r.affinity })),
-        preferredLanguage
-      )
-
-      // Persist quest changes
-      for (const questUpdate of questNpcUpdates.quests) {
-        if (!questUpdate.title) continue
-        const existingQuest = currentQuests.find(
-          q => q.id === questUpdate.id || q.title.toLowerCase() === questUpdate.title!.toLowerCase()
-        )
-        if (existingQuest) {
-          await updateQuest(existingQuest.id, {
-            status: questUpdate.status as any,
-            objectives: questUpdate.objectives || existingQuest.objectives
-          })
-        } else if (questUpdate.status === 'active') {
-          await createQuest({
-            sessionId,
-            title: questUpdate.title,
-            description: '',
-            status: 'active',
-            objectives: questUpdate.objectives || []
-          })
-        }
-      }
-
-      // Persist NPC relationship changes
-      for (const rel of questNpcUpdates.npcRelationships) {
-        if (!rel.npcName) continue
-        await syncNPCRelationship(
-          sessionId,
-          rel.npcId || rel.npcName.toLowerCase().replace(/\s+/g, '-'),
-          rel.npcName,
-          rel.affinityDelta,
-          rel.notes || null
-        )
-      }
-
-      // Re-fetch updated state
-      const [freshQuests, freshRels] = await Promise.all([
-        getQuestsForSession(sessionId).catch(() => currentQuests),
-        getNPCRelationshipsForSession(sessionId).catch(() => currentNPCRels)
-      ])
-      updatedQuests = freshQuests
-      updatedNPCRelationships = freshRels
-    } catch (questNpcError) {
-      console.warn('Quest/NPC extraction skipped due to error:', questNpcError)
-    }
-
     console.log('Narrative engine response generated successfully, length:', responseText.length)
     const npcRegistry = listNPCProfiles(campaignKey).map(npc => ({
-      id: npc.id,
-      name: localizeNpcName(npc.name, preferredLanguage),
-      dialogueColorId: npc.dialogueColorId
+      id: npc.id, name: localizeNpcName(npc.name, preferredLanguage), dialogueColorId: npc.dialogueColorId
     }))
     const npcPalette = listNPCDialoguePalette()
     res.json({
-      narrative: responseText,
-      response: responseText,
-      scene: narrativeResult.scene,
-      choices: narrativeResult.choices,
-      updatedWorldState: directorResult.updatedWorldState,
-      directorNotes: directorResult.directorNotes,
-      requiresRoll: false,
-      checkRequest: null,
-      pending_check: null,
-      ui: { showRoll: false },
-      npcRegistry,
-      npcPalette,
-      quests: updatedQuests,
-      npcRelationships: updatedNPCRelationships
+      narrative: responseText, response: responseText, scene: narrativeResult.scene,
+      choices: narrativeResult.choices, updatedWorldState: directorResult.updatedWorldState,
+      directorNotes: directorResult.directorNotes, requiresRoll: false, checkRequest: null,
+      pending_check: null, ui: { showRoll: false }, npcRegistry, npcPalette
     })
   } catch (error: any) {
     console.error('Error generating DM response:', error)
     console.error('Error stack:', error?.stack)
     const errorMessage = error?.message || 'Failed to generate DM response'
-    res.status(500).json({
-      error: errorMessage,
-      details: error?.message || 'Unknown error occurred'
-    })
+    res.status(500).json({ error: errorMessage, details: error?.message || 'Unknown error occurred' })
   }
 })
 
@@ -1520,21 +1045,12 @@ router.post('/summarize-scene', async (req, res) => {
 
     const historyMessages: ChatCompletionMessage[] = Array.isArray(history)
       ? history
-        .map((entry: any) => {
-          if (
-            !entry ||
-            typeof entry.content !== 'string' ||
-            !entry.content.trim() ||
-            (entry.role !== 'user' && entry.role !== 'assistant' && entry.role !== 'system')
-          ) {
-            return null
-          }
-          return {
-            role: entry.role,
-            content: entry.content
-          } as ChatCompletionMessage
-        })
-        .filter((entry): entry is ChatCompletionMessage => Boolean(entry))
+          .map((entry: any) => {
+            if (!entry || typeof entry.content !== 'string' || !entry.content.trim() ||
+              (entry.role !== 'user' && entry.role !== 'assistant' && entry.role !== 'system')) return null
+            return { role: entry.role, content: entry.content } as ChatCompletionMessage
+          })
+          .filter((entry): entry is ChatCompletionMessage => Boolean(entry))
       : []
 
     if (!historyMessages.length) {
@@ -1546,10 +1062,7 @@ router.post('/summarize-scene', async (req, res) => {
   } catch (error: any) {
     console.error('Error generating scene summary:', error)
     const errorMessage = error?.message || 'Failed to summarize scene'
-    res.status(500).json({
-      error: errorMessage,
-      details: error?.message || 'Unknown error occurred'
-    })
+    res.status(500).json({ error: errorMessage, details: error?.message || 'Unknown error occurred' })
   }
 })
 
@@ -1561,41 +1074,25 @@ router.post('/status-update', async (req, res) => {
 
     const historyMessages: ChatCompletionMessage[] = Array.isArray(history)
       ? history
-        .map((entry: any) => {
-          if (
-            !entry ||
-            typeof entry.content !== 'string' ||
-            !entry.content.trim() ||
-            (entry.role !== 'user' && entry.role !== 'assistant' && entry.role !== 'system')
-          ) {
-            return null
-          }
-          return {
-            role: entry.role,
-            content: entry.content
-          } as ChatCompletionMessage
-        })
-        .filter((entry): entry is ChatCompletionMessage => Boolean(entry))
+          .map((entry: any) => {
+            if (!entry || typeof entry.content !== 'string' || !entry.content.trim() ||
+              (entry.role !== 'user' && entry.role !== 'assistant' && entry.role !== 'system')) return null
+            return { role: entry.role, content: entry.content } as ChatCompletionMessage
+          })
+          .filter((entry): entry is ChatCompletionMessage => Boolean(entry))
       : []
 
     if (!historyMessages.length) {
       return res.status(400).json({ error: 'History is required to evaluate status' })
     }
 
-    const normalizedStatusState =
-      statusState && typeof statusState === 'object'
-        ? statusState
-        : { active_statuses: [] }
-
+    const normalizedStatusState = statusState && typeof statusState === 'object' ? statusState : { active_statuses: [] }
     const update = await generateStatusUpdate(historyMessages, normalizedStatusState, preferredLanguage)
     res.json(update)
   } catch (error: any) {
     console.error('Error generating status update:', error)
     const errorMessage = error?.message || 'Failed to generate status update'
-    res.status(500).json({
-      error: errorMessage,
-      details: error?.message || 'Unknown error occurred'
-    })
+    res.status(500).json({ error: errorMessage, details: error?.message || 'Unknown error occurred' })
   }
 })
 
@@ -1609,18 +1106,11 @@ router.post('/generate-quest', async (req, res) => {
       return res.status(400).json({ error: 'Backstory is required to generate a quest' })
     }
 
-    const quest = await generateQuestFromBackstory(backstory, {
-      name: characterName,
-      className: characterClass
-    }, preferredLanguage)
-
+    const quest = await generateQuestFromBackstory(backstory, { name: characterName, className: characterClass }, preferredLanguage)
     res.json(quest)
   } catch (error: any) {
     console.error('Error generating quest from backstory:', error)
-    res.status(500).json({
-      error: error?.message || 'Failed to generate quest',
-      details: 'Check backend logs for more information'
-    })
+    res.status(500).json({ error: error?.message || 'Failed to generate quest', details: 'Check backend logs for more information' })
   }
 })
 
@@ -1638,10 +1128,7 @@ router.post('/summarize-backstory', async (req, res) => {
     res.json({ summary })
   } catch (error: any) {
     console.error('Error generating backstory summary:', error)
-    res.status(500).json({
-      error: error?.message || 'Failed to summarize backstory',
-      details: 'Check backend logs for more information'
-    })
+    res.status(500).json({ error: error?.message || 'Failed to summarize backstory', details: 'Check backend logs for more information' })
   }
 })
 
@@ -1653,18 +1140,11 @@ router.post('/reset-session', async (req, res) => {
       return res.status(400).json({ error: 'campaignId is required' })
     }
 
-    // Clear in-memory state
     gameStateByCampaign.delete(campaignId)
     worldStateByCampaign.delete(campaignId)
     storyMemoryByCampaign.delete(campaignId)
 
-    // Reset persisted session history (keep the session row, just clear history)
-    upsertSession({
-      id: campaignId,
-      characterId: characterId ?? null,
-      history: [],
-      payload: {}
-    })
+    upsertSession({ id: campaignId, characterId: characterId ?? null, history: [], payload: {} })
 
     return res.json({ success: true, campaignId })
   } catch (error: any) {
@@ -1674,4 +1154,3 @@ router.post('/reset-session', async (req, res) => {
 })
 
 export default router
-
