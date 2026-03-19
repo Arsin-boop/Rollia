@@ -415,6 +415,79 @@ export async function generateCustomClass(description: string, language: Preferr
     tags: string[]
   }
 }> {
+  const normalizeClassDescription = (
+    rawDescription: string | undefined,
+    className: string | undefined,
+    seedDescription: string,
+    lang: PreferredLanguage
+  ): string => {
+    const cleaned = String(rawDescription || '')
+      .replace(/\r/g, '')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+
+    const paragraphCount = cleaned
+      ? cleaned.split(/\n{2,}/).map(part => part.trim()).filter(Boolean).length
+      : 0
+    const sentenceCount = (cleaned.match(/[.!?]/g) || []).length
+    const cyrCount = (cleaned.match(/[\u0400-\u04FF]/g) || []).length
+    const latinCount = (cleaned.match(/[A-Za-z]/g) || []).length
+    const looksRussian = lang !== 'ru' || cyrCount >= Math.max(30, latinCount)
+    const hasQuality =
+      cleaned.length >= (lang === 'ru' ? 520 : 420) &&
+      paragraphCount >= 3 &&
+      sentenceCount >= 6 &&
+      looksRussian
+
+    if (hasQuality) {
+      return cleaned
+    }
+
+    const safeName = (className || (lang === 'ru' ? 'Пользовательский класс' : 'Custom Class')).trim()
+    const safeSeed = seedDescription.trim() || (lang === 'ru' ? 'уникальная концепция героя' : 'a unique adventurer concept')
+
+    if (lang === 'ru') {
+      return `${safeName} — это путь героя, который строится вокруг идеи: ${safeSeed}. Представители этого класса обычно приходят из суровой практики, а не из академических трактатов. Их мировоззрение формируется через конкретные испытания, из-за чего они быстро оценивают угрозу, держат фокус на цели и действуют без лишней театральности.\n\nВ бою ${safeName} сочетает дисциплину и адаптацию. Класс уверенно работает на средней дистанции, умеет входить в ближний контакт в нужный момент и поддерживает стабильный темп схватки за счёт выверенных базовых приёмов. Его сильная сторона — последовательность: сначала контроль позиции, затем давление, затем добивание через точное применение ключевых умений.\n\nВ группе ${safeName} закрывает роль надёжного универсала. Такой персонаж полезен в затяжных сценах, не теряется при смене темпа и помогает команде удерживать инициативу. Идеальный стиль игры для этого класса — принимать тактические решения по ситуации, сохранять ресурс до решающего эпизода и раскрывать потенциал через командное взаимодействие.`
+    }
+
+    return `${safeName} is a class path built around this concept: ${safeSeed}. Its practitioners are shaped by practical trials rather than abstract doctrine, so they prioritize situational awareness, disciplined execution, and clear tactical goals. The class identity is grounded, direct, and action-focused.\n\nIn combat, ${safeName} combines control and pressure. It performs best when it can manage distance, choose timing for engagement, and maintain momentum through reliable core techniques. The class rewards deliberate sequencing: establish position, apply pressure, then convert advantage with decisive abilities.\n\nInside a party, ${safeName} functions as a dependable flexible specialist. It stays useful in long encounters, supports team tempo, and scales well with coordinated play. The ideal gameplay loop is to read the battlefield, spend resources at high-impact moments, and keep the group stable while pursuing mission objectives.`
+  }
+
+  const normalizeClassFeatures = (
+    rawFeatures: unknown,
+    lang: PreferredLanguage
+  ): string[] => {
+    const features = Array.isArray(rawFeatures)
+      ? rawFeatures.map(item => String(item || '').trim()).filter(Boolean)
+      : []
+    const normalized = features.map(feature =>
+      feature.endsWith('.') || feature.endsWith('!') || feature.endsWith('?')
+        ? feature
+        : `${feature}.`
+    )
+
+    if (normalized.length >= 3) {
+      return normalized
+    }
+
+    if (lang === 'ru') {
+      return [
+        'Боевой ритм: класс получает бонус к устойчивости в первом раунде столкновения.',
+        'Тактический шаг: раз за сцену можно занять более выгодную позицию без потери темпа.',
+        'Контролируемый натиск: успешные действия усиливают следующее целевое умение.',
+        'Полевой опыт: класс лучше справляется с проверками, связанными с угрозами и преследованием.'
+      ]
+    }
+
+    return [
+      'Battle Rhythm: gain early-round stability in dangerous engagements.',
+      'Tactical Step: reposition once per scene without losing tempo.',
+      'Controlled Pressure: successful actions improve the next focused ability.',
+      'Field Experience: stronger checks in threat assessment and pursuit scenarios.'
+    ]
+  }
+
   const systemPrompt = `You are an expert D&D 5e game designer. Generate a balanced custom class based on the user's description.
 Return ONLY a valid JSON object with this exact structure:
 {
@@ -447,6 +520,11 @@ Return ONLY a valid JSON object with this exact structure:
 }
 Make sure the stats total between 72-78 (standard point buy range). The class should be balanced and follow D&D 5e design principles.
 Always include both startingWeapon and startingArmor.
+If language is Russian:
+- Write fluent, grammatically correct Russian.
+- Avoid sentence fragments and broken clauses.
+- Description must be detailed and semantically coherent in 3 full paragraphs.
+- Each paragraph should contain at least 2 complete sentences.
 ${languageDirective(language)}`
 
   const userPrompt = `Create a D&D 5e custom class based on this description: ${description}
@@ -516,8 +594,13 @@ Return only JSON. Do not wrap the response in markdown or add any commentary.`
       },
       hitDie: classData.hitDie || 'd8',
       proficiencies: Array.isArray(classData.proficiencies) ? classData.proficiencies : [],
-      features: Array.isArray(classData.features) ? classData.features : [],
-      description: classData.description || description,
+      features: normalizeClassFeatures(classData.features, language),
+      description: normalizeClassDescription(
+        classData.description,
+        classData.className,
+        description,
+        language
+      ),
       startingWeapon: {
         name: classData.startingWeapon?.name || 'Adventurer Blade',
         type: classData.startingWeapon?.type || 'melee',
@@ -554,8 +637,22 @@ Return only JSON. Do not wrap the response in markdown or add any commentary.`
       },
       hitDie: 'd8',
       proficiencies: ['Simple weapons', 'Light armor'],
-      features: ['Custom ability based on your description'],
-      description: `${description}
+      features:
+        language === 'ru'
+          ? [
+              'Базовая техника: класс получает надёжный приём, отражающий выбранную концепцию.',
+              'Тактическая гибкость: класс может подстраивать стиль боя под обстановку.',
+              'Профильное мастерство: класс стабильно усиливается по мере развития персонажа.'
+            ]
+          : ['Custom ability based on your description'],
+      description:
+        language === 'ru'
+          ? `Этот класс создан на основе вашей идеи: ${description}. Его основа — понятный боевой стиль, логичная роль в группе и внятный путь развития без разрывов в механике и повествовании.
+
+Представители класса действуют собранно: они выбирают момент для давления, контролируют дистанцию и используют сильные стороны без лишнего риска. Главный принцип — последовательность решений и устойчивость в затяжных сценах.
+
+В команде такой персонаж полезен как универсальный исполнитель: он поддерживает темп, закрывает ключевые задачи и помогает группе удерживать инициативу в критические моменты.`
+          : `${description}
 
 Their tale is whispered through campfires and taverns alike, describing the ideals that shaped them and the oaths they swore. Paint a vivid origin story for this class when you play them.
 
@@ -2875,4 +2972,3 @@ function assignDialogueColorId(npcId: string): string {
   const hash = npcId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
   return palette[hash % palette.length].id
 }
-
