@@ -94,14 +94,14 @@ export function Home() {
       <SideDeco side="right" visible={visible} />
 
       {/* Language switcher */}
-      <div style={{ position: 'fixed', top: 16, right: 20, zIndex: 50, opacity: visible ? 1 : 0, transition: 'opacity 1s ease 1.8s' }}>
+      <div style={{ position: 'fixed', top: 18, right: 22, zIndex: 50, opacity: visible ? 1 : 0, transition: 'opacity 1s ease 1.8s' }}>
         <select
           value={language}
           onChange={e => setLanguage(e.target.value as 'en' | 'ru')}
           style={{
-            background: 'rgba(10,8,14,0.9)', border: '1px solid var(--g-border)',
-            color: 'var(--g-parch-faint)', fontFamily: 'var(--g-font-title)',
-            fontSize: 9, letterSpacing: '0.15em', padding: '5px 10px',
+            background: 'rgba(10,8,14,0.9)', border: '1px solid rgba(200,165,74,0.3)',
+            color: 'rgba(200,165,74,0.8)', fontFamily: 'var(--g-font-title)',
+            fontSize: 11, letterSpacing: '0.15em', padding: '6px 12px',
             outline: 'none', cursor: 'pointer', clipPath: 'var(--g-clip-sm)',
           }}
         >
@@ -122,7 +122,7 @@ export function Home() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 32, ...fade(0.3) }}>
           <div style={{ width: 100, height: 1, background: 'linear-gradient(90deg, transparent, var(--g-gold-dim))' }} />
           <div style={{ width: 6, height: 6, background: 'var(--g-gold)', transform: 'rotate(45deg)', boxShadow: '0 0 8px var(--g-gold)' }} />
-          <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 9, letterSpacing: '0.35em', color: 'var(--g-parch-faint)', textTransform: 'uppercase' }}>
+          <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 11, letterSpacing: '0.3em', color: 'var(--g-gold-dim)', textTransform: 'uppercase' }}>
             The Arcane Chronicle
           </span>
           <div style={{ width: 6, height: 6, background: 'var(--g-gold)', transform: 'rotate(45deg)', boxShadow: '0 0 8px var(--g-gold)' }} />
@@ -131,11 +131,11 @@ export function Home() {
 
         {/* Logo + tagline */}
         <div style={{ ...fade(0.5), marginBottom: 10 }}>
-          <div style={{ fontFamily: 'var(--g-font-italic)', fontSize: 13, fontStyle: 'italic', color: 'var(--g-parch-faint)', letterSpacing: '0.12em', marginBottom: 8 }}>
+          <div style={{ fontFamily: 'var(--g-font-italic)', fontSize: 15, fontStyle: 'italic', color: 'rgba(200,165,74,0.65)', letterSpacing: '0.12em', marginBottom: 10 }}>
             An AI Dungeon Master
           </div>
           <LogoTitle />
-          <div style={{ fontFamily: 'var(--g-font-italic)', fontSize: 14, fontStyle: 'italic', color: 'var(--g-parch-faint)', marginTop: 12, letterSpacing: '0.08em' }}>
+          <div style={{ fontFamily: 'var(--g-font-italic)', fontSize: 16, fontStyle: 'italic', color: 'rgba(200,165,74,0.82)', marginTop: 14, letterSpacing: '0.06em', textShadow: '0 0 20px rgba(200,165,74,0.12)' }}>
             {t('home.tagline')}
           </div>
         </div>
@@ -148,9 +148,9 @@ export function Home() {
         </div>
 
         {/* Menu */}
-        <nav style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, ...fade(1.1) }}>
-          {menuItems.map(item => (
-            <MenuItemButton key={item.key} item={item} hovered={hoveredItem === item.key} onHover={setHoveredItem} lang={language} />
+        <nav style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, ...fade(1.1) }}>
+          {menuItems.map((item, index) => (
+            <MenuItemButton key={item.key} item={item} hovered={hoveredItem === item.key} onHover={setHoveredItem} lang={language} index={index} total={menuItems.length} />
           ))}
         </nav>
       </div>
@@ -200,37 +200,54 @@ function LogoTitle() {
   )
 }
 
-function MenuItemButton({ item, hovered, onHover, lang }: {
-  item: MenuItem; hovered: boolean; onHover: (k: string | null) => void; lang: string
+function MenuItemButton({ item, hovered, onHover, lang, index, total }: {
+  item: MenuItem; hovered: boolean; onHover: (k: string | null) => void; lang: string; index: number; total: number
 }) {
   const label = lang === 'ru' ? item.labelRu : item.label
+  const isPrimary = item.primary
+  const width     = isPrimary ? 300 : 260
+  const fontSize  = isPrimary ? 14 : 13
+  const padding   = isPrimary ? '15px 28px' : '12px 24px'
+
   return (
     <button
       onClick={item.action}
       onMouseEnter={() => onHover(item.key)}
       onMouseLeave={() => onHover(null)}
       style={{
-        position: 'relative', width: 260,
+        position: 'relative',
+        width,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '13px 24px',
-        fontFamily: 'var(--g-font-title)', fontSize: 13,
-        letterSpacing: hovered ? '0.28em' : '0.2em', textTransform: 'uppercase',
-        color: item.primary
-          ? (hovered ? 'var(--g-parch)' : 'var(--g-gold)')
+        padding,
+        fontFamily: 'var(--g-font-title)',
+        fontSize,
+        letterSpacing: hovered ? '0.28em' : '0.2em',
+        textTransform: 'uppercase',
+        color: isPrimary
+          ? (hovered ? '#fff' : 'var(--g-gold)')
           : (hovered ? 'var(--g-parch)' : 'var(--g-parch-dim)'),
-        background: hovered ? 'rgba(200,165,74,0.06)' : 'transparent',
+        background: isPrimary
+          ? (hovered ? 'rgba(200,165,74,0.18)' : 'rgba(200,165,74,0.08)')
+          : (hovered ? 'rgba(200,165,74,0.05)' : 'transparent'),
         border: '1px solid',
-        borderColor: item.primary
-          ? (hovered ? 'var(--g-gold)' : 'rgba(200,165,74,0.28)')
+        borderColor: isPrimary
+          ? (hovered ? 'rgba(200,165,74,0.85)' : 'rgba(200,165,74,0.55)')
           : (hovered ? 'rgba(200,165,74,0.35)' : 'rgba(200,165,74,0.12)'),
-        clipPath: 'var(--g-clip-md)', cursor: 'pointer',
-        transition: 'color 0.25s, letter-spacing 0.25s, background 0.25s, border-color 0.25s',
+        boxShadow: isPrimary
+          ? (hovered ? '0 0 24px rgba(200,165,74,0.18), inset 0 0 12px rgba(200,165,74,0.06)' : '0 0 12px rgba(200,165,74,0.08)')
+          : 'none',
+        clipPath: 'var(--g-clip-md)',
+        cursor: 'pointer',
+        transition: 'color 0.25s, letter-spacing 0.25s, background 0.25s, border-color 0.25s, box-shadow 0.25s',
         outline: 'none',
       }}
     >
       <span style={{
-        position: 'absolute', left: 18, color: 'var(--g-blood2)', fontSize: 12,
-        opacity: hovered ? 1 : 0, transform: hovered ? 'translateX(0)' : 'translateX(-6px)',
+        position: 'absolute', left: 18,
+        color: isPrimary ? 'var(--g-gold)' : 'var(--g-blood2)',
+        fontSize: isPrimary ? 14 : 12,
+        opacity: hovered ? 1 : 0,
+        transform: hovered ? 'translateX(0)' : 'translateX(-6px)',
         transition: 'opacity 0.2s, transform 0.2s',
       }}>›</span>
       {label}
