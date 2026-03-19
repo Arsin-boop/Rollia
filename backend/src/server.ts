@@ -18,7 +18,7 @@ const backendRoot = fs.existsSync(inferredBackendRoot) ? inferredBackendRoot : c
 const envPath = path.join(backendRoot, '.env')
 dotenv.config({ path: envPath })
 
-const requiredEnvVars = ['GROQ_API_KEY_PRIMARY', 'GROQ_API_KEY_UTILITY', 'GROQ_BASE_URL']
+const requiredEnvVars = ['GROQ_API_KEY_PRIMARY']
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
     console.error(`Missing required environment variable: ${envVar}`)
@@ -27,17 +27,23 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
+if (!process.env.GROQ_API_KEY_UTILITY) {
+  console.warn('GROQ_API_KEY_UTILITY is not set. Utility tasks will use primary model fallback.')
+}
+
 const app = express()
 const PORT = process.env.PORT || 3001
 
 app.use(
   cors({
     origin: process.env.ALLOWED_ORIGIN || 'http://localhost:5173',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization']
   })
 )
 app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
 app.use('/uploads', express.static(path.join(backendRoot, 'uploads')))
 
 const globalLimiter = rateLimit({
@@ -66,7 +72,7 @@ app.use('/api/battle', battleRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'D&D AI DM Backend is running' })
+  res.json({ status: 'ok', message: 'D&D AI DM Backend is running', timestamp: new Date().toISOString() })
 })
 
 // Test AI endpoint
@@ -87,6 +93,18 @@ app.get('/api/test-ai', async (req, res) => {
       details: 'Check backend console for more information'
     })
   }
+})
+
+// Keep API failures JSON-shaped (never HTML), which prevents frontend JSON parse crashes.
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` })
+})
+
+app.use((error: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Unhandled server error:', error)
+  res.status(error?.status || 500).json({
+    error: error?.message || 'Internal server error'
+  })
 })
 
 app.listen(PORT, () => {

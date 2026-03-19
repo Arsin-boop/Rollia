@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+const rawApiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+const trimmedApiBase = String(rawApiBase).replace(/\/+$/, '')
+const API_BASE_URL = /\/api$/i.test(trimmedApiBase) ? trimmedApiBase : `${trimmedApiBase}/api`
 export const API_ORIGIN = API_BASE_URL.replace(/\/api$/, '')
 
 export type ApiLanguage = 'en' | 'ru'
@@ -685,4 +687,3 @@ export async function deleteCharacterFromDB(characterId: string): Promise<void> 
     throw new Error(err.error || `Failed to delete character (${response.status})`)
   }
 }
-
