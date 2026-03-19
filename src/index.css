@@ -68,3 +68,11 @@ input:focus, textarea:focus, select:focus {
   outline-offset: 2px;
 }
 
+
+
+/* ── Mobile: hide side decorations on small screens ── */
+@media (max-width: 640px) {
+  .side-deco {
+    display: none !important;
+  }
+}

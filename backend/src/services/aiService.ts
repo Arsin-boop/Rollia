@@ -387,7 +387,7 @@ export async function generateAIResponse(options: AIPromptOptions): Promise<stri
   }
 }
 
-export async function generateCustomClass(description: string): Promise<{
+export async function generateCustomClass(description: string, language: PreferredLanguage = 'en'): Promise<{
   className: string
   stats: {
     strength: number
@@ -446,7 +446,8 @@ Return ONLY a valid JSON object with this exact structure:
   }
 }
 Make sure the stats total between 72-78 (standard point buy range). The class should be balanced and follow D&D 5e design principles.
-Always include both startingWeapon and startingArmor.`
+Always include both startingWeapon and startingArmor.
+${languageDirective(language)}`
 
   const userPrompt = `Create a D&D 5e custom class based on this description: ${description}
 Return only JSON. Do not wrap the response in markdown or add any commentary.`

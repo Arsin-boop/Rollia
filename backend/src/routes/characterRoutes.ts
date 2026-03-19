@@ -105,14 +105,14 @@ const generateAvatarForCharacter = async (
 // Generate custom class with AI
 router.post('/generate-class', async (req, res) => {
   try {
-    const { description } = req.body
+    const { description, language } = req.body
 
     if (!description || typeof description !== 'string') {
       return res.status(400).json({ error: 'Class description is required' })
     }
 
     console.log('Generating custom class for description:', description.substring(0, 100))
-    const classData = await generateCustomClass(description)
+    const classData = await generateCustomClass(description, language === 'ru' ? 'ru' : 'en')
     console.log('Custom class generated successfully:', classData.className)
     res.json(classData)
   } catch (error: any) {

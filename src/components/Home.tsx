@@ -4,7 +4,7 @@ import { useI18n } from '../i18n'
 import { useEmberCanvas } from '../hooks/useEmberCanvas'
 import { RunicSigil } from './grimoire/RunicSigil'
 
-const CHARACTER_KEY      = 'character'
+const CHARACTER_KEY        = 'character'
 const LEGACY_CHARACTER_KEY = 'dnd-ai-character'
 const ACTIVE_CAMPAIGN_KEY  = 'activeCampaignId'
 
@@ -77,15 +77,18 @@ export function Home() {
       overflow: 'hidden', background: 'var(--g-ink)',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
     }}>
-      {/* Ember canvas */}
-      <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }} />
+      {/* ── Ember canvas ── */}
+      <canvas ref={canvasRef} style={{
+        position: 'fixed', inset: 0, width: '100%', height: '100%',
+        zIndex: 0, pointerEvents: 'none',
+      }} />
 
-      {/* Grain */}
+      {/* ── Grain ── */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none',
         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.88' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E")`,
       }} />
 
-      {/* Vignette */}
+      {/* ── Vignette ── */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 2, pointerEvents: 'none',
         background: 'radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(4,2,7,0.75) 100%)',
       }} />
@@ -93,16 +96,24 @@ export function Home() {
       <SideDeco side="left"  visible={visible} />
       <SideDeco side="right" visible={visible} />
 
-      {/* Language switcher */}
-      <div style={{ position: 'fixed', top: 18, right: 22, zIndex: 50, opacity: visible ? 1 : 0, transition: 'opacity 1s ease 1.8s' }}>
+      {/* ── Language switcher ── */}
+      <div style={{
+        position: 'fixed', top: 18, right: 22, zIndex: 50,
+        opacity: visible ? 1 : 0, transition: 'opacity 1s ease 1.4s',
+      }}>
         <select
           value={language}
           onChange={e => setLanguage(e.target.value as 'en' | 'ru')}
           style={{
-            background: 'rgba(10,8,14,0.9)', border: '1px solid rgba(200,165,74,0.3)',
-            color: 'rgba(200,165,74,0.8)', fontFamily: 'var(--g-font-title)',
-            fontSize: 11, letterSpacing: '0.15em', padding: '6px 12px',
-            outline: 'none', cursor: 'pointer', clipPath: 'var(--g-clip-sm)',
+            background: 'rgba(10,8,14,0.92)',
+            border: '1px solid rgba(200,165,74,0.38)',
+            color: 'rgba(200,165,74,0.88)',
+            fontFamily: 'var(--g-font-title)',
+            fontSize: 12,
+            letterSpacing: '0.18em',
+            padding: '7px 14px',
+            outline: 'none', cursor: 'pointer',
+            clipPath: 'var(--g-clip-sm)',
           }}
         >
           <option value="en">EN</option>
@@ -110,8 +121,12 @@ export function Home() {
         </select>
       </div>
 
-      {/* Stage */}
-      <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* ── Stage ── */}
+      <div style={{
+        position: 'relative', zIndex: 10, textAlign: 'center',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        padding: '0 24px', width: '100%', maxWidth: 560,
+      }}>
 
         {/* Runic sigil */}
         <div style={{ ...fade(0.1), marginBottom: 12 }}>
@@ -119,54 +134,99 @@ export function Home() {
         </div>
 
         {/* Top ornament */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 32, ...fade(0.3) }}>
-          <div style={{ width: 100, height: 1, background: 'linear-gradient(90deg, transparent, var(--g-gold-dim))' }} />
-          <div style={{ width: 6, height: 6, background: 'var(--g-gold)', transform: 'rotate(45deg)', boxShadow: '0 0 8px var(--g-gold)' }} />
-          <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 11, letterSpacing: '0.3em', color: 'var(--g-gold-dim)', textTransform: 'uppercase' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          marginBottom: 28, ...fade(0.3),
+          width: '100%', overflow: 'hidden',
+        }}>
+          <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, var(--g-gold-dim))' }} />
+          <div style={{ width: 5, height: 5, background: 'var(--g-gold)', transform: 'rotate(45deg)', boxShadow: '0 0 8px var(--g-gold)', flexShrink: 0 }} />
+          <span style={{
+            fontFamily: 'var(--g-font-title)',
+            fontSize: 11,
+            letterSpacing: '0.28em',
+            color: 'var(--g-gold-dim)',
+            textTransform: 'uppercase',
+            whiteSpace: 'nowrap',
+          }}>
             The Arcane Chronicle
           </span>
-          <div style={{ width: 6, height: 6, background: 'var(--g-gold)', transform: 'rotate(45deg)', boxShadow: '0 0 8px var(--g-gold)' }} />
-          <div style={{ width: 100, height: 1, background: 'linear-gradient(270deg, transparent, var(--g-gold-dim))' }} />
+          <div style={{ width: 5, height: 5, background: 'var(--g-gold)', transform: 'rotate(45deg)', boxShadow: '0 0 8px var(--g-gold)', flexShrink: 0 }} />
+          <div style={{ flex: 1, height: 1, background: 'linear-gradient(270deg, transparent, var(--g-gold-dim))' }} />
         </div>
 
         {/* Logo + tagline */}
-        <div style={{ ...fade(0.5), marginBottom: 10 }}>
-          <div style={{ fontFamily: 'var(--g-font-italic)', fontSize: 15, fontStyle: 'italic', color: 'rgba(200,165,74,0.65)', letterSpacing: '0.12em', marginBottom: 10 }}>
+        <div style={{ ...fade(0.5), marginBottom: 10, width: '100%' }}>
+          <div style={{
+            fontFamily: 'var(--g-font-italic)', fontStyle: 'italic',
+            fontSize: 15,
+            color: 'rgba(200,165,74,0.68)',
+            letterSpacing: '0.12em', marginBottom: 10,
+          }}>
             An AI Dungeon Master
           </div>
+
           <LogoTitle />
-          <div style={{ fontFamily: 'var(--g-font-italic)', fontSize: 16, fontStyle: 'italic', color: 'rgba(200,165,74,0.82)', marginTop: 14, letterSpacing: '0.06em', textShadow: '0 0 20px rgba(200,165,74,0.12)' }}>
+
+          <div style={{
+            fontFamily: 'var(--g-font-italic)', fontStyle: 'italic',
+            fontSize: 17,
+            color: 'rgba(200,165,74,0.78)',
+            marginTop: 14, letterSpacing: '0.06em',
+            lineHeight: 1.55,
+            textShadow: '0 0 24px rgba(200,165,74,0.14)',
+          }}>
             {t('home.tagline')}
           </div>
         </div>
 
         {/* Divider */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, width: 320, margin: '36px 0 40px', opacity: visible ? 1 : 0, transition: 'opacity 1.2s ease 0.9s' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 16,
+          width: '100%', maxWidth: 340,
+          margin: '32px 0 36px',
+          opacity: visible ? 1 : 0, transition: 'opacity 1.2s ease 0.9s',
+        }}>
           <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, var(--g-gold-dim))' }} />
           <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 11, color: 'var(--g-gold)', letterSpacing: '0.3em' }}>✦</span>
           <div style={{ flex: 1, height: 1, background: 'linear-gradient(270deg, transparent, var(--g-gold-dim))' }} />
         </div>
 
         {/* Menu */}
-        <nav style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, ...fade(1.1) }}>
-          {menuItems.map((item, index) => (
-            <MenuItemButton key={item.key} item={item} hovered={hoveredItem === item.key} onHover={setHoveredItem} lang={language} index={index} total={menuItems.length} />
+        <nav style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          gap: 8, ...fade(1.1), width: '100%',
+        }}>
+          {menuItems.map(item => (
+            <MenuItemButton
+              key={item.key}
+              item={item}
+              hovered={hoveredItem === item.key}
+              onHover={setHoveredItem}
+              lang={language}
+            />
           ))}
         </nav>
       </div>
 
-      {/* Bottom bar */}
+      {/* ── Bottom bar ── */}
       <div style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 20,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '12px 28px', borderTop: '1px solid rgba(200,165,74,0.08)',
         opacity: visible ? 1 : 0, transition: 'opacity 1s ease 1.6s',
       }}>
-        <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 8, letterSpacing: '0.25em', color: 'var(--g-parch-faint)', opacity: 0.45, textTransform: 'uppercase' }}>v0.9 · Arcane Build</span>
+        <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 8, letterSpacing: '0.25em', color: 'var(--g-parch-faint)', opacity: 0.45, textTransform: 'uppercase' }}>
+          v0.9 · Arcane Build
+        </span>
         <div style={{ display: 'flex', gap: 6 }}>
-          {[0, 1, 2].map(i => <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--g-gold-dim)', opacity: 0.4 }} />)}
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--g-gold-dim)', opacity: 0.4 }} />
+          ))}
         </div>
-        <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 8, letterSpacing: '0.25em', color: 'var(--g-parch-faint)', opacity: 0.45, textTransform: 'uppercase' }}>Powered by Groq · Qwen 3</span>
+        <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 8, letterSpacing: '0.25em', color: 'var(--g-parch-faint)', opacity: 0.45, textTransform: 'uppercase' }}>
+          Powered by Groq · Qwen 3
+        </span>
       </div>
     </div>
   )
@@ -179,17 +239,16 @@ function LogoTitle() {
     <div style={{ position: 'relative', display: 'inline-block' }}>
       <h1 style={{
         fontFamily: 'var(--g-font-display)', fontWeight: 900,
-        fontSize: 'clamp(56px, 9vw, 108px)', lineHeight: 1,
+        fontSize: 'clamp(52px, 9vw, 108px)', lineHeight: 1,
         color: 'var(--g-parch)', letterSpacing: '0.04em',
         animation: 'g-flicker 7s ease-in-out infinite', margin: 0,
       }}>
         Rol<span style={{ color: 'var(--g-blood2)', textShadow: '0 0 30px var(--g-blood-glow)' }}>l</span>ia
       </h1>
-      {/* Shimmer overlay */}
       <h1 aria-hidden style={{
         position: 'absolute', inset: 0, margin: 0,
         fontFamily: 'var(--g-font-display)', fontWeight: 900,
-        fontSize: 'clamp(56px, 9vw, 108px)', lineHeight: 1, letterSpacing: '0.04em',
+        fontSize: 'clamp(52px, 9vw, 108px)', lineHeight: 1, letterSpacing: '0.04em',
         background: 'linear-gradient(105deg, transparent 30%, rgba(200,165,74,0.55) 48%, rgba(232,200,100,0.75) 50%, rgba(200,165,74,0.55) 52%, transparent 70%)',
         backgroundSize: '200% 100%',
         WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent',
@@ -200,14 +259,14 @@ function LogoTitle() {
   )
 }
 
-function MenuItemButton({ item, hovered, onHover, lang, index, total }: {
-  item: MenuItem; hovered: boolean; onHover: (k: string | null) => void; lang: string; index: number; total: number
+function MenuItemButton({ item, hovered, onHover, lang }: {
+  item: MenuItem
+  hovered: boolean
+  onHover: (k: string | null) => void
+  lang: string
 }) {
   const label = lang === 'ru' ? item.labelRu : item.label
-  const isPrimary = item.primary
-  const width     = isPrimary ? 300 : 260
-  const fontSize  = isPrimary ? 14 : 13
-  const padding   = isPrimary ? '15px 28px' : '12px 24px'
+  const isPrimary = Boolean(item.primary)
 
   return (
     <button
@@ -216,36 +275,38 @@ function MenuItemButton({ item, hovered, onHover, lang, index, total }: {
       onMouseLeave={() => onHover(null)}
       style={{
         position: 'relative',
-        width,
+        width: '100%',
+        maxWidth: isPrimary ? 320 : 280,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding,
+        padding: isPrimary ? '15px 28px' : '11px 24px',
         fontFamily: 'var(--g-font-title)',
-        fontSize,
-        letterSpacing: hovered ? '0.28em' : '0.2em',
+        fontSize: isPrimary ? 14 : 12,
+        letterSpacing: hovered ? '0.26em' : (isPrimary ? '0.22em' : '0.16em'),
         textTransform: 'uppercase',
         color: isPrimary
           ? (hovered ? '#fff' : 'var(--g-gold)')
-          : (hovered ? 'var(--g-parch)' : 'var(--g-parch-dim)'),
+          : (hovered ? 'var(--g-parch)' : 'rgba(184,168,136,0.65)'),
         background: isPrimary
-          ? (hovered ? 'rgba(200,165,74,0.18)' : 'rgba(200,165,74,0.08)')
-          : (hovered ? 'rgba(200,165,74,0.05)' : 'transparent'),
+          ? (hovered ? 'rgba(200,165,74,0.15)' : 'rgba(200,165,74,0.07)')
+          : (hovered ? 'rgba(200,165,74,0.04)' : 'transparent'),
         border: '1px solid',
         borderColor: isPrimary
-          ? (hovered ? 'rgba(200,165,74,0.85)' : 'rgba(200,165,74,0.55)')
-          : (hovered ? 'rgba(200,165,74,0.35)' : 'rgba(200,165,74,0.12)'),
+          ? (hovered ? 'rgba(200,165,74,0.92)' : 'rgba(200,165,74,0.55)')
+          : (hovered ? 'rgba(200,165,74,0.3)' : 'rgba(200,165,74,0.1)'),
         boxShadow: isPrimary
-          ? (hovered ? '0 0 24px rgba(200,165,74,0.18), inset 0 0 12px rgba(200,165,74,0.06)' : '0 0 12px rgba(200,165,74,0.08)')
+          ? (hovered
+              ? '0 0 32px rgba(200,165,74,0.18), inset 0 0 18px rgba(200,165,74,0.06)'
+              : '0 0 16px rgba(200,165,74,0.09)')
           : 'none',
-        clipPath: 'var(--g-clip-md)',
-        cursor: 'pointer',
-        transition: 'color 0.25s, letter-spacing 0.25s, background 0.25s, border-color 0.25s, box-shadow 0.25s',
+        clipPath: 'var(--g-clip-md)', cursor: 'pointer',
+        transition: 'all 0.25s ease',
         outline: 'none',
       }}
     >
       <span style={{
         position: 'absolute', left: 18,
         color: isPrimary ? 'var(--g-gold)' : 'var(--g-blood2)',
-        fontSize: isPrimary ? 14 : 12,
+        fontSize: isPrimary ? 15 : 12,
         opacity: hovered ? 1 : 0,
         transform: hovered ? 'translateX(0)' : 'translateX(-6px)',
         transition: 'opacity 0.2s, transform 0.2s',
@@ -257,14 +318,21 @@ function MenuItemButton({ item, hovered, onHover, lang, index, total }: {
 
 function SideDeco({ side, visible }: { side: 'left' | 'right'; visible: boolean }) {
   return (
-    <div style={{
-      position: 'fixed', top: '50%', [side]: 24,
-      transform: 'translateY(-50%)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-      zIndex: 15, opacity: visible ? 0.6 : 0, transition: 'opacity 1.5s ease 1.8s',
-    }}>
+    <div
+      className="side-deco"
+      style={{
+        position: 'fixed', top: '50%', [side]: 24,
+        transform: 'translateY(-50%)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+        zIndex: 15, opacity: visible ? 0.6 : 0, transition: 'opacity 1.5s ease 1.8s',
+      }}
+    >
       <div style={{ width: 1, height: 60, background: 'linear-gradient(180deg, transparent, var(--g-gold-dim), transparent)' }} />
-      <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 7, letterSpacing: '0.3em', color: 'var(--g-parch-faint)', textTransform: 'uppercase', writingMode: 'vertical-rl', opacity: 0.4 }}>
+      <span style={{
+        fontFamily: 'var(--g-font-title)', fontSize: 7, letterSpacing: '0.3em',
+        color: 'var(--g-parch-faint)', textTransform: 'uppercase',
+        writingMode: 'vertical-rl', opacity: 0.4,
+      }}>
         {side === 'left' ? 'Est. MMX' : 'Rollia'}
       </span>
       <div style={{ width: 1, height: 60, background: 'linear-gradient(180deg, transparent, var(--g-gold-dim), transparent)' }} />

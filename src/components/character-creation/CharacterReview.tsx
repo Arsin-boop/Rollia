@@ -166,7 +166,17 @@ export function CharacterReview() {
                   </div>
                 )}
                 {avatarStatus === 'failed' && avatarError && (
-                  <p style={{ fontFamily:'var(--g-font-title)', fontSize:10, color:'var(--g-blood2)', marginTop:6, letterSpacing:'0.1em' }}>{avatarError}</p>
+                  <div style={{ marginTop: 10, padding: '10px 14px', border: '1px solid rgba(255,80,80,0.25)', background: 'rgba(255,80,80,0.06)', clipPath: 'polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px))' }}>
+                    <p style={{ fontFamily:'var(--g-font-title)', fontSize:11, color:'rgba(255,100,100,0.9)', letterSpacing:'0.08em', marginBottom:8 }}>{avatarError}</p>
+                    <button
+                      onClick={() => navigate(0)}
+                      style={{ fontFamily:'var(--g-font-title)', fontSize:10, letterSpacing:'0.14em', textTransform:'uppercase', border:'1px solid rgba(255,100,100,0.35)', color:'rgba(255,140,140,0.85)', background:'transparent', padding:'5px 14px', cursor:'pointer', clipPath:'polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px))', transition:'all 0.2s' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,100,100,0.6)'; (e.currentTarget as HTMLElement).style.background = 'rgba(255,100,100,0.08)' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,100,100,0.35)'; (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                    >
+                      ↺ Retry
+                    </button>
+                  </div>
                 )}
               </div>
             )}

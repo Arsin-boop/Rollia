@@ -248,14 +248,14 @@ export type ActionIntent = {
 }
 
 // Generate custom class
-export async function generateCustomClass(description: string): Promise<CustomClassResponse> {
+export async function generateCustomClass(description: string, language?: string): Promise<CustomClassResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/character/generate-class`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ description }),
+      body: JSON.stringify({ description, language }),
     })
 
     if (!response.ok) {

@@ -1645,5 +1645,33 @@ router.post('/summarize-backstory', async (req, res) => {
   }
 })
 
+// Reset session — clears history and in-memory state for a campaign
+router.post('/reset-session', async (req, res) => {
+  try {
+    const { campaignId, characterId } = req.body
+    if (!campaignId || typeof campaignId !== 'string') {
+      return res.status(400).json({ error: 'campaignId is required' })
+    }
+
+    // Clear in-memory state
+    gameStateByCampaign.delete(campaignId)
+    worldStateByCampaign.delete(campaignId)
+    storyMemoryByCampaign.delete(campaignId)
+
+    // Reset persisted session history (keep the session row, just clear history)
+    upsertSession({
+      id: campaignId,
+      characterId: characterId ?? null,
+      history: [],
+      payload: {}
+    })
+
+    return res.json({ success: true, campaignId })
+  } catch (error: any) {
+    console.error('Error resetting session:', error)
+    return res.status(500).json({ error: error?.message || 'Failed to reset session' })
+  }
+})
+
 export default router
 

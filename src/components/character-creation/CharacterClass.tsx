@@ -92,7 +92,7 @@ export function CharacterClass() {
     if (!customInput.trim()) return
     setIsGenerating(true)
     try {
-      const data = await generateCustomClass(customInput.trim())
+      const data = await generateCustomClass(customInput.trim(), language)
       setGeneratedData(data)
       setCustomDesc(data.description || buildCustomDesc(customInput, Date.now().toString(), language))
       setCustomStats(mapStats(data.stats))
@@ -162,7 +162,7 @@ export function CharacterClass() {
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                   gap: 10, padding: '20px 12px',
                   border: '1px solid',
-                  borderColor: isActive ? 'var(--g-gold)' : isHov ? 'var(--g-border-h)' : 'var(--g-border)',
+                  borderColor: isActive ? 'var(--g-gold)' : isHov ? 'rgba(200,165,74,0.7)' : 'rgba(200,165,74,0.25)',
                   background: isActive ? 'rgba(200,165,74,0.07)' : isHov ? 'rgba(200,165,74,0.03)' : 'rgba(0,0,0,0.18)',
                   clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
                   cursor: 'pointer', transition: 'all 0.2s', outline: 'none', position: 'relative',
@@ -174,7 +174,7 @@ export function CharacterClass() {
                 <span style={{ fontSize: 30, filter: isActive ? 'drop-shadow(0 0 8px rgba(200,165,74,0.4))' : 'none', transition: 'filter 0.2s' }}>
                   {cls.icon}
                 </span>
-                <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: isActive ? 'var(--g-gold)' : 'var(--g-parch-dim)' }}>
+                <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 13, letterSpacing: '0.12em', textTransform: 'uppercase', color: isActive ? 'var(--g-gold)' : 'var(--g-parch-dim)' }}>
                   {cls.label}
                 </span>
                 {isActive && activeStats && (
@@ -209,8 +209,12 @@ export function CharacterClass() {
         )}
 
         {/* Custom class */}
-        <div style={{ border: '1px solid var(--g-border)', background: 'rgba(0,0,0,0.15)', clipPath: 'var(--g-clip-md)', padding: '18px 20px' }}>
-          <div className="g-label-gold" style={{ marginBottom: 6 }}>✦ {t('characterClass.customTitle')}</div>
+        <div style={{ border: '1px solid rgba(200,165,74,0.28)', background: 'rgba(200,165,74,0.025)', clipPath: 'var(--g-clip-md)', padding: '18px 20px', boxShadow: 'inset 0 0 24px rgba(200,165,74,0.03)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, rgba(200,165,74,0.2))' }} />
+            <div className="g-label-gold">✦ {t('characterClass.customTitle')}</div>
+            <div style={{ flex: 1, height: 1, background: 'linear-gradient(270deg, transparent, rgba(200,165,74,0.2))' }} />
+          </div>
           <p style={{ fontFamily: 'var(--g-font-italic)', fontStyle: 'italic', fontSize: 13, color: 'var(--g-parch-faint)', marginBottom: 12, lineHeight: 1.5 }}>
             {t('characterClass.customHint')}
           </p>

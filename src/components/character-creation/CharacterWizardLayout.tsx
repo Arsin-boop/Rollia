@@ -89,15 +89,15 @@ export function CharacterWizardLayout({
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   padding: '3px 9px',
-                  fontFamily: 'var(--g-font-title)', fontSize: 8, letterSpacing: '0.18em', textTransform: 'uppercase',
-                  color: isCurrent ? 'var(--g-gold)' : isDone ? 'rgba(200,165,74,0.5)' : 'rgba(200,165,74,0.2)',
+                  fontFamily: 'var(--g-font-title)', fontSize: isCurrent ? 12 : 11, letterSpacing: '0.18em', textTransform: 'uppercase',
+                  color: isCurrent ? 'var(--g-gold)' : isDone ? 'rgba(200,165,74,0.65)' : 'rgba(200,165,74,0.55)',
                   border: '1px solid',
-                  borderColor: isCurrent ? 'rgba(200,165,74,0.35)' : isDone ? 'rgba(200,165,74,0.2)' : 'rgba(200,165,74,0.07)',
+                  borderColor: isCurrent ? 'rgba(200,165,74,0.45)' : isDone ? 'rgba(200,165,74,0.28)' : 'rgba(200,165,74,0.15)',
                   background: isCurrent ? 'rgba(200,165,74,0.06)' : 'transparent',
                   clipPath: 'polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px))',
                   transition: 'all 0.3s',
                 }}>
-                  {isDone && <span style={{ fontSize: 7 }}>✓</span>}
+                  {isDone && <span style={{ fontSize: 9 }}>✓</span>}
                   {label}
                 </div>
               </div>
@@ -132,7 +132,7 @@ export function CharacterWizardLayout({
               {step.number}
             </div>
             <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, rgba(200,165,74,0.2), transparent)' }} />
-            <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 8, letterSpacing: '0.25em', color: 'rgba(200,165,74,0.3)', textTransform: 'uppercase' }}>
+            <span style={{ fontFamily: 'var(--g-font-title)', fontSize: 11, letterSpacing: '0.25em', color: 'rgba(200,165,74,0.65)', textTransform: 'uppercase' }}>
               Step {step.number} of {step.total}
             </span>
           </div>
