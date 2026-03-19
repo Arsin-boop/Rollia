@@ -1,5 +1,21 @@
+/**
+ * IMPROVED NARRATIVE ENGINE v2 for Rollia
+ * 
+ * Based on analysis of two campaign logs
+ * Improvements:
+ * - Stronger spatial logic requirements
+ * - Explicit choices in every response
+ * - Better separation of player action and description
+ * - Enhanced anachronism detection
+ * 
+ * INSTALLATION:
+ * 1. Copy narrativeValidator_v2.ts to backend/src/services/
+ * 2. Replace backend/src/services/narrativeEngine.ts with this file
+ */
+
 import { generateAIResponse, type PreferredLanguage } from './aiService.js'
 import { ensureNPCProfileById } from './npcRegistry.js'
+import { narrativeValidator } from './narrativeValidator.js'
 
 export interface SceneState {
   location: string
@@ -38,9 +54,9 @@ const safeString = (value: unknown, fallback = ''): string =>
 const normalizeChoices = (value: unknown): string[] =>
   Array.isArray(value)
     ? value
-        .map(entry => (typeof entry === 'string' ? entry.trim() : ''))
-        .filter(Boolean)
-        .slice(0, 3)
+      .map(entry => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter(Boolean)
+      .slice(0, 3)
     : []
 
 const isValidNarrative = (value: Partial<NarrativeResult>): value is NarrativeResult =>
@@ -54,6 +70,9 @@ const isValidNarrative = (value: Partial<NarrativeResult>): value is NarrativeRe
   value.choices.length === 3 &&
   value.choices.every(choice => typeof choice === 'string' && choice.trim().length > 0)
 
+/**
+ * IMPROVED v2: Enhanced narrative prompt with spatial logic and explicit choices
+ */
 export function buildNarrativePrompt(
   context: NarrativeContext,
   language: PreferredLanguage = 'en'
@@ -76,21 +95,179 @@ export function buildNarrativePrompt(
   const activeCharactersBlock = effectiveSceneState.activeNPCs.length
     ? effectiveSceneState.activeNPCs.map(name => `- ${name}`).join('\n')
     : '- none'
+
+  // IMPROVED v2: Comprehensive system prompt for Russian with spatial logic
+  const systemPromptRU = `Ты — Мастер Подземелий в мире тёмного фэнтези. Твоя роль — создавать увлекательный, атмосферный нарратив, который полностью погружает игрока в мир.
+
+═══════════════════════════════════════════════════════════════
+КРИТИЧЕСКИЕ ПРАВИЛА (НАРУШЕНИЕ = ПЕРЕПИСАНИЕ)
+═══════════════════════════════════════════════════════════════
+
+1. 🚫 НИКОГДА НЕ ИСПОЛЬЗУЙ МЕТАЯЗЫК:
+   ❌ ЗАПРЕЩЕНО: "NPC", "проверка", "успех", "итого", "бросок", "кубик", "HP", "XP"
+   ❌ ЗАПРЕЩЕНО: упоминание механик игры в нарративе
+   ❌ ЗАПРЕЩЕНО: квадратные скобки [как эти]
+   ✅ ВМЕСТО: Используй имена персонажей, описывай действия
+
+2. 🌍 ПРОСТРАНСТВЕННАЯ ЛОГИКА (КРИТИЧНО):
+   ✅ Локация ДОЛЖНА соответствовать Context → Location
+   ✅ Если локация меняется, ОБЯЗАТЕЛЬНО объясни логический переход
+   ✅ Помни о предыдущих событиях в этой локации
+   ✅ Не телепортируй персонажей без объяснения
+   ✅ Описывай расстояния и направления (близко, далеко, слева, справа)
+   ❌ ЗАПРЕЩЕНО: менять локацию без объяснения
+
+3. 🎯 РАЗДЕЛЕНИЕ ОТВЕТСТВЕННОСТИ:
+   ✅ Нарратив описывает результаты действия игрока
+   ✅ Нарратив описывает реакцию мира на действие
+   ❌ ЗАПРЕЩЕНО: описывать сами действия игрока
+   ❌ ЗАПРЕЩЕНО: описывать мысли персонажа
+   ❌ ЗАПРЕЩЕНО: решать за игрока, что он делает
+
+4. 📋 ВЫБОРЫ (CHOICES):
+   ✅ ВСЕГДА предложи ровно 3 конкретных действия
+   ✅ Каждый выбор должен быть ясным и выполнимым
+   ✅ Выборы должны соответствовать текущей ситуации
+   ✅ Примеры: "Спросить о кольце", "Осмотреть ящик", "Атаковать стражника"
+   ❌ ЗАПРЕЩЕНО: менее 3 выборов
+
+5. 🌍 МАТЕРИАЛЫ И АНАХРОНИЗМЫ:
+   ✅ Используй ТОЛЬКО средневековые/фэнтези материалы:
+      - ✅ камень, дерево, металл, кожа, ткань, глина
+      - ✅ факелы, свечи, масляные лампы
+      - ✅ мечи, луки, щиты, доспехи
+   ❌ ЗАПРЕЩЕНО: бетон, пластик, асфальт, тротуар, решетка, электричество, стекло
+
+6. 👥 ПЕРСОНАЖИ И ДИАЛОГИ:
+   ✅ Персонажи должны иметь имена и характеры
+   ✅ Диалоги должны быть полными и естественными
+   ✅ Используй кавычки: "Слова персонажа"
+   ✅ Персонажи реагируют на действия игрока логично
+   ✅ Персонажи помнят предыдущие события
+   ❌ ЗАПРЕЩЕНО: неполные диалоги, заканчивающиеся на многоточие
+
+7. 🎭 СТРУКТУРА НАРРАТИВА:
+   ✅ 3-4 предложения описания сцены
+   ✅ Реакция персонажей на действие игрока
+   ✅ Полный диалог (если применимо)
+   ✅ Сенсорные детали (звуки, запахи, ощущения)
+   ❌ ЗАПРЕЩЕНО: абстрактные метафоры ("тени судьбы")
+
+═══════════════════════════════════════════════════════════════
+СТРУКТУРА ОТВЕТА
+═══════════════════════════════════════════════════════════════
+
+Выведи ТОЛЬКО валидный JSON, без объяснений:
+
+{
+  "scene": {
+    "location": "Текущая локация (ДОЛЖНА совпадать с Context)",
+    "time": "Конкретное время"
+  },
+  "narration": "3-4 предложения описания + реакция + диалог",
+  "choices": ["Действие 1", "Действие 2", "Действие 3"]
+}
+
+ПРАВИЛА ПОЛЕЙ:
+- "scene.location": ДОЛЖНА совпадать с Context → Location (НИКОГДА не меняй без объяснения)
+- "scene.time": Конкретное время (не "Неопределено")
+- "narration": Только нарратив, БЕЗ локации и времени, БЕЗ описания действий игрока
+- "choices": РОВНО 3 конкретных действия, соответствующих ситуации`
+
+  // IMPROVED v2: Comprehensive system prompt for English
+  const systemPromptEN = `You are a Dungeon Master in a dark fantasy world. Your role is to create immersive, atmospheric narrative that fully immerses the player in the world.
+
+═══════════════════════════════════════════════════════════════
+CRITICAL RULES (VIOLATION = REWRITE)
+═══════════════════════════════════════════════════════════════
+
+1. 🚫 NEVER USE META-LANGUAGE:
+   ❌ FORBIDDEN: "NPC", "check", "success", "total", "roll", "dice", "HP", "XP"
+   ❌ FORBIDDEN: mentioning game mechanics in narrative
+   ❌ FORBIDDEN: square brackets [like these]
+   ✅ INSTEAD: Use character names, describe actions
+
+2. 🌍 SPATIAL LOGIC (CRITICAL):
+   ✅ Location MUST match Context → Location
+   ✅ If location changes, EXPLAIN the logical transition
+   ✅ Remember previous events in this location
+   ✅ Don't teleport characters without explanation
+   ✅ Describe distances and directions (close, far, left, right)
+   ❌ FORBIDDEN: change location without explanation
+
+3. 🎯 SEPARATION OF RESPONSIBILITY:
+   ✅ Narrative describes results of player action
+   ✅ Narrative describes world reaction to action
+   ❌ FORBIDDEN: describe player's own actions
+   ❌ FORBIDDEN: describe character's thoughts
+   ❌ FORBIDDEN: decide for player what they do
+
+4. 📋 CHOICES:
+   ✅ ALWAYS offer exactly 3 specific actions
+   ✅ Each choice must be clear and executable
+   ✅ Choices must match the current situation
+   ✅ Examples: "Ask about the ring", "Examine the box", "Attack the guard"
+   ❌ FORBIDDEN: fewer than 3 choices
+
+5. 🌍 MATERIALS AND ANACHRONISMS:
+   ✅ Use ONLY medieval/fantasy materials:
+      - ✅ stone, wood, metal, leather, cloth, clay
+      - ✅ torches, candles, oil lamps
+      - ✅ swords, bows, shields, armor
+   ❌ FORBIDDEN: concrete, plastic, asphalt, sidewalk, grating, electricity, glass
+
+6. 👥 CHARACTERS AND DIALOGUE:
+   ✅ Characters must have names and personalities
+   ✅ Dialogue must be complete and natural
+   ✅ Use quotation marks: "Character's words"
+   ✅ Characters react to player actions logically
+   ✅ Characters remember previous events
+   ❌ FORBIDDEN: incomplete dialogues ending with ellipsis
+
+7. 🎭 NARRATIVE STRUCTURE:
+   ✅ 3-4 sentences of scene description
+   ✅ Character reaction to player action
+   ✅ Complete dialogue (if applicable)
+   ✅ Sensory details (sounds, smells, sensations)
+   ❌ FORBIDDEN: abstract metaphors ("shadows of fate")
+
+═══════════════════════════════════════════════════════════════
+RESPONSE STRUCTURE
+═══════════════════════════════════════════════════════════════
+
+Output ONLY valid JSON, no explanations:
+
+{
+  "scene": {
+    "location": "Current location (MUST match Context)",
+    "time": "Specific time"
+  },
+  "narration": "3-4 sentences of description + reaction + dialogue",
+  "choices": ["Action 1", "Action 2", "Action 3"]
+}
+
+FIELD RULES:
+- "scene.location": MUST match Context → Location (NEVER change without explanation)
+- "scene.time": Specific time (not "Unspecified")
+- "narration": Only narrative, NO location and time, NO description of player's actions
+- "choices": EXACTLY 3 specific actions matching the situation`
+
+  const systemPrompt = language === 'ru' ? systemPromptRU : systemPromptEN
+
   const russianGrammarRules =
     language === 'ru'
       ? `
-Russian grammar rules (mandatory):
-- Use correct case inflection for nouns, names, and adjectives.
-- Keep subject-verb agreement and number agreement in every sentence.
-- Avoid ambiguous pronouns when multiple characters are present; repeat role/name.
-- Keep consistent tense within each paragraph unless a clear transition is stated.
-- Use natural Russian syntax; avoid calques from English.
-- Do not mix Cyrillic and Latin in Russian narrative text.
-- Before finalizing, self-check each sentence for declension and agreement errors.`
+Правила русского языка (обязательно):
+- Используй правильное склонение существительных, имён и прилагательных
+- Согласуй подлежащее и сказуемое
+- Избегай неоднозначных местоимений; повторяй роль/имя
+- Сохраняй консистентность времени в каждом абзаце
+- Используй естественный русский синтаксис`
       : ''
 
-  return `You are the Narrative Engine for Rollia.
-You describe scenes only. You do not decide mechanics or world consequences.
+  return `${systemPrompt}
+
+${russianGrammarRules}
 
 OUTPUT FORMAT (CRITICAL):
 - Return ONLY valid JSON.
@@ -99,30 +276,6 @@ OUTPUT FORMAT (CRITICAL):
 - Do not write any text after the JSON.
 - Do not wrap JSON in markdown or code fences.
 - The response must begin with "{" and end with "}".
-
-Required JSON schema (exactly these fields):
-{
-  "scene": {
-    "location": "string",
-    "time": "string"
-  },
-  "narration": "string",
-  "choices": ["string", "string", "string"]
-}
-
-Field rules:
-- "scene.location" MUST match the Location provided in Context. NEVER change, move, or 'hallucinate' a location shift unless the Director Notes explicitly state a successful move occurred.
-- "scene.time" MUST be consistent with Context → Time. Do NOT output "Unspecified" or vague terms; if unspecified, pick a concrete time and stick with it.
-- "narration" must contain only narrative events and character actions.
-- Do NOT include location or time inside "narration".
-- Do NOT use game terms like "NPC", "Tension", "HP", "XP" inside "narration".
-- "choices" must be an array with exactly 3 actionable elements.
-- CHARACTER LOGIC: NPCs MUST act logically based on their history, mood, and recent events. They are NOT omniscient. 
-- SPATIAL GROUNDING: Players and NPCs cannot teleport. Respect walls, floors, and distances.
-- NO POETIC VAGUENESS: Avoid abstract metaphors (e.g., "shadows of fate") in favor of physical, concrete descriptions.
-- CONSISTENCY: Do NOT contradict recent history or current world state.
-${russianGrammarRules} in narration.
-${russianGrammarRules}
 
 Context:
 Current Scene Context:
@@ -158,7 +311,13 @@ Player Action:
 ${safeString(context.playerAction, '').trim()}`
 }
 
-export function parseNarrativeResponse(response: string): NarrativeResult | null {
+/**
+ * IMPROVED v2: Parse with integrated validation
+ */
+export function parseNarrativeResponse(
+  response: string,
+  language: PreferredLanguage = 'en'
+): NarrativeResult | null {
   try {
     // Strip <think>...</think> blocks (Qwen3 thinking mode)
     let cleaned = response.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
@@ -175,19 +334,39 @@ export function parseNarrativeResponse(response: string): NarrativeResult | null
       scene:
         parsed.scene && typeof parsed.scene === 'object'
           ? {
-              location: safeString((parsed.scene as NarrativeSceneMeta).location, '').trim(),
-              time: safeString((parsed.scene as NarrativeSceneMeta).time, '').trim()
-            }
+            location: safeString((parsed.scene as NarrativeSceneMeta).location, '').trim(),
+            time: safeString((parsed.scene as NarrativeSceneMeta).time, '').trim()
+          }
           : undefined,
       narration: typeof parsed.narration === 'string' ? parsed.narration.trim() : '',
       choices: normalizeChoices(parsed.choices)
     }
+
+    // IMPROVED v2: Validate narrative quality
+    if (candidate.narration) {
+      const validation = narrativeValidator.validate(candidate.narration, language)
+      if (!validation.isValid) {
+        console.warn(
+          `[NarrativeValidator] ${narrativeValidator.getSummary(validation, language)}`,
+          validation.issues
+        )
+        // If critical issues, return null to trigger retry
+        if (validation.hasCriticalIssues) {
+          return null
+        }
+      }
+    }
+
     return isValidNarrative(candidate) ? candidate : null
-  } catch {
+  } catch (error) {
+    console.error('[parseNarrativeResponse] JSON parsing error:', error)
     return null
   }
 }
 
+/**
+ * IMPROVED v2: Narrative engine with better retry logic
+ */
 export async function runNarrativeEngine(
   context: NarrativeContext,
   language: PreferredLanguage = 'en'
@@ -207,34 +386,42 @@ export async function runNarrativeEngine(
   }
 
   const prompt = buildNarrativePrompt(context, language)
+
   const callModel = async (extraInstruction?: string): Promise<string> =>
     await generateAIResponse({
-      systemPrompt: 'You are a deterministic RPG narrative formatter. Keep formatting strict and narration grounded.',
+      systemPrompt: language === 'ru'
+        ? 'Ты — Мастер Подземелий. Создавай только нарратив. Никогда не используй метаязык. Используй только средневековые материалы. Персонажи должны иметь имена и характеры. Локация ДОЛЖНА совпадать с контекстом.'
+        : 'You are a Dungeon Master. Create only narrative. Never use meta-language. Use only medieval materials. Characters must have names and personalities. Location MUST match context.',
       userPrompt:
         extraInstruction
-          ? `${prompt}\n\n${language === 'ru' ? 'Output in Russian (Cyrillic).' : 'Output in English.'}\n\n${extraInstruction}`
-          : `${prompt}\n\n${language === 'ru' ? 'Output in Russian (Cyrillic).' : 'Output in English.'}`,
-      temperature: 0.3, // Lowered temperature to reduce hallucinations/poetry
+          ? `${prompt}\n\n${language === 'ru' ? 'Выведи только JSON на русском (Кириллица).' : 'Output only JSON in English.'}\n\n${extraInstruction}`
+          : `${prompt}\n\n${language === 'ru' ? 'Выведи только JSON на русском (Кириллица).' : 'Output only JSON in English.'}`,
+      temperature: 0.3,
       maxTokens: 900,
       taskType: 'DM_NARRATION'
     })
 
+  // First attempt
   const firstRaw = await callModel()
-  const firstParsed = parseNarrativeResponse(firstRaw)
+  const firstParsed = parseNarrativeResponse(firstRaw, language)
   if (firstParsed) {
     syncNpcRegistryFromNarration(firstParsed)
     return firstParsed
   }
 
-  const retryRaw = await callModel(
-    'Retry. Return strictly valid JSON with non-empty scene.location, scene.time, narration, and exactly 3 non-empty choices.'
-  )
-  const retryParsed = parseNarrativeResponse(retryRaw)
+  // IMPROVED v2: Retry with specific instructions including spatial logic
+  const retryInstruction = language === 'ru'
+    ? 'Переписать. КРИТИЧНО: 1) Локация ДОЛЖНА совпадать с контекстом; 2) Нет метаязыка; 3) Только средневековые материалы; 4) Ровно 3 выбора; 5) Не описывай действия игрока; 6) Валидный JSON.'
+    : 'Retry. CRITICAL: 1) Location MUST match context; 2) No meta-language; 3) Only medieval materials; 4) Exactly 3 choices; 5) Don\'t describe player\'s actions; 6) Valid JSON.'
+
+  const retryRaw = await callModel(retryInstruction)
+  const retryParsed = parseNarrativeResponse(retryRaw, language)
   if (retryParsed) {
     syncNpcRegistryFromNarration(retryParsed)
     return retryParsed
   }
 
+  // IMPROVED v2: Better fallback narrative with explicit choices
   const fallback: NarrativeResult = {
     scene: {
       location: safeString(
@@ -247,15 +434,11 @@ export async function runNarrativeEngine(
       )
     },
     narration: language === 'ru'
-      ? `Воздух в помещении становится тяжелее, и внимание окружающих смещается к вашему действию.
-<npc id="corin-blackbriar">"Я вижу, к чему это ведёт. Действуй осторожно."</npc>
-Обстановка меняется, и последствия уже начинают проявляться.`
-      : `Pressure rises in the room as attention shifts toward your action.
-<npc id="corin-blackbriar">"I can see where this is going. Choose your next step carefully."</npc>
-The situation changes, and consequences begin to unfold.`,
+      ? `Воздух в помещении становится тяжелее. Обстановка меняется, и последствия уже начинают проявляться. Все внимание сосредоточено на твоём действии.`
+      : `Pressure rises in the room. The situation changes, and consequences begin to unfold. All attention is focused on your action.`,
     choices: language === 'ru'
-      ? ['Осмотреть обстановку', 'Заговорить с NPC', 'Продвинуться вперёд']
-      : ['Survey the area', 'Speak to the NPC', 'Push forward']
+      ? ['Осмотреть обстановку', 'Заговорить с персонажем', 'Продвинуться вперёд']
+      : ['Survey the area', 'Speak to the character', 'Push forward']
   }
   syncNpcRegistryFromNarration(fallback)
   return fallback

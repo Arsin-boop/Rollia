@@ -45,9 +45,10 @@ export function processTurnWithActionType(
   const npcReaction = determineNPCReaction(actionType, npcState)
   const updatedWorldState = updateWorldState(worldState, npcReaction)
 
+  // НОВОЕ: Более подробные директорские заметки
   const directorNotes = npcReaction.callGuards
-    ? `${npcReaction.summary} Tension rises to ${updatedWorldState.tension}. Guards are now alerted.`
-    : `${npcReaction.summary} Tension is now ${updatedWorldState.tension}.`
+    ? `${npcReaction.summary} Tension rises to ${updatedWorldState.tension}. Guards are now alerted. The NPC's mood: anger=${updatedWorldState.npcMood.anger}, suspicion=${updatedWorldState.npcMood.suspicion}, trust=${updatedWorldState.npcMood.trust}.`
+    : `${npcReaction.summary} Tension is now ${updatedWorldState.tension}. The NPC's mood: anger=${updatedWorldState.npcMood.anger}, suspicion=${updatedWorldState.npcMood.suspicion}, trust=${updatedWorldState.npcMood.trust}.`
 
   return {
     actionType,
