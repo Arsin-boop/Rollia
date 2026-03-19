@@ -274,6 +274,7 @@ export function ensureNPCProfileById(
     return registerNPCProfile({
       id: `unknown-${Date.now()}`,
       name: 'Unknown',
+      dialogueColorId: 'ember1',
       age: 'unknown', occupation: 'unknown', firstImpression: '',
       innerCharacter: '', primaryMotivation: '', secondaryMotivation: '',
       secret: '', voice: '', behaviorQuirks: '', relationshipToLocation: 'unknown',

@@ -297,30 +297,30 @@ export function useEmberCanvas(options: EmberOptions = {}) {
     let raf: number
 
     function frame() {
-      ctx.clearRect(0, 0, canvas!.width, canvas!.height)
+      ctx!.clearRect(0, 0, canvas!.width, canvas!.height)
       glowPhase += 0.004
 
       // Центральный туман
-      const grad = ctx.createRadialGradient(
+      const grad = ctx!.createRadialGradient(
         canvas!.width * 0.5, canvas!.height * 0.5, 0,
         canvas!.width * 0.5, canvas!.height * 0.5, canvas!.width * 0.55,
       )
       grad.addColorStop(0, `rgba(22,10,16,${0.06 + 0.018 * Math.sin(glowPhase)})`)
       grad.addColorStop(1, 'rgba(0,0,0,0)')
-      ctx.fillStyle = grad
-      ctx.fillRect(0, 0, canvas!.width, canvas!.height)
+      ctx!.fillStyle = grad
+      ctx!.fillRect(0, 0, canvas!.width, canvas!.height)
 
       // Огненное свечение снизу
       const firePhase1 = Math.sin(glowPhase * 2.3)
       const firePhase2 = Math.sin(glowPhase * 3.7 + 1.1)
       const glowHeight = canvas!.height * (0.45 + 0.04 * firePhase1)
-      const fireGrad = ctx.createLinearGradient(0, canvas!.height, 0, canvas!.height - glowHeight)
+      const fireGrad = ctx!.createLinearGradient(0, canvas!.height, 0, canvas!.height - glowHeight)
       fireGrad.addColorStop(0, `rgba(200, 80, 15, ${0.38 + 0.10 * firePhase1})`)
       fireGrad.addColorStop(0.18, `rgba(160, 50, 8,  ${0.22 + 0.07 * firePhase2})`)
       fireGrad.addColorStop(0.45, `rgba(100, 18, 4,  ${0.10 + 0.04 * firePhase1})`)
       fireGrad.addColorStop(1, 'rgba(0,0,0,0)')
-      ctx.fillStyle = fireGrad
-      ctx.fillRect(0, 0, canvas!.width, canvas!.height)
+      ctx!.fillStyle = fireGrad
+      ctx!.fillRect(0, 0, canvas!.width, canvas!.height)
 
       runes.forEach(r => { r.tick(); r.draw() })
       embers.forEach(e => { e.tick(); e.draw() })

@@ -9,11 +9,9 @@ import {
   Send,
   Scroll,
   Swords,
-  BookOpen,
   Package,
   Users,
   Sparkles,
-  Trophy,
   Gift,
   Shield,
   Dices,
@@ -52,7 +50,7 @@ interface NPC {
 }
 
 export function GameInterface() {
-  const { sessionId } = useParams();
+  useParams();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [activeTab, setActiveTab] = useState("stats");
@@ -172,7 +170,7 @@ export function GameInterface() {
     }, 1000);
   };
 
-  const generateMockResponse = (playerInput: string): string => {
+  const generateMockResponse = (_playerInput: string): string => {
     const responses = [
       "As you take action, the room grows quiet. The patrons turn to look at you with curious expressions.",
       "You notice a hooded figure in the corner watching your every move. They slowly stand up and approach you.",

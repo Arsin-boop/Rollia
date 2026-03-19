@@ -261,8 +261,8 @@ const generateAvatarPngHuggingFace = async (
   }
 
   // Some models return JSON with base64
-  const data = await response.json()
-  const base64 = data?.generated_image || data?.image || data?.data?.[0]
+  const data = await response.json() as Record<string, unknown>
+  const base64 = (data?.generated_image || data?.image || (data?.data as unknown[])?.[0]) as string | undefined
   if (base64 && typeof base64 === 'string') {
     const cleaned = base64.includes(',') ? base64.split(',').pop()! : base64
     return Buffer.from(cleaned, 'base64')

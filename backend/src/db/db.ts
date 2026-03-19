@@ -1,8 +1,9 @@
 import fs from 'fs'
 import path from 'path'
-import Database from 'better-sqlite3'
+import Database, { type Database as DatabaseType } from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 
+// On Railway, process.cwd() is the persistent volume root — data/ is auto-created here on first run.
 const dataDir = path.join(process.cwd(), 'data')
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true })
@@ -65,6 +66,6 @@ CREATE TABLE IF NOT EXISTS npc_relationships (
 );
 `)
 
-export const rawDb = sqlite
+export const rawDb: DatabaseType = sqlite
 export const db = drizzle(sqlite)
 

@@ -8,7 +8,6 @@ import {
   User,
   Package,
   Users,
-  Send,
   X,
 } from 'lucide-react'
 import {
@@ -360,24 +359,6 @@ const parseEnemies = (input?: string): Array<{ name: string; hp: number }> => {
   })
 }
 
-const classifyCombatText = (text: string): ActionIntent => {
-  const lower = text.toLowerCase()
-  const actionMap: Array<{ action: ActionIntent['action']; pattern: RegExp }> = [
-    { action: 'attack', pattern: /(attack|hit|strike|stab|slash|shoot)/i },
-    { action: 'defend', pattern: /(defend|block|parry|guard)/i },
-    { action: 'move', pattern: /(move|run|dash|step|retreat|advance|cover)/i },
-    { action: 'item', pattern: /(use item|drink|potion|bandage)/i },
-    { action: 'spell', pattern: /(cast|spell|incant|magic)/i }
-  ]
-
-  const matched = actionMap.find(entry => entry.pattern.test(lower))
-  return {
-    action: matched?.action || 'attempt',
-    actor: 'player',
-    target: null,
-    free_text: text
-  }
-}
 
 
 const isAbilityUnlocked = (
@@ -574,47 +555,6 @@ const canonicalNpcId = (id?: string, name?: string): string => {
   return safeId || normalizeNpcName(name || '') || 'unknown-npc'
 }
 
-const colorFromName = (name: string): string => {
-  const seed = normalizeNpcName(name) || name
-  let hash = 0
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash << 5) - hash + seed.charCodeAt(i)
-    hash |= 0
-  }
-  const hue = Math.abs(hash) % 360
-  const saturation = 55
-  const lightness = 68
-  const c = (1 - Math.abs(2 * (lightness / 100) - 1)) * (saturation / 100)
-  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1))
-  const m = lightness / 100 - c / 2
-  let r = 0
-  let g = 0
-  let b = 0
-  if (hue < 60) {
-    r = c
-    g = x
-  } else if (hue < 120) {
-    r = x
-    g = c
-  } else if (hue < 180) {
-    g = c
-    b = x
-  } else if (hue < 240) {
-    g = x
-    b = c
-  } else if (hue < 300) {
-    r = x
-    b = c
-  } else {
-    r = c
-    b = x
-  }
-  const toHex = (value: number) =>
-    Math.round((value + m) * 255)
-      .toString(16)
-      .padStart(2, '0')
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
-}
 
 const createMessageId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
@@ -796,7 +736,7 @@ const GameSession = () => {
   const [activeLoadoutTab, setActiveLoadoutTab] = useState<LoadoutTab>('inventory')
   const [isLoading, setIsLoading] = useState(false)
   const [typingFrame, setTypingFrame] = useState(0)
-  const [characterColors, setCharacterColors] = useState<Record<string, string>>({})
+  const [, setCharacterColors] = useState<Record<string, string>>({})
   const [npcRegistryById, setNpcRegistryById] = useState<Record<string, NPCRegistryEntry>>({})
   const [npcPaletteById, setNpcPaletteById] = useState<Record<string, NPCPaletteEntry>>(() => {
     return DEFAULT_NPC_PALETTE.reduce<Record<string, NPCPaletteEntry>>((acc, entry) => {
@@ -806,7 +746,7 @@ const GameSession = () => {
   })
   const [npcPaletteList, setNpcPaletteList] = useState<NPCPaletteEntry[]>(DEFAULT_NPC_PALETTE)
   const [battleState, setBattleState] = useState<CombatState | null>(null)
-  const [combatEvents, setCombatEvents] = useState<CombatEvent[]>([])
+  const [, setCombatEvents] = useState<CombatEvent[]>([])
   const [combatAction, setCombatAction] = useState<{ action: ActionIntent['action'] | null; target?: string | null }>({
     action: null
   })
@@ -1684,16 +1624,6 @@ const GameSession = () => {
     return battleState.entities.filter(entity => entity.type === 'enemy' && entity.hp > 0)
   }, [battleState])
 
-  const resolveTargetFromText = useCallback(
-    (text: string) => {
-      const enemies = getEnemyTargets()
-      if (!enemies.length) return null
-      const match = enemies.find(enemy => text.toLowerCase().includes(enemy.name.toLowerCase()))
-      return match ? match.id : enemies[0].id
-    },
-    [getEnemyTargets]
-  )
-
   const buildGameContext = useCallback(
     () => {
       try {
@@ -1933,26 +1863,6 @@ const GameSession = () => {
     [updateStoredProfile, pushSystemMessage]
   )
 
-  const toggleQuestObjective = useCallback(
-    (questId: string, index: number) => {
-      updateStoredProfile(prev => {
-        if (!prev) return prev
-        const questsClone = [...(prev.quests || [])]
-        const questIndex = questsClone.findIndex(quest => quest.id === questId)
-        if (questIndex === -1) return prev
-        const quest = { ...questsClone[questIndex] }
-        const objectives = quest.objectives || []
-        const status = quest.objectiveStatus || objectives.map(() => false)
-        if (index < 0 || index >= objectives.length) return prev
-        status[index] = !status[index]
-        quest.objectiveStatus = status
-        questsClone[questIndex] = quest
-        return { ...prev, quests: questsClone }
-      })
-    },
-    [updateStoredProfile]
-  )
-
   const handleRumorTag = useCallback(
     (attrText: string, body: string) => {
       const attributes = parseAttributes(attrText)
@@ -2086,7 +1996,6 @@ const GameSession = () => {
 
   const handleEffectTag = useCallback(
     (attrText: string) => {
-      const attributes = parseAttributes(attrText)
       const hpMatch = attrText.match(/hp\s*=\s*([+-]?\d+)/i)
       const mpMatch = attrText.match(/mp\s*=\s*([+-]?\d+)/i)
       const hpDelta = hpMatch ? Number(hpMatch[1]) : 0

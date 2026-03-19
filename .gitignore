@@ -29,6 +29,8 @@ backend/uploads/
 
 # Local env and workspace
 .env
+backend/.env
+backend/data/
 .vs/
 tmp/
 backend/drizzle/

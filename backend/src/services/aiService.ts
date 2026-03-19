@@ -1116,7 +1116,7 @@ Class description: ${classDescription || 'None'}`
   if (!parsed || !Array.isArray(parsed.tags)) {
     return []
   }
-  return parsed.tags.map(tag => String(tag).trim()).filter(Boolean).slice(0, 6)
+  return parsed.tags.map((tag: unknown) => String(tag).trim()).filter(Boolean).slice(0, 6)
 }
 
 export async function generateCombatNarration(
@@ -1401,6 +1401,7 @@ export async function generateDMResponse(
   requiresRoll?: boolean
   rollType?: string
   optionalRollType?: string
+  checkRequest?: CheckRequest | null
 }> {
   const knownNPCs = listNPCProfiles()
   const npcDisplayName = (name: string) => localizeNpcName(name, normalizeLanguage(language))
@@ -1704,8 +1705,8 @@ function extractMessageContent(message?: ChatCompletionMessage): string {
     return message.content.trim()
   }
 
-  return message.content
-    .map(part => {
+  return (message.content as Array<unknown>)
+    .map((part: unknown) => {
       if (!part) {
         return ''
       }
@@ -1714,8 +1715,8 @@ function extractMessageContent(message?: ChatCompletionMessage): string {
         return part
       }
 
-      if ('text' in part && part.text) {
-        return part.text
+      if (typeof part === 'object' && part !== null && 'text' in part && (part as Record<string, unknown>).text) {
+        return (part as Record<string, unknown>).text as string
       }
 
       return ''
@@ -1919,7 +1920,7 @@ function normalizeStatusUpdate(
 
   const activeIds = new Set((statusState.active_statuses || []).map(status => status.id))
   let prunedApply = apply.filter((entry: any) => entry && entry.id && entry.name)
-  prunedApply = prunedApply.filter(entry => !activeIds.has(entry.id))
+  prunedApply = prunedApply.filter((entry: any) => !activeIds.has(entry.id))
 
   if (prunedApply.length > 1) {
     prunedApply = prunedApply.slice(0, 1)
