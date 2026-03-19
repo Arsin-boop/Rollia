@@ -3,6 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import rateLimit from 'express-rate-limit'
 import characterRoutes from './routes/characterRoutes.js'
 import gameRoutes from './routes/gameRoutes.js'
 import diceRoutes from './routes/diceRoutes.js'
@@ -39,9 +40,27 @@ app.use(
 app.use(express.json())
 app.use('/uploads', express.static(path.join(backendRoot, 'uploads')))
 
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: 'Too many requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const strictLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { error: 'Too many requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+app.use(globalLimiter)
+
 // Routes
-app.use('/api/character', characterRoutes)
-app.use('/api/game', gameRoutes)
+app.use('/api/character', strictLimiter, characterRoutes)
+app.use('/api/game', strictLimiter, gameRoutes)
 app.use('/api/dice', diceRoutes)
 app.use('/api/battle', battleRoutes)
 
