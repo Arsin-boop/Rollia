@@ -34,6 +34,9 @@ if (!process.env.GROQ_API_KEY_UTILITY) {
 const app = express()
 const PORT = process.env.PORT || 3001
 
+// Trust Railway's reverse proxy so express-rate-limit reads the correct IP
+app.set('trust proxy', 1)
+
 app.use(
   cors({
     origin: process.env.ALLOWED_ORIGIN || 'http://localhost:5173',
@@ -71,12 +74,12 @@ app.use('/api/dice', diceRoutes)
 app.use('/api/battle', battleRoutes)
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', message: 'D&D AI DM Backend is running', timestamp: new Date().toISOString() })
 })
 
 // Test AI endpoint
-app.get('/api/test-ai', async (req, res) => {
+app.get('/api/test-ai', async (_req, res) => {
   try {
     console.log('Testing AI connection...')
     const response = await generateAIResponse({
