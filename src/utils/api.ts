@@ -1,5 +1,7 @@
-const response = await fetch(`${API_BASE_URL.replace('/api', '')}/api/health`)
-const response = await fetch(`${API_ORIGIN}/api/health`)
+const rawApiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+const trimmedApiBase = String(rawApiBase).replace(/\/+$/, '')
+const API_BASE_URL = /\/api$/i.test(trimmedApiBase) ? trimmedApiBase : `${trimmedApiBase}/api`
+export const API_ORIGIN = API_BASE_URL.replace(/\/api$/, '')
 
 
 export type ApiLanguage = 'en' | 'ru'
@@ -8,7 +10,7 @@ const normalizeLanguage = (language?: string): ApiLanguage => (language === 'ru'
 // Test backend connection
 export async function testBackendConnection(): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE_URL.replace('/api', '')}/api/health`)
+    const response = await fetch(`${API_ORIGIN}/api/health`)
     return response.ok
   } catch (error) {
     console.error('Backend connection test failed:', error)

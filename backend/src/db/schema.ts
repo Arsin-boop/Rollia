@@ -37,6 +37,15 @@ export const quests = sqliteTable('quests', {
   updatedAt: integer('updated_at').notNull()
 })
 
+export const memories = sqliteTable('memories', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id').notNull(),
+  role: text('role').notNull(), // 'player' | 'assistant'
+  content: text('content').notNull(),
+  embedding: text('embedding').notNull(), // JSON float array
+  createdAt: integer('created_at').notNull()
+})
+
 export const npcRelationships = sqliteTable('npc_relationships', {
   id: text('id').primaryKey(),
   sessionId: text('session_id').references(() => sessions.id).notNull(),

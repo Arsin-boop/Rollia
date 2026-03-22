@@ -13,7 +13,10 @@ import {
   saveBackstoryArc,
   normalizeBackstoryArc,
   getEligibleBeat,
-  markBeatUsed
+  markBeatUsed,
+  checkArcAlignment,
+  recordBeatAlignment,
+  type BackstoryBeat
 } from '../services/backstoryArcStore.js'
 import { listNPCProfiles, listNPCDialoguePalette, localizeNpcName, clearNPCRegistry } from '../services/npcRegistry.js'
 import { getBattle, resolveAction, startBattle, type CombatEntity } from '../services/combatService.js'
@@ -36,9 +39,10 @@ import {
   segmentMessage,
   type LastResolvedAction
 } from '../services/intentUtility.js'
-import { runNarrativeEngine } from '../services/narrativeEngine.js'
+import { runNarrativeEngine, streamNarrativeEngine } from '../services/narrativeEngine.js'
 import { interpretPlayerAction } from '../services/actionInterpreter.js'
 import { upsertSession } from '../services/sessionStore.js'
+import { addMemory, recallMemories, clearMemories } from '../services/vectorMemoryService.js'
 
 const router = express.Router()
 const pendingChecks = new Map<string, PendingCheck>()
@@ -288,6 +292,58 @@ const ensureBackstoryArcForCharacter = async (payload: {
   saveBackstoryArc(payload.characterKey, normalized.profile, normalized.plan)
   console.log('Backstory arc generated:', payload.characterKey)
   return normalized
+}
+
+const REPLAN_THRESHOLD = 3
+
+/**
+ * After a beat is surfaced, score alignment and replan if DM keeps missing the beat.
+ * Fire-and-forget — call without await from the hot path.
+ */
+const maybereplanArc = async (
+  characterKey: string,
+  surfacedBeat: BackstoryBeat,
+  narration: string,
+  currentTurn: number,
+  characterInfo?: any
+) => {
+  const arcData = getBackstoryArc(characterKey)
+  if (!arcData) return
+
+  const score = checkArcAlignment(surfacedBeat, narration)
+  let updatedPlan = recordBeatAlignment(arcData.plan, score)
+
+  if ((updatedPlan.consecutiveLowAlignment ?? 0) >= REPLAN_THRESHOLD) {
+    console.log(`[ArcReplan] ${characterKey}: ${REPLAN_THRESHOLD} consecutive low-alignment turns — replanning`)
+    try {
+      const revealedContext = updatedPlan.revealedFacts.length > 0
+        ? `\n\nAlready revealed to the player:\n${updatedPlan.revealedFacts.map(f => `- ${f}`).join('\n')}`
+        : ''
+      const generated = await generateBackstoryArcPlan({
+        characterKey,
+        name: characterInfo?.name,
+        className: characterInfo?.class,
+        backstory: (characterInfo?.backstory || '') + revealedContext,
+        currentTurn
+      })
+      const normalized = normalizeBackstoryArc(characterKey, generated.profile, generated.plan, currentTurn)
+
+      // Keep already-used beats; replace unused with fresh ones
+      const usedBeats = arcData.plan.beats.filter(b => b.used)
+      updatedPlan = {
+        ...normalized.plan,
+        beats: [...usedBeats, ...normalized.plan.beats],
+        currentBeatIndex: usedBeats.length,
+        revealedFacts: updatedPlan.revealedFacts,
+        consecutiveLowAlignment: 0
+      }
+    } catch (err: any) {
+      console.warn('[ArcReplan] Failed to replan:', err?.message || err)
+      updatedPlan = { ...updatedPlan, consecutiveLowAlignment: 0 }
+    }
+  }
+
+  saveBackstoryArc(characterKey, arcData.profile, updatedPlan)
 }
 
 const buildBackstoryArcContext = async (payload: {
@@ -1132,6 +1188,294 @@ router.post('/summarize-backstory', async (req, res) => {
   }
 })
 
+// Streaming DM response — SSE version of /dm-response
+router.post('/dm-response-stream', async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.flushHeaders()
+
+  const sendEvent = (data: object) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`)
+  }
+
+  try {
+    const {
+      playerAction, characterInfo, gameContext, history, campaignId,
+      rollResult, pendingCheckId, selectedTarget, sceneParticipants,
+      playerSnapshot, worldState, npcState, language
+    } = req.body
+    const preferredLanguage = normalizeLanguage(language)
+
+    if (!playerAction || typeof playerAction !== 'string') {
+      sendEvent({ type: 'error', error: 'Player action is required' })
+      res.write('data: [DONE]\n\n')
+      return res.end()
+    }
+
+    const historyMessages: ChatCompletionMessage[] = Array.isArray(history)
+      ? history
+          .map((entry: any) => {
+            if (!entry || typeof entry.content !== 'string' || !entry.content.trim() ||
+              (entry.role !== 'user' && entry.role !== 'assistant' && entry.role !== 'system')) return null
+            return { role: entry.role, content: entry.content } as ChatCompletionMessage
+          })
+          .filter((entry): entry is ChatCompletionMessage => Boolean(entry))
+      : []
+
+    const campaignKey = campaignId || 'default'
+    const gameState = gameStateByCampaign.get(campaignKey) || { lastResolvedAction: null, turnIndex: 0 }
+    const currentTurn = (gameState.turnIndex || 0) + 1
+    gameStateByCampaign.set(campaignKey, { ...gameState, turnIndex: currentTurn })
+
+    if (currentTurn === 1) clearNPCRegistry(campaignKey)
+
+    const sceneState = buildSceneState(gameContext || '', sceneParticipants)
+    const interpretedAction = interpretPlayerAction(playerAction, {
+      location: sceneState.location,
+      activeNPCs: (sceneState.roster || []).filter((name): name is string => typeof name === 'string' && Boolean(name.trim())),
+      lastNpcPrompt: extractLatestAssistantCue(historyMessages),
+      lastEvent: gameState.lastResolvedAction?.summary || undefined
+    })
+    const effectivePlayerAction = interpretedAction.interpretedInput
+    const interpreterNote = interpretedAction.transformed
+      ? `Action Interpreter: "${playerAction}" -> ${interpretedAction.intentType}. ${interpretedAction.reason}`
+      : ''
+
+    // ── Roll resolution path ──
+    if (rollResult && pendingCheckId) {
+      const pending = pendingChecks.get(campaignKey)
+      if (pending && pending.id === pendingCheckId) {
+        pendingChecks.delete(campaignKey)
+        const { directorResult, memoryContext, recentEvents } = await applyDirectorMemoryPipeline({
+          campaignKey, playerInput: effectivePlayerAction, turnNumber: currentTurn,
+          worldStateOverride: worldState, npcStateOverride: npcState
+        })
+
+        const narrativeContext = {
+          playerAction: effectivePlayerAction,
+          directorNotes: `${directorResult.directorNotes}${interpreterNote ? ` ${interpreterNote}` : ''}`,
+          worldState: directorResult.updatedWorldState as unknown as Record<string, unknown>,
+          playerProfile: sanitizeCharacterForNarrative(characterInfo),
+          memoryContext,
+          location: sceneState.location || extractLocationFromContext(gameContext || ''),
+          recentEvents,
+          sceneState: {
+            location: sceneState.location || extractLocationFromContext(gameContext || ''),
+            timeOfDay: extractTimeOfDayFromContext(gameContext || ''),
+            activeNPCs: (sceneState.roster || []).filter((name): name is string => typeof name === 'string' && Boolean(name.trim())),
+            sceneGoal: pending.context || 'Resolve the immediate consequence',
+            tensionLevel: mapTensionLevel(directorResult.updatedWorldState.tension)
+          },
+          campaignKey
+        }
+
+        let battleResult: any = null
+        if (pending.type === 'attack') {
+          let battleState = getBattle(campaignKey)
+          if (!battleState) {
+            const { hp: maxHp, hp_max, mp: maxMp, mp_max } = computePlayerResources(characterInfo)
+            const baseHp = typeof playerSnapshot?.hp === 'number' ? playerSnapshot.hp : maxHp
+            const baseMp = typeof playerSnapshot?.mp === 'number' ? playerSnapshot.mp : maxMp
+            const playerEntity: CombatEntity = {
+              id: 'player', type: 'player', name: characterInfo?.name || 'Player',
+              hp: baseHp, hp_max: hp_max, mp: baseMp, mp_max: mp_max, statuses: [], statusEffects: []
+            }
+            battleState = startBattle(campaignKey, playerEntity, [{ id: 'enemy-0', type: 'enemy', name: pending.targetLabel || 'Enemy', hp: 12, hp_max: 12, statuses: [], statusEffects: [] } as CombatEntity])
+          }
+          let targetId = pending.target || null
+          if (!targetId || !battleState.entities.find(e => e.id === targetId)) {
+            targetId = battleState.entities.find(e => e.type === 'enemy' && e.hp > 0)?.id || null
+          }
+          const rollTotal = rollResult.total ?? rollResult.result ?? 0
+          const rollD20 = typeof rollResult.d20 === 'number' ? rollResult.d20 : undefined
+          const rollBonus = typeof rollResult.bonus === 'number' ? rollResult.bonus : typeof rollD20 === 'number' ? rollTotal - rollD20 : 0
+          const resolved = resolveAction(campaignKey,
+            { action: 'attack', actor: 'player', target: targetId, params: { action_type: pending.reason, label: pending.context } },
+            playerSnapshot,
+            { attackRoll: typeof rollD20 === 'number' ? { d20: rollD20, bonus: rollBonus, total: rollTotal } : undefined }
+          )
+          battleResult = { state: resolved.state, events: resolved.events }
+          narrativeContext.directorNotes += ` Combat events: ${JSON.stringify(resolved.events)}`
+        } else {
+          narrativeContext.directorNotes += rollResult.success ? ' Outcome: success.' : ' Outcome: failure.'
+        }
+
+        if (pending.actionLabel || pending.context) {
+          const label = pending.actionLabel || pending.context
+          updateLastResolvedAction(campaignKey, {
+            summary: label, domain: pending.domain || 'other', stat: pending.stat || null,
+            skill: pending.skill ?? null, timestamp: Date.now(), keywords: extractKeywords(label)
+          })
+        }
+
+        const narrativeResult = await streamNarrativeEngine(
+          narrativeContext,
+          preferredLanguage,
+          (chunk) => sendEvent({ type: 'chunk', text: chunk })
+        )
+
+        const npcRegistry = listNPCProfiles(campaignKey).map(npc => ({
+          id: npc.id, name: localizeNpcName(npc.name, preferredLanguage), dialogueColorId: npc.dialogueColorId
+        }))
+        sendEvent({
+          type: 'done', scene: narrativeResult.scene, choices: narrativeResult.choices,
+          narration: narrativeResult.narration, npcRegistry, npcPalette: listNPCDialoguePalette(),
+          updatedWorldState: directorResult.updatedWorldState, pending_check: null, requiresRoll: false,
+          battle: battleResult?.state || null, events: battleResult?.events || []
+        })
+        res.write('data: [DONE]\n\n')
+        return res.end()
+      }
+    }
+
+    // ── Intent classification ──
+    const segments = annotateSegments(segmentMessage(effectivePlayerAction), gameState.lastResolvedAction || null)
+    let decision: any = null
+    try {
+      decision = await generateIntentDecision({
+        rawText: effectivePlayerAction, segments, lastResolvedAction: gameState.lastResolvedAction || null, sceneContext: null
+      })
+    } catch { /* fallback below */ }
+
+    const fallbackIntent = classifyIntent(effectivePlayerAction, { selectedTarget, sceneParticipants, gameContext })
+    if (!decision) {
+      const primarySegment = segments.find(s => s.hint === 'REQUEST') || segments.find(s => s.hint === 'ACTION_NOW') || segments[0]
+      const resolvedCheck = resolveCheck(fallbackIntent, effectivePlayerAction, gameContext)
+      decision = {
+        primarySegmentId: primarySegment?.id || 'seg-1',
+        intentType: primarySegment?.hint || 'UNKNOWN',
+        domain: fallbackIntent.tags[0] || (fallbackIntent.action === 'attack' ? 'violence' : 'other'),
+        shouldRoll: Boolean(resolvedCheck) && primarySegment?.hint === 'ACTION_NOW',
+        stat: resolvedCheck?.stat || null, skill: null,
+        dc: typeof resolvedCheck?.difficulty === 'number' ? resolvedCheck.difficulty : null,
+        actionLabel: summarizeActionText(primarySegment?.text || effectivePlayerAction) || summarizeActionText(effectivePlayerAction),
+        narration: ''
+      }
+    }
+
+    const target = selectedTarget || detectTarget(effectivePlayerAction, sceneParticipants)
+    const pendingCheck = decision.shouldRoll
+      ? buildDecisionCheck({ decision, target, rawText: effectivePlayerAction, sceneParticipants })
+      : null
+
+    const activeBattle = getBattle(campaignKey)
+    if (pendingCheck?.type === 'attack' && !activeBattle) {
+      const { hp: playerHp, hp_max: playerHpMax, mp: playerMp, mp_max: playerMpMax } = computePlayerResources(characterInfo)
+      startBattle(campaignKey,
+        { id: 'player', type: 'player', name: characterInfo?.name || 'Player', hp: playerHp, hp_max: playerHpMax, mp: playerMp, mp_max: playerMpMax, statuses: [], statusEffects: [] } as CombatEntity,
+        [{ id: 'enemy-0', type: 'enemy', name: pendingCheck.targetLabel || 'Enemy', hp: 12, hp_max: 12, statuses: [], statusEffects: [] } as CombatEntity]
+      )
+    }
+
+    if (pendingCheck) {
+      pendingChecks.set(campaignKey, {
+        ...pendingCheck,
+        intent: { action: fallbackIntent.action, tags: fallbackIntent.tags, target: fallbackIntent.target }
+      })
+      const currentWorldState = worldState
+        ? normalizeWorldState(worldState)
+        : worldStateByCampaign.get(campaignKey) || { ...DEFAULT_WORLD_STATE, npcMood: { ...DEFAULT_WORLD_STATE.npcMood } }
+      sendEvent({
+        type: 'pending', requiresRoll: true, updatedWorldState: currentWorldState,
+        pending_check: pendingCheck,
+        checkRequest: {
+          id: pendingCheck.id, type: pendingCheck.type, actor: pendingCheck.actor, stat: pendingCheck.stat,
+          difficulty: typeof pendingCheck.difficulty === 'number' ? String(pendingCheck.difficulty) : pendingCheck.difficulty,
+          context: pendingCheck.context, on_success: 'resolve', on_failure: 'resolve'
+        }
+      })
+      res.write('data: [DONE]\n\n')
+      return res.end()
+    }
+
+    if (decision.shouldRoll === false && decision.intentType !== 'PAST_REF' && decision.intentType !== 'SPEECH') {
+      const actionLabel = String(decision.actionLabel || '').trim()
+      if (actionLabel) {
+        updateLastResolvedAction(campaignKey, {
+          summary: actionLabel, domain: decision.domain || 'other', stat: decision.stat || null,
+          skill: decision.skill ?? null, timestamp: Date.now(), keywords: extractKeywords(actionLabel)
+        })
+      }
+    }
+
+    // ── Backstory + Director + Memory ──
+    const characterKey = buildCharacterKey(campaignKey, characterInfo)
+    const backstoryArcContext = characterInfo?.backstory
+      ? await buildBackstoryArcContext({ characterKey, characterInfo, backstory: characterInfo.backstory, currentTurn })
+          .catch(err => { console.warn('Backstory arc failed:', err); return null })
+      : null
+
+    const backstoryDirectorNote = backstoryArcContext?.eligibleBeat
+      ? `Backstory beat to weave in subtly: ${backstoryArcContext.eligibleBeat.goal}. ` +
+        `Delivery: ${backstoryArcContext.eligibleBeat.deliveryModes.join(' or ')}. ` +
+        `Max reveal level: ${backstoryArcContext.eligibleBeat.constraints.maxRevealLevel}. ` +
+        `Do NOT state this explicitly — surface it through NPC reaction, environment, or coincidence.`
+      : ''
+
+    const { directorResult, memoryContext, recentEvents } = await applyDirectorMemoryPipeline({
+      campaignKey, playerInput: effectivePlayerAction, turnNumber: currentTurn,
+      worldStateOverride: worldState, npcStateOverride: npcState
+    })
+
+    // Recall semantically relevant memories and prepend to memoryContext
+    const vectorMemories = await recallMemories(campaignKey, effectivePlayerAction, 5)
+    const enrichedMemoryContext = vectorMemories.length > 0
+      ? `[Relevant past events]\n${vectorMemories.join('\n')}\n\n${memoryContext}`
+      : memoryContext
+
+    const narrativeResult = await streamNarrativeEngine(
+      {
+        playerAction: effectivePlayerAction,
+        directorNotes: `${directorResult.directorNotes}${interpreterNote ? ` ${interpreterNote}` : ''}${backstoryDirectorNote ? ` ${backstoryDirectorNote}` : ''}`,
+        worldState: directorResult.updatedWorldState as unknown as Record<string, unknown>,
+        playerProfile: sanitizeCharacterForNarrative(characterInfo),
+        memoryContext: enrichedMemoryContext,
+        location: sceneState.location || extractLocationFromContext(gameContext || ''),
+        recentEvents,
+        sceneState: {
+          location: sceneState.location || extractLocationFromContext(gameContext || ''),
+          timeOfDay: extractTimeOfDayFromContext(gameContext || ''),
+          activeNPCs: (sceneState.roster || []).filter((name): name is string => typeof name === 'string' && Boolean(name.trim())),
+          sceneGoal: 'Continue the current scene',
+          tensionLevel: mapTensionLevel(directorResult.updatedWorldState.tension)
+        },
+        campaignKey
+      },
+      preferredLanguage,
+      (chunk) => sendEvent({ type: 'chunk', text: chunk })
+    )
+
+    // Score backstory beat alignment and replan if needed (fire-and-forget)
+    if (backstoryArcContext?.eligibleBeat) {
+      void maybereplanArc(characterKey, backstoryArcContext.eligibleBeat, narrativeResult.narration || '', currentTurn, characterInfo)
+    }
+
+    // Store this turn's action and narration as memories (fire-and-forget)
+    void addMemory(campaignKey, 'player', effectivePlayerAction)
+    void addMemory(campaignKey, 'assistant', narrativeResult.narration || '')
+
+    const npcRegistry = listNPCProfiles(campaignKey).map(npc => ({
+      id: npc.id, name: localizeNpcName(npc.name, preferredLanguage), dialogueColorId: npc.dialogueColorId
+    }))
+    sendEvent({
+      type: 'done', scene: narrativeResult.scene, choices: narrativeResult.choices,
+      narration: narrativeResult.narration, npcRegistry, npcPalette: listNPCDialoguePalette(),
+      updatedWorldState: directorResult.updatedWorldState, pending_check: null, requiresRoll: false,
+      battle: null, events: []
+    })
+    res.write('data: [DONE]\n\n')
+    res.end()
+  } catch (error: any) {
+    console.error('Stream error:', error)
+    try {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: error?.message || 'Stream failed' })}\n\n`)
+      res.write('data: [DONE]\n\n')
+    } catch { /* connection already closed */ }
+    res.end()
+  }
+})
+
 // Reset session — clears history and in-memory state for a campaign
 router.post('/reset-session', async (req, res) => {
   try {
@@ -1143,6 +1487,7 @@ router.post('/reset-session', async (req, res) => {
     gameStateByCampaign.delete(campaignId)
     worldStateByCampaign.delete(campaignId)
     storyMemoryByCampaign.delete(campaignId)
+    clearMemories(campaignId)
 
     upsertSession({ id: campaignId, characterId: characterId ?? null, history: [], payload: {} })
 

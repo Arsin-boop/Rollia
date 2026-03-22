@@ -66,6 +66,7 @@ export type BackstoryArcPlan = {
   nextEligibleAfter: number
   revealedFacts: string[]
   status: 'active' | 'resolved' | 'dormant'
+  consecutiveLowAlignment?: number
 }
 
 const arcStore = new Map<string, { profile: BackstoryProfile; plan: BackstoryArcPlan }>()
@@ -266,6 +267,45 @@ export const markBeatUsed = (
     nextEligibleAfter,
     pressureLevel: Math.min(100, plan.pressureLevel + 5),
     revealedFacts
+  }
+}
+
+/**
+ * Score how well a narration response honored a surfaced backstory beat.
+ * Returns 0.0–1.0 based on keyword overlap between the beat's payload and the narration text.
+ */
+export const checkArcAlignment = (beat: BackstoryBeat, narration: string): number => {
+  if (!narration) return 0
+  const text = narration.toLowerCase()
+
+  const keywords = [
+    ...(beat.payload.keyNames ?? []),
+    ...(beat.payload.symbols ?? []),
+    ...(beat.payload.phrases ?? []),
+    ...(beat.payload.objects ?? []),
+    beat.payload.summary ?? '',
+    beat.goal ?? ''
+  ].map(s => s.toLowerCase().trim()).filter(s => s.length >= 3)
+
+  if (keywords.length === 0) return 0.5 // No keywords to check — assume fine
+
+  let hits = 0
+  for (const kw of keywords) {
+    if (text.includes(kw)) hits++
+  }
+  return Math.min(1, hits / keywords.length)
+}
+
+/**
+ * Record alignment score for the most recent beat.
+ * Increments consecutiveLowAlignment on a miss; resets to 0 on a hit.
+ */
+export const recordBeatAlignment = (plan: BackstoryArcPlan, score: number): BackstoryArcPlan => {
+  const LOW_THRESHOLD = 0.1
+  const current = plan.consecutiveLowAlignment ?? 0
+  return {
+    ...plan,
+    consecutiveLowAlignment: score < LOW_THRESHOLD ? current + 1 : 0
   }
 }
 

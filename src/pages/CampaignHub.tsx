@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Edit2, Play } from 'lucide-react'
 import './CampaignHub.css'
@@ -9,13 +9,26 @@ type Campaign = {
   createdAt: string
 }
 
+const STORAGE_KEY = 'rollia_campaigns_v1'
+
 const CampaignHub = () => {
   const navigate = useNavigate()
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [campaigns, setCampaigns] = useState<Campaign[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      return saved ? (JSON.parse(saved) as Campaign[]) : []
+    } catch {
+      return []
+    }
+  })
   const [isCreating, setIsCreating] = useState(false)
   const [newCampaignName, setNewCampaignName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(campaigns))
+  }, [campaigns])
 
   const handleCreateCampaign = () => {
     if (newCampaignName.trim()) {

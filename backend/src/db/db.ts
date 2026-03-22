@@ -54,6 +54,15 @@ CREATE TABLE IF NOT EXISTS quests (
   FOREIGN KEY (session_id) REFERENCES sessions(id)
 );
 
+CREATE TABLE IF NOT EXISTS memories (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  role TEXT NOT NULL,
+  content TEXT NOT NULL,
+  embedding TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS npc_relationships (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,

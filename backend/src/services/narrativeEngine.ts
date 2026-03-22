@@ -13,7 +13,7 @@
  * 2. Replace backend/src/services/narrativeEngine.ts with this file
  */
 
-import { generateAIResponse, type PreferredLanguage } from './aiService.js'
+import { generateAIResponse, streamNarrationTokens, type PreferredLanguage } from './aiService.js'
 import { ensureNPCProfileById } from './npcRegistry.js'
 import { narrativeValidator } from './narrativeValidator.js'
 
@@ -442,4 +442,126 @@ export async function runNarrativeEngine(
   }
   syncNpcRegistryFromNarration(fallback)
   return fallback
+}
+
+const DM_SYSTEM = {
+  en: 'You are a Dungeon Master. Create only narrative. Never use meta-language. Use only medieval materials. Characters must have names and personalities. Location MUST match context.',
+  ru: 'Ты — Мастер Подземелий. Создавай только нарратив. Никогда не используй метаязык. Используй только средневековые материалы. Персонажи должны иметь имена и характеры. Локация ДОЛЖНА совпадать с контекстом.'
+}
+
+/**
+ * Streaming variant of runNarrativeEngine.
+ * Calls the primary model with stream=true, detects the "narration" JSON field,
+ * and emits those tokens via onChunk as they arrive.
+ * Returns the full NarrativeResult (parsed at stream-end).
+ * Falls back to the non-streaming engine on parse failure.
+ */
+export async function streamNarrativeEngine(
+  context: NarrativeContext,
+  language: PreferredLanguage = 'en',
+  onChunk: (text: string) => void
+): Promise<NarrativeResult> {
+  const prompt = buildNarrativePrompt(context, language)
+  const userPrompt = `${prompt}\n\n${
+    language === 'ru' ? 'Выведи только JSON на русском (Кириллица).' : 'Output only JSON in English.'
+  }`
+
+  // State machine: detect "narration":"..." field in the streaming JSON
+  let inNarration = false
+  let narrationDone = false
+  let escaped = false
+  let lookAhead = '' // accumulates chars while scanning for the marker
+
+  const MARKERS = ['"narration":"', '"narration": "']
+
+  let fullText = ''
+  try {
+    fullText = await streamNarrationTokens(
+      DM_SYSTEM[language],
+      userPrompt,
+      (delta) => {
+        if (narrationDone) return
+
+        if (!inNarration) {
+          lookAhead += delta
+          let markerIdx = -1
+          let markerLen = 0
+          for (const m of MARKERS) {
+            const idx = lookAhead.indexOf(m)
+            if (idx !== -1) { markerIdx = idx; markerLen = m.length; break }
+          }
+          if (markerIdx !== -1) {
+            inNarration = true
+            // everything after the marker opening quote is narration content
+            delta = lookAhead.slice(markerIdx + markerLen)
+            lookAhead = ''
+          } else {
+            // keep last 50 chars for overlap detection across chunk boundaries
+            if (lookAhead.length > 100) lookAhead = lookAhead.slice(-50)
+            return
+          }
+        }
+
+        // We are inside the narration string — process chars, handle escapes, stop at closing "
+        let emit = ''
+        for (let i = 0; i < delta.length; i++) {
+          const ch = delta[i]
+          if (escaped) {
+            if (ch === 'n') emit += '\n'
+            else if (ch === 't') emit += '\t'
+            else if (ch === '"') emit += '"'
+            else if (ch === '\\') emit += '\\'
+            else emit += ch
+            escaped = false
+          } else if (ch === '\\') {
+            escaped = true
+          } else if (ch === '"') {
+            // closing quote of narration JSON string
+            inNarration = false
+            narrationDone = true
+            break
+          } else {
+            emit += ch
+          }
+        }
+        if (emit) onChunk(emit)
+      }
+    )
+  } catch (err) {
+    console.warn('[streamNarrativeEngine] streaming failed, falling back:', err)
+    return runNarrativeEngine(context, language)
+  }
+
+  const parsed = parseNarrativeResponse(fullText, language)
+  if (parsed) {
+    const syncNpc = (result: NarrativeResult) => {
+      const narration = result.narration || ''
+      const regex = /<npc\s+id="([^"]+)"/gi
+      let match: RegExpExecArray | null
+      while ((match = regex.exec(narration)) !== null) {
+        const npcId = (match[1] || '').trim()
+        if (!npcId) continue
+        ensureNPCProfileById(npcId, context.campaignKey || 'default', {
+          location: result.scene.location || context.sceneState?.location || context.location,
+          contextSnippet: narration.slice(0, 500)
+        })
+      }
+    }
+    syncNpc(parsed)
+    return parsed
+  }
+
+  // Fallback metadata if JSON parse failed (narration was already streamed)
+  return {
+    scene: {
+      location: safeString(context.sceneState?.location || context.location, language === 'ru' ? 'Неизвестная локация' : 'Unknown location'),
+      time: safeString(context.sceneState?.timeOfDay, language === 'ru' ? 'Сейчас' : 'Present')
+    },
+    narration: language === 'ru'
+      ? 'Воздух становится тяжелее. Обстановка меняется.'
+      : 'The air grows heavy. Things are shifting.',
+    choices: language === 'ru'
+      ? ['Осмотреть обстановку', 'Заговорить с кем-то', 'Продвинуться вперёд']
+      : ['Survey the area', 'Speak to someone', 'Push forward']
+  }
 }

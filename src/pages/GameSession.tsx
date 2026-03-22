@@ -12,7 +12,6 @@ import {
 } from 'lucide-react'
 import {
   API_ORIGIN,
-  getDMResponse,
   resetSession,
   generateQuestFromBackstory,
   summarizeScene,
@@ -34,6 +33,9 @@ import {
 } from '../utils/api'
 import './GameSession.css'
 import { useEmberCanvas } from '../hooks/useEmberCanvas'
+import { useStreamingDM, type StreamingMeta } from '../hooks/useStreamingDM'
+import { useAmbientAudio } from '../hooks/useAmbientAudio'
+import { CombatTracker } from '../components/game/CombatTracker'
 import { useI18n } from '../i18n'
 import type { CharacterStats, InventoryItem } from '../types/character'
 
@@ -735,6 +737,7 @@ const GameSession = () => {
   const [activeSidebar, setActiveSidebar] = useState<SidebarSection>('stats')
   const [activeLoadoutTab, setActiveLoadoutTab] = useState<LoadoutTab>('inventory')
   const [isLoading, setIsLoading] = useState(false)
+  const [audioMuted, setAudioMuted] = useState(false)
   const [typingFrame, setTypingFrame] = useState(0)
   const [, setCharacterColors] = useState<Record<string, string>>({})
   const [npcRegistryById, setNpcRegistryById] = useState<Record<string, NPCRegistryEntry>>({})
@@ -767,6 +770,8 @@ const GameSession = () => {
   const battleUiEnabled = false
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fogCanvasRef = useEmberCanvas({ count: 55, spawnYFactor: 0.95 })
+  const { streamDMResponse } = useStreamingDM()
+  const { updateAmbience, toggleMute } = useAmbientAudio()
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const questInitRef = useRef(false)
   const backstorySummaryAttemptedRef = useRef(false)
@@ -2093,75 +2098,6 @@ const GameSession = () => {
     []
   )
 
-  const handleDMResponseOutput = useCallback(
-    (dmResponse: DMResponse) => {
-      if (dmResponse.npcRegistry?.length) {
-        const registryMap = dmResponse.npcRegistry.reduce<Record<string, NPCRegistryEntry>>(
-          (acc, entry) => {
-            const key = canonicalNpcId(entry.id, entry.name)
-            if (!acc[key]) {
-              acc[key] = { ...entry, id: key }
-            }
-            return acc
-          },
-          {}
-        )
-        setNpcRegistryById(registryMap)
-      }
-      if (dmResponse.npcPalette?.length) {
-        const paletteMap = dmResponse.npcPalette.reduce<Record<string, NPCPaletteEntry>>(
-          (acc, entry) => {
-            acc[entry.id] = entry
-            return acc
-          },
-          {}
-        )
-        setNpcPaletteById(paletteMap)
-        setNpcPaletteList(dmResponse.npcPalette)
-      }
-
-      const rawNarration = dmResponse.response || dmResponse.narrative || ''
-      const cleanedContent = stripNumberedParagraphs(
-        stripStructuredTags(rawNarration)
-      )
-      const { header: extractedHeader, body } = extractSceneHeader(cleanedContent)
-      const sceneHeaderFromMeta =
-        dmResponse.scene?.location && dmResponse.scene?.time
-          ? `${dmResponse.scene.location} · ${dmResponse.scene.time}`
-          : dmResponse.scene?.location
-            ? dmResponse.scene.location
-            : ''
-      const finalHeader = sceneHeaderFromMeta || extractedHeader
-      if (finalHeader) {
-        lastSceneHeaderRef.current = finalHeader
-        setCurrentLocation(finalHeader.split('·')[0].trim())
-        setCurrentTime((finalHeader.split('·')[1] || '').trim())
-      }
-
-      if (body) {
-        const dmMessage: Message = {
-          id: createMessageId(),
-          type: 'dm',
-          content: body,
-          sceneHeader: finalHeader || undefined,
-          timestamp: new Date(),
-          diceRoll: dmResponse.diceRolls?.[0]
-        }
-        setMessages(prev => [...prev, dmMessage])
-      }
-
-      const skillCheck = extractSkillCheckRequest(dmResponse)
-      if (skillCheck && lastPlayerMessageIdRef.current) {
-        const messageId = lastPlayerMessageIdRef.current
-        if (skillCheck.pendingCheckId) {
-          pendingCheckByMessageRef.current.set(messageId, skillCheck.pendingCheckId)
-        }
-        startInlineRollRef.current?.(messageId, skillCheck.request)
-      }
-    },
-    [extractSkillCheckRequest, stripStructuredTags]
-  )
-
   const buildStatusStateInput = useCallback(
     (): StatusStateInput => ({
       active_statuses: statusEffects
@@ -2230,6 +2166,85 @@ const GameSession = () => {
     [applyStatusUpdate, buildStatusStateInput, language]
   )
 
+  // Applies streaming 'done' event metadata to an existing placeholder DM message
+  const applyStreamingDone = useCallback(
+    (meta: StreamingMeta, dmMsgId: string, historyWithAction: ChatMessage[]) => {
+      if (meta.npcRegistry?.length) {
+        const registryMap = meta.npcRegistry.reduce<Record<string, NPCRegistryEntry>>((acc, entry) => {
+          const key = canonicalNpcId(entry.id, entry.name)
+          if (!acc[key]) acc[key] = { ...entry, id: key, dialogueColorId: entry.dialogueColorId ?? '' }
+          return acc
+        }, {})
+        setNpcRegistryById(registryMap)
+      }
+      if (meta.npcPalette?.length) {
+        const paletteMap = meta.npcPalette.reduce<Record<string, NPCPaletteEntry>>((acc, entry) => {
+          acc[entry.id] = entry
+          return acc
+        }, {})
+        setNpcPaletteById(paletteMap)
+        setNpcPaletteList(meta.npcPalette)
+      }
+      setMessages(prev => prev.map(m => {
+        if (m.id !== dmMsgId) return m
+        const cleaned = stripNumberedParagraphs(stripStructuredTags(m.content))
+        const { header: extractedHeader, body } = extractSceneHeader(cleaned)
+        const sceneHeaderFromMeta =
+          meta.scene?.location && meta.scene?.time
+            ? `${meta.scene.location} · ${meta.scene.time}`
+            : meta.scene?.location || ''
+        const finalHeader = sceneHeaderFromMeta || extractedHeader
+        if (finalHeader) {
+          lastSceneHeaderRef.current = finalHeader
+          setCurrentLocation(finalHeader.split('·')[0].trim())
+          setCurrentTime((finalHeader.split('·')[1] || '').trim())
+        }
+        return { ...m, content: body || cleaned || m.content, sceneHeader: finalHeader || undefined }
+      }))
+      const updatedHistory: ChatMessage[] = [
+        ...historyWithAction,
+        { role: 'assistant', content: meta.narration || '' }
+      ]
+      setChatHistory(updatedHistory)
+      void maybeSummarizeHistory(updatedHistory)
+      void maybeUpdateStatusEffects(updatedHistory)
+      clearSystemNotices()
+      // Update ambient audio based on new scene
+      updateAmbience(
+        meta.scene?.location || lastSceneHeaderRef.current || '',
+        meta.narration || ''
+      )
+      const fakeResponse = { pending_check: meta.pending_check, checkRequest: meta.checkRequest } as DMResponse
+      const skillCheck = extractSkillCheckRequest(fakeResponse)
+      if (skillCheck && lastPlayerMessageIdRef.current) {
+        const msgId = lastPlayerMessageIdRef.current
+        if (skillCheck.pendingCheckId) pendingCheckByMessageRef.current.set(msgId, skillCheck.pendingCheckId)
+        startInlineRollRef.current?.(msgId, skillCheck.request)
+      }
+    },
+    [extractSkillCheckRequest, stripStructuredTags, maybeSummarizeHistory, maybeUpdateStatusEffects, clearSystemNotices]
+  )
+
+  // Handles streaming 'pending' event (check needed before narrative)
+  const applyStreamingPending = useCallback(
+    (_pendingCheck: any, checkRequest: any, dmMsgId: string) => {
+      setMessages(prev => prev.filter(m => m.id !== dmMsgId))
+      if (checkRequest && lastPlayerMessageIdRef.current) {
+        const msgId = lastPlayerMessageIdRef.current
+        if (checkRequest.id) pendingCheckByMessageRef.current.set(msgId, checkRequest.id)
+        const dcNum = Number(checkRequest.difficulty)
+        const request: SkillCheckRequest = {
+          stat: (checkRequest.stat || 'STR').toUpperCase() as Stat,
+          label: checkRequest.context || t('gameSession.check'),
+          dc: Number.isFinite(dcNum) ? dcNum : undefined,
+          kind: checkRequest.type
+        }
+        startInlineRollRef.current?.(msgId, request)
+      }
+    },
+    [t]
+  )
+
   useEffect(() => {
     if (!campaignId || !characterProfile || openingGeneratedRef.current) {
       return
@@ -2243,33 +2258,40 @@ const GameSession = () => {
       'Follow the DM output format exactly: Dungeon Master line, scene header line, then three unnumbered paragraphs. ' +
       'No bullets, no questions, no meta.'
 
-    getDMResponse(
-      openingPrompt,
+    const dmMsgId = createMessageId()
+    setMessages(prev => [...prev, { id: dmMsgId, type: 'dm', content: '', timestamp: new Date(), roll: { status: 'idle' } }])
+
+    streamDMResponse(
       {
-        name: characterProfile?.name,
-        class: characterProfile?.class,
-        appearance: characterProfile?.appearance,
-        backstory: characterProfile?.backstory,
-        backstorySummary: characterProfile?.backstorySummary,
-        stats,
-        quests
+        playerAction: openingPrompt,
+        characterInfo: {
+          name: characterProfile?.name,
+          class: characterProfile?.class,
+          appearance: characterProfile?.appearance,
+          backstory: characterProfile?.backstory,
+          backstorySummary: characterProfile?.backstorySummary,
+          stats,
+          quests
+        },
+        gameContext: buildGameContext(),
+        history: [],
+        campaignId,
+        playerSnapshot: { hp: resources.hp, mp: resources.mp },
+        language,
+        worldState: null, npcState: null, sceneParticipants: [], selectedTarget: null
       },
-      buildGameContext(),
-      [],
-      { campaignId, playerSnapshot: { hp: resources.hp, mp: resources.mp }, language, worldState: undefined, npcState: undefined, sceneParticipants: [], selectedTarget: null }
+      (chunk) => {
+        setMessages(prev => prev.map(m =>
+          m.id === dmMsgId ? { ...m, content: m.content + chunk } : m
+        ))
+      },
+      (meta) => applyStreamingDone(meta, dmMsgId, []),
+      (_pc, _cr) => { setMessages(prev => prev.filter(m => m.id !== dmMsgId)) }
     )
-      .then(dmResponse => {
-        const updatedHistory: ChatMessage[] = [{ role: 'assistant', content: dmResponse.response }]
-        setChatHistory(updatedHistory)
-        void maybeSummarizeHistory(updatedHistory)
-        void maybeUpdateStatusEffects(updatedHistory)
-        clearSystemNotices()
-        handleDMResponseOutput(dmResponse)
-      })
       .catch(error => {
         openingGeneratedRef.current = false
         console.error('Failed to generate opening scene:', error)
-        console.error('Opening scene error details:', JSON.stringify(error))
+        setMessages(prev => prev.filter(m => m.id !== dmMsgId))
         pushSystemMessage(error?.message || t('gameSession.error.openingScene'))
       })
       .finally(() => {
@@ -2279,16 +2301,16 @@ const GameSession = () => {
     buildGameContext,
     campaignId,
     characterProfile,
-    clearSystemNotices,
-    handleDMResponseOutput,
-    maybeSummarizeHistory,
+    applyStreamingDone,
+    streamDMResponse,
     pushSystemMessage,
     quests,
     resources.hp,
     resources.mp,
     stats,
     language,
-    openingSeed
+    openingSeed,
+    t
   ])
 
   const continueStoryAfterRoll = useCallback(
@@ -2317,20 +2339,25 @@ const GameSession = () => {
         ]
         setChatHistory(historyWithRoll)
 
-        const dmResponse = await getDMResponse(
-          followUp,
+        pendingCheckByMessageRef.current.delete(payload.messageId)
+
+        const dmMsgId = createMessageId()
+        setMessages(prev => [...prev, { id: dmMsgId, type: 'dm', content: '', timestamp: new Date(), roll: { status: 'idle' } }])
+
+        await streamDMResponse(
           {
-            name: characterProfile?.name,
-            class: characterProfile?.class,
-            appearance: characterProfile?.appearance,
-            backstory: characterProfile?.backstory,
-            backstorySummary: characterProfile?.backstorySummary,
-            stats,
-            quests
-          },
-          buildGameContext(),
-          historyWithRoll,
-          {
+            playerAction: followUp,
+            characterInfo: {
+              name: characterProfile?.name,
+              class: characterProfile?.class,
+              appearance: characterProfile?.appearance,
+              backstory: characterProfile?.backstory,
+              backstorySummary: characterProfile?.backstorySummary,
+              stats,
+              quests
+            },
+            gameContext: buildGameContext(),
+            history: historyWithRoll,
             campaignId,
             rollResult: {
               total: payload.total,
@@ -2344,27 +2371,16 @@ const GameSession = () => {
             pendingCheckId,
             playerSnapshot: { hp: resources.hp, mp: resources.mp },
             language,
-            worldState: undefined,
-            npcState: undefined,
-            sceneParticipants: [],
-            selectedTarget: null
-          }
+            worldState: null, npcState: null, sceneParticipants: [], selectedTarget: null
+          },
+          (chunk) => {
+            setMessages(prev => prev.map(m =>
+              m.id === dmMsgId ? { ...m, content: m.content + chunk } : m
+            ))
+          },
+          (meta) => applyStreamingDone(meta, dmMsgId, historyWithRoll),
+          (pc, cr) => applyStreamingPending(pc, cr, dmMsgId)
         )
-
-        pendingCheckByMessageRef.current.delete(payload.messageId)
-
-        const updatedHistory: ChatMessage[] = [
-          ...historyWithRoll,
-          {
-            role: 'assistant',
-            content: dmResponse.response
-          }
-        ]
-        setChatHistory(updatedHistory)
-        void maybeSummarizeHistory(updatedHistory)
-        void maybeUpdateStatusEffects(updatedHistory)
-        clearSystemNotices()
-        handleDMResponseOutput(dmResponse)
       } catch (error: any) {
         console.error('Failed to continue story after roll:', error)
         pushSystemMessage(error?.message || t('gameSession.error.dmHesitates'))
@@ -2376,17 +2392,18 @@ const GameSession = () => {
       buildGameContext,
       characterProfile,
       chatHistory,
-      clearSystemNotices,
-      handleDMResponseOutput,
-      maybeSummarizeHistory,
-      maybeUpdateStatusEffects,
+      applyStreamingDone,
+      applyStreamingPending,
+      streamDMResponse,
       pushSystemMessage,
       quests,
       resources.hp,
       resources.mp,
       stats,
       tickCooldowns,
-      language
+      language,
+      campaignId,
+      t
     ]
   )
 
@@ -2770,17 +2787,9 @@ const GameSession = () => {
 
   const handleSendMessage = useCallback(
     async (event?: React.FormEvent) => {
-      console.log('handleSendMessage called', { inputValue, characterProfile: !!characterProfile, campaignId })
       event?.preventDefault()
       const trimmedInput = inputValue.trim()
-      if (!trimmedInput) {
-        console.log('early return: empty input')
-        return
-      }
-      if (isLoading) {
-        console.log('early return: isLoading')
-        return
-      }
+      if (!trimmedInput || isLoading) return
       tickCooldowns()
 
       lastPlayerActionRef.current = trimmedInput
@@ -2793,50 +2802,50 @@ const GameSession = () => {
         timestamp: new Date(),
         roll: { status: 'idle' }
       }
-
       lastPlayerMessageIdRef.current = playerMessage.id
       setMessages(prev => [...prev, playerMessage])
       setIsLoading(true)
 
+      const historyWithPlayer: ChatMessage[] = [
+        ...chatHistory,
+        { role: 'user', content: trimmedInput }
+      ]
+      setChatHistory(historyWithPlayer)
+
+      const dmMsgId = createMessageId()
+      setMessages(prev => [...prev, { id: dmMsgId, type: 'dm', content: '', timestamp: new Date(), roll: { status: 'idle' } }])
+
       try {
-        const historyWithPlayer: ChatMessage[] = [
-          ...chatHistory,
-          { role: 'user', content: trimmedInput }
-        ]
-        setChatHistory(historyWithPlayer)
-
-        const dmResponse = await getDMResponse(
-          trimmedInput,
+        await streamDMResponse(
           {
-            name: characterProfile?.name,
-            class: characterProfile?.class,
-            appearance: characterProfile?.appearance,
-            backstory: characterProfile?.backstory,
-            backstorySummary: characterProfile?.backstorySummary,
-            stats,
-            quests
+            playerAction: trimmedInput,
+            characterInfo: {
+              name: characterProfile?.name,
+              class: characterProfile?.class,
+              appearance: characterProfile?.appearance,
+              backstory: characterProfile?.backstory,
+              backstorySummary: characterProfile?.backstorySummary,
+              stats,
+              quests
+            },
+            gameContext: buildGameContext(),
+            history: historyWithPlayer,
+            campaignId,
+            playerSnapshot: { hp: resources.hp, mp: resources.mp },
+            language,
+            worldState: null, npcState: null, sceneParticipants: [], selectedTarget: null
           },
-          buildGameContext(),
-          historyWithPlayer,
-          { campaignId, playerSnapshot: { hp: resources.hp, mp: resources.mp }, language, worldState: undefined, npcState: undefined, sceneParticipants: [], selectedTarget: null }
+          (chunk) => {
+            setMessages(prev => prev.map(m =>
+              m.id === dmMsgId ? { ...m, content: m.content + chunk } : m
+            ))
+          },
+          (meta) => applyStreamingDone(meta, dmMsgId, historyWithPlayer),
+          (pc, cr) => applyStreamingPending(pc, cr, dmMsgId)
         )
-
-        const updatedHistory: ChatMessage[] = [
-          ...historyWithPlayer,
-          { role: 'assistant', content: dmResponse.response }
-        ]
-        setChatHistory(updatedHistory)
-        void maybeSummarizeHistory(updatedHistory)
-        void maybeUpdateStatusEffects(updatedHistory)
-        clearSystemNotices()
-        handleDMResponseOutput(dmResponse)
       } catch (error: any) {
         console.error('handleSendMessage error:', error)
-        console.error('handleSendMessage error details:', {
-          message: error?.message,
-          status: error?.status,
-          stack: error?.stack,
-        })
+        setMessages(prev => prev.filter(m => m.id !== dmMsgId))
         pushSystemMessage(error?.message || t('gameSession.error.weaveSilent'))
       } finally {
         setIsLoading(false)
@@ -2849,16 +2858,17 @@ const GameSession = () => {
       stats,
       quests,
       buildGameContext,
-      handleDMResponseOutput,
+      applyStreamingDone,
+      applyStreamingPending,
       chatHistory,
-      maybeSummarizeHistory,
-      maybeUpdateStatusEffects,
-      clearSystemNotices,
+      streamDMResponse,
       pushSystemMessage,
       tickCooldowns,
       resources.hp,
       resources.mp,
-      language
+      language,
+      campaignId,
+      t
     ]
   )
 
@@ -3515,6 +3525,14 @@ const GameSession = () => {
             </button>
           ))}
           <div style={{ width: 1, height: 18, background: 'var(--g-border)' }} />
+          <button
+            onClick={() => { const m = toggleMute(); setAudioMuted(m) }}
+            title={audioMuted ? 'Unmute ambience' : 'Mute ambience'}
+            style={{ fontFamily: 'var(--g-font-title)', fontSize: 14, border: '1px solid var(--g-border)', color: audioMuted ? 'rgba(168,28,48,0.6)' : 'var(--g-parch-faint)', background: 'transparent', padding: '4px 10px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))', transition: 'all 0.2s', lineHeight: 1 }}
+          >
+            {audioMuted ? '🔇' : '🔊'}
+          </button>
+          <div style={{ width: 1, height: 18, background: 'var(--g-border)' }} />
           <button style={{ fontFamily: 'var(--g-font-title)', fontSize: 13, letterSpacing: '0.08em', textTransform: 'uppercase', border: '1px solid var(--g-border)', color: 'var(--g-parch-faint)', background: 'transparent', padding: '5px 13px', cursor: 'pointer', clipPath: 'polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,4px 100%,0 calc(100% - 4px))', transition: 'all 0.2s' }}
             onClick={() => void handleResetCampaignText()} disabled={isLoading}
           >
@@ -3626,6 +3644,14 @@ const GameSession = () => {
           )}
 
         </div>
+
+        {/* Combat Tracker */}
+        {battleState && battleState.phase !== 'ended' && (
+          <div style={{ padding: '0 14px 14px', flexShrink: 0 }}>
+            <CombatTracker combatState={battleState} />
+          </div>
+        )}
+
       </aside>
 
       {/* ════════════════════════════════════

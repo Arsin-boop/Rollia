@@ -387,6 +387,72 @@ export async function generateAIResponse(options: AIPromptOptions): Promise<stri
   }
 }
 
+/**
+ * Stream narration tokens from the primary model.
+ * Filters out <think>…</think> blocks emitted by qwen3.
+ * Yields each text chunk via the onChunk callback.
+ * Returns the full accumulated text when done.
+ */
+export async function streamNarrationTokens(
+  systemPrompt: string,
+  userPrompt: string,
+  onChunk: (text: string) => void,
+  maxTokens = 900
+): Promise<string> {
+  if (!primaryClient) throw new Error('Groq client is not configured')
+
+  const isThinkingModel = /qwen.?3|llama-4/i.test(configuredModel)
+
+  const stream = await primaryClient.chat.completions.create({
+    model: configuredModel,
+    temperature: isThinkingModel ? 1 : 0.3,
+    max_tokens: maxTokens,
+    stream: true,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ]
+  })
+
+  let full = ''
+  let insideThink = false
+  let thinkBuffer = ''
+
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta?.content ?? ''
+    if (!delta) continue
+
+    thinkBuffer += delta
+
+    if (!insideThink && thinkBuffer.includes('<think>')) {
+      insideThink = true
+    }
+    if (insideThink) {
+      if (thinkBuffer.includes('</think>')) {
+        insideThink = false
+        thinkBuffer = thinkBuffer.split('</think>').slice(1).join('</think>')
+      } else {
+        // still inside think block, keep buffering
+        continue
+      }
+    }
+
+    if (thinkBuffer && !thinkBuffer.includes('<think>')) {
+      full += thinkBuffer
+      onChunk(thinkBuffer)
+      thinkBuffer = ''
+    }
+  }
+
+  // flush any remaining non-think content
+  if (thinkBuffer && !insideThink) {
+    full += thinkBuffer
+    onChunk(thinkBuffer)
+  }
+
+  return full
+}
+
 export async function generateCustomClass(description: string, language: PreferredLanguage = 'en'): Promise<{
   className: string
   stats: {
