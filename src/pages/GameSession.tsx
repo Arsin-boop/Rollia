@@ -283,8 +283,15 @@ The Gilded Griffin · Taproom · Morning
 
 */
 
-// Map verbose time strings to short labels
+// Map verbose time strings (EN + RU) to short labels
 const SHORT_TIME_MAP: Array<[RegExp, string]> = [
+  [/рассвет|восход|первый\s*свет/i, 'Рассвет'],
+  [/утр/i, 'Утро'],
+  [/полдень|полуден/i, 'Полдень'],
+  [/день|днём|дневн/i, 'День'],
+  [/закат|сумерк|вечерн.*свет/i, 'Закат'],
+  [/вечер/i, 'Вечер'],
+  [/ночь|ночн|полночь|полуноч/i, 'Ночь'],
   [/dawn|sunrise|first\s*light|early\s*morn/i, 'Dawn'],
   [/morn/i, 'Morning'],
   [/noon|midday|mid-?day/i, 'Noon'],
@@ -297,8 +304,12 @@ const shortenTime = (time: string): string => {
   for (const [pattern, label] of SHORT_TIME_MAP) {
     if (pattern.test(time)) return label
   }
-  return time.trim().split(/\s+/).slice(0, 2).join(' ')
+  return time.trim().split(/\s+/)[0] ?? time
 }
+
+// Returns true if a location string looks like a system ID rather than a real place
+const isSystemId = (loc: string) =>
+  /^campaign\s*[:：]/i.test(loc) || /^\d{6,}$/.test(loc.trim())
 
 const extractSceneHeader = (content: string) => {
   if (!content) {
@@ -3818,9 +3829,11 @@ const GameSession = () => {
                     const parts = message.sceneHeader.split('·')
                     const loc = parts[0].trim()
                     const time = parts[1] ? shortenTime(parts[1].trim()) : ''
+                    if (isSystemId(loc) && !time) return null
+                    const displayLoc = isSystemId(loc) ? '' : loc
                     return (
                       <div style={{ fontFamily: 'var(--g-font-title)', fontSize: 9, letterSpacing: '0.2em', color: 'var(--g-gold-dim)', textTransform: 'uppercase', marginBottom: 8, opacity: 0.7 }}>
-                        {loc}{time ? ` · ${time}` : ''}
+                        {displayLoc}{displayLoc && time ? ' · ' : ''}{time}
                       </div>
                     )
                   })()}
