@@ -1,2 +1,2 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "npm-9_x", "openssl"]
+nixPkgs = ["nodejs_20", "npm-9_x", "openssl", "python3", "pkg-config", "gnumake", "gcc"]
