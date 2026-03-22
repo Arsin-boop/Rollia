@@ -283,6 +283,23 @@ The Gilded Griffin · Taproom · Morning
 
 */
 
+// Map verbose time strings to short labels
+const SHORT_TIME_MAP: Array<[RegExp, string]> = [
+  [/dawn|sunrise|first\s*light|early\s*morn/i, 'Dawn'],
+  [/morn/i, 'Morning'],
+  [/noon|midday|mid-?day/i, 'Noon'],
+  [/after/i, 'Afternoon'],
+  [/dusk|sunset|twilight|gloaming/i, 'Dusk'],
+  [/even/i, 'Evening'],
+  [/night|midnight|witching|dark\s*hour/i, 'Night'],
+]
+const shortenTime = (time: string): string => {
+  for (const [pattern, label] of SHORT_TIME_MAP) {
+    if (pattern.test(time)) return label
+  }
+  return time.trim().split(/\s+/).slice(0, 2).join(' ')
+}
+
 const extractSceneHeader = (content: string) => {
   if (!content) {
     return { header: '', body: '' }
@@ -3797,11 +3814,16 @@ const GameSession = () => {
                   animationFillMode: 'forwards',
                 }}>
                   <div style={{ position: 'absolute', top: 12, left: -10, color: 'var(--g-blood2)', fontSize: 13, background: 'rgba(5,3,8,0.95)', lineHeight: 1 }}>❧</div>
-                  {message.sceneHeader && (
-                    <div style={{ fontFamily: 'var(--g-font-title)', fontSize: 9, letterSpacing: '0.2em', color: 'var(--g-gold-dim)', textTransform: 'uppercase', marginBottom: 8, opacity: 0.7 }}>
-                      {message.sceneHeader}
-                    </div>
-                  )}
+                  {message.sceneHeader && (() => {
+                    const parts = message.sceneHeader.split('·')
+                    const loc = parts[0].trim()
+                    const time = parts[1] ? shortenTime(parts[1].trim()) : ''
+                    return (
+                      <div style={{ fontFamily: 'var(--g-font-title)', fontSize: 9, letterSpacing: '0.2em', color: 'var(--g-gold-dim)', textTransform: 'uppercase', marginBottom: 8, opacity: 0.7 }}>
+                        {loc}{time ? ` · ${time}` : ''}
+                      </div>
+                    )
+                  })()}
                   <div style={{ fontFamily: 'var(--g-font-body)', fontSize: 18, lineHeight: 1.78, color: 'var(--g-parch)', fontStyle: 'italic' }}>
                     {renderMessageContent(message.content)}
                   </div>
