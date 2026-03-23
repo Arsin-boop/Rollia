@@ -379,17 +379,19 @@ export async function runNarrativeEngine(
 
   const prompt = buildNarrativePrompt(context, language)
 
+  console.log(`[runNarrativeEngine] system prompt length: ${prompt.length} chars (~${Math.round(prompt.length / 3.5)} tokens)`)
+
   const callModel = async (extraInstruction?: string): Promise<string> =>
     await generateAIResponse({
       systemPrompt: language === 'ru'
-        ? 'Ты — Мастер Подземелий. Создавай только нарратив. Никогда не используй метаязык. Используй только средневековые материалы. Персонажи должны иметь имена и характеры. Локация ДОЛЖНА совпадать с контекстом.'
-        : 'You are a Dungeon Master. Create only narrative. Never use meta-language. Use only medieval materials. Characters must have names and personalities. Location MUST match context.',
+        ? 'Ты — Мастер Подземелий. Создавай только нарратив. Никогда не используй метаязык. Персонажи должны иметь имена и характеры. Локация ДОЛЖНА совпадать с контекстом.'
+        : 'You are a Dungeon Master. Create only narrative. Never use meta-language. Characters must have names and personalities. Location MUST match context.',
       userPrompt:
         extraInstruction
           ? `${prompt}\n\n${language === 'ru' ? 'Выведи только JSON на русском (Кириллица).' : 'Output only JSON in English.'}\n\n${extraInstruction}`
           : `${prompt}\n\n${language === 'ru' ? 'Выведи только JSON на русском (Кириллица).' : 'Output only JSON in English.'}`,
       temperature: 0.3,
-      maxTokens: 900,
+      maxTokens: 1600,
       taskType: 'DM_NARRATION'
     })
 
@@ -437,8 +439,8 @@ export async function runNarrativeEngine(
 }
 
 const DM_SYSTEM = {
-  en: 'You are a Dungeon Master. Create only narrative. Never use meta-language. Use only medieval materials. Characters must have names and personalities. Location MUST match context.',
-  ru: 'Ты — Мастер Подземелий. Создавай только нарратив. Никогда не используй метаязык. Используй только средневековые материалы. Персонажи должны иметь имена и характеры. Локация ДОЛЖНА совпадать с контекстом.'
+  en: 'You are a Dungeon Master. Create only narrative. Never use meta-language. Characters must have names and personalities. Location MUST match context.',
+  ru: 'Ты — Мастер Подземелий. Создавай только нарратив. Никогда не используй метаязык. Персонажи должны иметь имена и характеры. Локация ДОЛЖНА совпадать с контекстом.'
 }
 
 /**
@@ -457,6 +459,7 @@ export async function streamNarrativeEngine(
   const userPrompt = `${prompt}\n\n${
     language === 'ru' ? 'Выведи только JSON на русском (Кириллица).' : 'Output only JSON in English.'
   }`
+  console.log(`[streamNarrativeEngine] userPrompt length: ${userPrompt.length} chars (~${Math.round(userPrompt.length / 3.5)} tokens), maxTokens: 1600`)
 
   // State machine: detect "narration":"..." field in the streaming JSON
   let inNarration = false
@@ -473,6 +476,7 @@ export async function streamNarrativeEngine(
       userPrompt,
       (delta) => {
         if (narrationDone) return
+
 
         if (!inNarration) {
           lookAhead += delta
@@ -517,7 +521,8 @@ export async function streamNarrativeEngine(
           }
         }
         if (emit) onChunk(emit)
-      }
+      },
+      1600
     )
   } catch (err) {
     console.warn('[streamNarrativeEngine] streaming failed, falling back:', err)
